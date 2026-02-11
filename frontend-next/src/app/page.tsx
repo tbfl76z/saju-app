@@ -8,7 +8,7 @@ import { AnalysisTable } from "@/components/AnalysisTable";
 import { LuckSection } from "@/components/LuckSection";
 import { Button } from "@/components/ui/button";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);

@@ -14,7 +14,7 @@
    git add .
    git commit -m "Initial commit: Saju App with FastAPI and Next.js"
    git branch -M main
-   git remote add origin https://github.com/사용자아이디/saju-app.git
+   git remote add origin https://github.com/tbfl76z/saju-app.git
    # 만약 "error: remote origin already exists" 에러가 발생하면 아래 명령어를 실행하세요:
    # git remote set-url origin https://github.com/사용자아이디/saju-app.git
    git push -u origin main
@@ -48,9 +48,14 @@ FastAPI와 같은 파이썬 백엔드는 **Render**나 **Railway**가 무료 티
 3. **설정값 입력**:
    - **Root Directory**: `frontend-next`
    - **Framework Preset**: `Next.js`
-4. **코드 수정 (중요!)**:
-   - `frontend-next/src/app/page.tsx` 파일의 `API_BASE`를 **위에서 받은 백엔드 URL**로 수정해야 합니다.
-   - 혹은 Vercel 환경 설정에서 `NEXT_PUBLIC_API_URL`을 설정하고 코드가 이를 참조하도록 수정하는 것이 좋습니다.
+4. **환경 변수 설정 (중요!)**:
+   - Vercel의 프로젝트 설정 화면에서 **Environment Variables** 메뉴를 찾습니다.
+   - **Key**: `NEXT_PUBLIC_API_URL`
+   - **Value**: `https://saju-backend.onrender.com` (사용자님의 백엔드 주소)
+   - **Add**를 누른 후 **Deploy**를 진행합니다.
+
+> [!TIP]
+> 제가 이미 코드를 `process.env.NEXT_PUBLIC_API_URL`을 사용하도록 수정해 두었기 때문에, 깃허브에서 코드를 직접 고칠 필요 없이 Vercel 대시보드 설정만으로 충분합니다!
 
 ---
 

@@ -22,8 +22,8 @@ calc = SajuCalculator()  # Initialize calculator once
 # Enable CORS for Next.js
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this for production
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Set to False to avoid conflicts with "*" when using credentials
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -274,4 +274,5 @@ async def analyze(req: AnalysisRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    port = int(os.getenv("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)
