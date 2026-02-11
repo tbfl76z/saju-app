@@ -15,6 +15,8 @@
    git commit -m "Initial commit: Saju App with FastAPI and Next.js"
    git branch -M main
    git remote add origin https://github.com/사용자아이디/saju-app.git
+   # 만약 "error: remote origin already exists" 에러가 발생하면 아래 명령어를 실행하세요:
+   # git remote set-url origin https://github.com/사용자아이디/saju-app.git
    git push -u origin main
    ```
    > [!IMPORTANT]
