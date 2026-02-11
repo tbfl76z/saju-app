@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 명리학 - 사주 풀이 서비스</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif KR', serif;
+            background-color: #1a1a1a;
+            color: #d4af37;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: #262626;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #d4af37;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            letter-spacing: 5px;
+            color: #d4af37;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        input[type="text"], input[type="date"], input[type="time"], select {
+            width: 100%;
+            padding: 12px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: #fff;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #d4af37;
+            color: #1a1a1a;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background: #f1c40f;
+            transform: translateY(-2px);
+        }
+
+        #result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #333;
+            border-radius: 5px;
+            display: none;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            text-align: center;
+            display: none;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(212, 175, 55, 0.3);
+            border-top: 4px solid #d4af37;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>명리(命理)</h1>
+        <div class="form-group">
+            <label for="name">이름</label>
+            <input type="text" id="name" placeholder="성함을 입력하세요">
+        </div>
+        <div class="form-group">
+            <label for="birth_date">생년월일</label>
+            <input type="date" id="birth_date">
+        </div>
+        <div class="form-group">
+            <label for="birth_time">태어난 시(선택)</label>
+            <input type="time" id="birth_time">
+        </div>
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="is_lunar">
+            <label for="is_lunar">음력으로 계산</label>
+        </div>
+        <button onclick="analyzeSaju()">운세 풀이 시작</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>천기(天氣)를 살피고 있습니다...</p>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function analyzeSaju() {
+            const name = document.getElementById('name').value;
+            const birthDate = document.getElementById('birth_date').value;
+            const birthTime = document.getElementById('birth_time').value;
+            const isLunar = document.getElementById('is_lunar').checked;
+
+            if (!name || !birthDate) {
+                alert('이름과 생년월일을 입력해 주세요.');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        birth_date: birthDate,
+                        birth_time: birthTime,
+                        is_lunar: isLunar
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.result) {
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerText = data.result;
+                } else {
+                    alert('에러 발생: ' + data.error);
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                alert('서버와 통신 중 오류가 발생했습니다.');
+            }
+        }
+    </script>
+</body>
+</html>

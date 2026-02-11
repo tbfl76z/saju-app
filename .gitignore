@@ -1,0 +1,28 @@
+# Node.js
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# Next.js
+.next/
+.env*.local
+
+# Data (Sensitive or generated)
+knowledge_base.txt
+*.pdf
+!data/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db

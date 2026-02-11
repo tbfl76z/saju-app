@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>사주 계산기</title>
+  <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+  </style>
+</head>
+<body class="bg-dark text-white">
+  <div class="container py-5">
+    <h1 class="mb-4">사주팔자 만세력 계산기</h1>
+    <div class="card bg-dark border-secondary mb-4">
+      <div class="card-body">
+        <form id="sajuForm" class="row g-3">
+          <!-- 1) 연도 -->
+          <div class="col-md-4">
+            <label class="form-label">연도:</label>
+            <input type="number" id="y" class="form-control" value="1983" min="1900" max="2100" required>
+          </div>
+          <!-- 2) 월 -->
+          <div class="col-md-2">
+            <label class="form-label">월:</label>
+            <input type="number" id="m" class="form-control" value="12" min="1" max="12" required>
+          </div>
+          <!-- 3) 일 -->
+          <div class="col-md-2">
+            <label class="form-label">일:</label>
+            <input type="number" id="d" class="form-control" value="25" min="1" max="31" required>
+          </div>
+          <!-- 4) 시 -->
+          <div class="col-md-2">
+            <label class="form-label">시 (0~23):</label>
+            <input type="number" id="hh" class="form-control" value="0" min="0" max="23">
+          </div>
+          <!-- 5) 분 -->
+          <div class="col-md-2">
+            <label class="form-label">분 (0~59):</label>
+            <input type="number" id="mm" class="form-control" value="0" min="0" max="59">
+          </div>
+          <!-- 6) 달력 선택 -->
+          <div class="col-md-6">
+            <label class="form-label">달력:</label>
+            <select id="calendar" class="form-select">
+              <option value="solar">양력</option>
+              <option value="lunar">음력</option>
+            </select>
+          </div>
+          <!-- 7) 윤달 체크박스 -->
+          <div class="col-md-3">
+            <div class="form-check mt-4">
+              <input type="checkbox" id="leap" class="form-check-input" disabled>
+              <label class="form-check-label" for="leap">윤달</label>
+            </div>
+          </div>
+          <!-- 8) 성별 라디오 버튼 -->
+          <div class="col-md-3">
+            <label class="form-label">성별:</label>
+            <div>
+              <div class="form-check form-check-inline">
+                <input type="radio" id="gender-male" name="gender" value="남" class="form-check-input">
+                <label class="form-check-label" for="gender-male">남자</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input type="radio" id="gender-female" name="gender" value="여" class="form-check-input" checked>
+                <label class="form-check-label" for="gender-female">여자</label>
+              </div>
+            </div>
+          </div>
+          <!-- 9) 계산하기 버튼 -->
+          <div class="col-12 mt-3">
+            <button type="button" id="calculate-btn"
+                    class="btn btn-primary w-100 btn-lg"
+                    onclick="submitForm()">계산하기</button>
+            <div class="form-text">계산하기를 누르면 아래쪽에 결과값이 출력됩니다.</div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 로딩·오류 표시 -->
+    <div id="loading" class="text-center my-5" style="display:none;">
+      <div class="spinner-border text-info" role="status"></div>
+      <p class="mt-2">계산 중...</p>
+    </div>
+    <div id="error-container" class="alert alert-danger" style="display:none;">
+      <strong>오류:</strong> <span id="error-message"></span>
+    </div>
+
+    <!-- 결과 영역 -->
+    <div id="results-container" class="mt-5" style="display:none;">
+      <p>양력: <span id="converted-date" style="font-size:0.9rem; color:#0dcaf0;"></span></p>
+
+      <div class="mb-3">
+        <button type="button" id="copy-btn" class="btn btn-success w-100 btn-lg" style="font-size:1.2rem; display:none;" onclick="copyAll()">
+          📋 사주 결과 복사하기
+        </button>
+        <div id="copy-info" class="alert alert-info mt-2" style="display:none;">
+          사주팔자가 계산 되었습니다. 위 복사 버튼을 눌러서 ChatGPT에 붙이시면 됩니다.
+        </div>
+      </div>
+
+      <!-- 사주 4주 -->
+      <h3 id="pillars-title">사주 4주</h3>
+      <table class="table table-dark table-striped align-middle mb-5">
+        <thead><tr><th>시주</th><th>일주</th><th>월주</th><th>연주</th></tr></thead>
+        <tbody><tr>
+          <td id="pillar-hour"></td>
+          <td id="pillar-day"></td>
+          <td id="pillar-month"></td>
+          <td id="pillar-year"></td>
+        </tr></tbody>
+      </table>
+
+      <!-- 오행 분포 -->
+      <h3>오행 분포</h3>
+      <table class="table table-dark table-striped align-middle mb-5">
+        <thead><tr><th>목</th><th>화</th><th>토</th><th>금</th><th>수</th></tr></thead>
+        <tbody><tr>
+          <td id="elem-목"></td>
+          <td id="elem-화"></td>
+          <td id="elem-토"></td>
+          <td id="elem-금"></td>
+          <td id="elem-수"></td>
+        </tr></tbody>
+      </table>
+
+      <!-- 십성 & 12운성 해석 -->
+      <h3>십성 &amp; 12운성 해석</h3>
+      <table class="table table-dark table-striped align-middle mb-5">
+        <thead><tr><th>구분</th><th>시주</th><th>일주</th><th>월주</th><th>연주</th></tr></thead>
+        <tbody id="deep-body"></tbody>
+      </table>
+
+      <!-- 천간 특수관계 -->
+      <h3>천간 특수관계</h3>
+      <div id="stem-relation-container" style="display:none;">
+        <ul id="stem-relation-list" class="list-group list-group-flush mb-4"></ul>
+      </div>
+
+      <!-- 지지형충회합 해석 -->
+      <h3>지지형충회합 해석</h3>
+          <table class="table table-dark table-striped align-middle mb-5"
+             style="table-layout: fixed; width:100%; border-collapse:collapse;">
+          <colgroup>
+          <col style="width:10%"><!-- '항목' 열 -->
+          <col style="width:22.5%"><!-- '시주' 열 -->
+          <col style="width:22.5%"><!-- '일주' 열 -->
+          <col style="width:22.5%"><!-- '월주' 열 -->
+          <col style="width:22.5%"><!-- '연주' 열 -->
+        </colgroup>
+        <thead>
+          <tr>
+            <th>항목</th><th>시주</th><th>일주</th><th>월주</th><th>연주</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th class="bg-secondary">지장간</th>
+            <td id="rel-지장간-hour"></td><td id="rel-지장간-day"></td>
+            <td id="rel-지장간-month"></td><td id="rel-지장간-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">방합</th>
+            <td id="rel-방합-hour"></td><td id="rel-방합-day"></td>
+            <td id="rel-방합-month"></td><td id="rel-방합-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">삼합</th>
+            <td id="rel-삼합-hour"></td><td id="rel-삼합-day"></td>
+            <td id="rel-삼합-month"></td><td id="rel-삼합-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">반합</th>
+            <td id="rel-반합-hour"></td><td id="rel-반합-day"></td>
+            <td id="rel-반합-month"></td><td id="rel-반합-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">가합</th>
+            <td id="rel-가합-hour"></td><td id="rel-가합-day"></td>
+            <td id="rel-가합-month"></td><td id="rel-가합-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">육합</th>
+            <td id="rel-육합-hour"></td><td id="rel-육합-day"></td>
+            <td id="rel-육합-month"></td><td id="rel-육합-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">암합</th>
+            <td id="rel-암합-hour"></td><td id="rel-암합-day"></td>
+            <td id="rel-암합-month"></td><td id="rel-암합-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">충</th>
+            <td id="rel-충-hour"></td><td id="rel-충-day"></td>
+            <td id="rel-충-month"></td><td id="rel-충-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">형</th>
+            <td id="rel-형-hour"></td><td id="rel-형-day"></td>
+            <td id="rel-형-month"></td><td id="rel-형-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">파</th>
+            <td id="rel-파-hour"></td><td id="rel-파-day"></td>
+            <td id="rel-파-month"></td><td id="rel-파-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">해</th>
+            <td id="rel-해-hour"></td><td id="rel-해-day"></td>
+            <td id="rel-해-month"></td><td id="rel-해-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">원진</th>
+            <td id="rel-원진-hour"></td><td id="rel-원진-day"></td>
+            <td id="rel-원진-month"></td><td id="rel-원진-year"></td>
+          </tr>
+          <tr><th class="bg-secondary">귀문</th>
+            <td id="rel-귀문-hour"></td><td id="rel-귀문-day"></td>
+            <td id="rel-귀문-month"></td><td id="rel-귀문-year"></td>
+          </tr>
+        </tbody>
+      </table>
+      <h3>십이신살,신살 종합</h3>
+        <table class="table table-dark table-striped align-middle mb-5 fixed-table">
+          <colgroup>
+            <col style="width:10%"><!-- 항목 열 -->
+            <col style="width:22.5%"><!-- 시주 열 -->
+            <col style="width:22.5%"><!-- 일주 열 -->
+            <col style="width:22.5%"><!-- 월주 열 -->
+            <col style="width:22.5%"><!-- 연주 열 -->
+          </colgroup>
+        <thead>
+          <tr>
+            <th></th>
+            <th>시주</th>
+            <th>일주</th>
+            <th>월주</th>
+            <th>연주</th>
+          </tr>
+        </thead>
+          <tbody>
+            <tr>
+              <th class="bg-secondary">십이신살</th>
+              <td id="sal-stem-hour"  style="white-space: pre-line;"></td>
+              <td id="sal-stem-day"   style="white-space: pre-line;"></td>
+              <td id="sal-stem-month" style="white-space: pre-line;"></td>
+              <td id="sal-stem-year"  style="white-space: pre-line;"></td>
+            </tr>
+            <tr>
+              <th class="bg-secondary">신살</th>
+              <td id="sal-god-hour" style="white-space: pre-line;"></td>
+              <td id="sal-god-day" style="white-space: pre-line;"></td>
+              <td id="sal-god-month" style="white-space: pre-line;"></td>
+              <td id="sal-god-year"  style="white-space: pre-line;"></td>
+            </tr>
+          </tbody>
+      </table>
+
+      <!-- 대운 테이블 -->
+      <div class="mb-5">
+        <h3 id="daeun-title">대운 <small style="font-size: 0.6rem;">[한국천문연구원 기준]</small></h3>
+        <table class="table table-dark table-striped align-middle">
+          <colgroup>
+            <col style="width:10%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+          </colgroup>
+          <tbody>
+            <tr>
+              <th class="bg-secondary text-center">대운나이</th>
+              <td id="daeun-age-1" class="text-center">-</td>
+              <td id="daeun-age-2" class="text-center">-</td>
+              <td id="daeun-age-3" class="text-center">-</td>
+              <td id="daeun-age-4" class="text-center">-</td>
+              <td id="daeun-age-5" class="text-center">-</td>
+              <td id="daeun-age-6" class="text-center">-</td>
+              <td id="daeun-age-7" class="text-center">-</td>
+              <td id="daeun-age-8" class="text-center">-</td>
+              <td id="daeun-age-9" class="text-center">-</td>
+              <td id="daeun-age-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">간지</th>
+              <td id="daeun-gan-1" class="text-center">-</td>
+              <td id="daeun-gan-2" class="text-center">-</td>
+              <td id="daeun-gan-3" class="text-center">-</td>
+              <td id="daeun-gan-4" class="text-center">-</td>
+              <td id="daeun-gan-5" class="text-center">-</td>
+              <td id="daeun-gan-6" class="text-center">-</td>
+              <td id="daeun-gan-7" class="text-center">-</td>
+              <td id="daeun-gan-8" class="text-center">-</td>
+              <td id="daeun-gan-9" class="text-center">-</td>
+              <td id="daeun-gan-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">천간십성</th>
+              <td id="daeun-ji-1" class="text-center">-</td>
+              <td id="daeun-ji-2" class="text-center">-</td>
+              <td id="daeun-ji-3" class="text-center">-</td>
+              <td id="daeun-ji-4" class="text-center">-</td>
+              <td id="daeun-ji-5" class="text-center">-</td>
+              <td id="daeun-ji-6" class="text-center">-</td>
+              <td id="daeun-ji-7" class="text-center">-</td>
+              <td id="daeun-ji-8" class="text-center">-</td>
+              <td id="daeun-ji-9" class="text-center">-</td>
+              <td id="daeun-ji-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">지지십성</th>
+              <td id="daeun-sipseong-1" class="text-center">-</td>
+              <td id="daeun-sipseong-2" class="text-center">-</td>
+              <td id="daeun-sipseong-3" class="text-center">-</td>
+              <td id="daeun-sipseong-4" class="text-center">-</td>
+              <td id="daeun-sipseong-5" class="text-center">-</td>
+              <td id="daeun-sipseong-6" class="text-center">-</td>
+              <td id="daeun-sipseong-7" class="text-center">-</td>
+              <td id="daeun-sipseong-8" class="text-center">-</td>
+              <td id="daeun-sipseong-9" class="text-center">-</td>
+              <td id="daeun-sipseong-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">신살</th>
+              <td id="daeun-sal-1" class="text-center">-</td>
+              <td id="daeun-sal-2" class="text-center">-</td>
+              <td id="daeun-sal-3" class="text-center">-</td>
+              <td id="daeun-sal-4" class="text-center">-</td>
+              <td id="daeun-sal-5" class="text-center">-</td>
+              <td id="daeun-sal-6" class="text-center">-</td>
+              <td id="daeun-sal-7" class="text-center">-</td>
+              <td id="daeun-sal-8" class="text-center">-</td>
+              <td id="daeun-sal-9" class="text-center">-</td>
+              <td id="daeun-sal-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">12운성</th>
+              <td id="daeun-12unsung-1" class="text-center">-</td>
+              <td id="daeun-12unsung-2" class="text-center">-</td>
+              <td id="daeun-12unsung-3" class="text-center">-</td>
+              <td id="daeun-12unsung-4" class="text-center">-</td>
+              <td id="daeun-12unsung-5" class="text-center">-</td>
+              <td id="daeun-12unsung-6" class="text-center">-</td>
+              <td id="daeun-12unsung-7" class="text-center">-</td>
+              <td id="daeun-12unsung-8" class="text-center">-</td>
+              <td id="daeun-12unsung-9" class="text-center">-</td>
+              <td id="daeun-12unsung-10" class="text-center">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 세운(년운) 테이블 -->
+      <div class="mb-5">
+        <h3 id="seuun-title">세운(년운)</h3>
+        <table class="table table-dark table-striped align-middle">
+          <colgroup>
+            <col style="width:10%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+            <col style="width:9%">
+          </colgroup>
+          <tbody>
+            <tr>
+              <th class="bg-secondary text-center">세운연도</th>
+              <td id="seuun-year-1" class="text-center">-</td>
+              <td id="seuun-year-2" class="text-center">-</td>
+              <td id="seuun-year-3" class="text-center">-</td>
+              <td id="seuun-year-4" class="text-center">-</td>
+              <td id="seuun-year-5" class="text-center">-</td>
+              <td id="seuun-year-6" class="text-center">-</td>
+              <td id="seuun-year-7" class="text-center">-</td>
+              <td id="seuun-year-8" class="text-center">-</td>
+              <td id="seuun-year-9" class="text-center">-</td>
+              <td id="seuun-year-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">간지</th>
+              <td id="seuun-gan-1" class="text-center">-</td>
+              <td id="seuun-gan-2" class="text-center">-</td>
+              <td id="seuun-gan-3" class="text-center">-</td>
+              <td id="seuun-gan-4" class="text-center">-</td>
+              <td id="seuun-gan-5" class="text-center">-</td>
+              <td id="seuun-gan-6" class="text-center">-</td>
+              <td id="seuun-gan-7" class="text-center">-</td>
+              <td id="seuun-gan-8" class="text-center">-</td>
+              <td id="seuun-gan-9" class="text-center">-</td>
+              <td id="seuun-gan-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">천간십성</th>
+              <td id="seuun-cheongan-1" class="text-center">-</td>
+              <td id="seuun-cheongan-2" class="text-center">-</td>
+              <td id="seuun-cheongan-3" class="text-center">-</td>
+              <td id="seuun-cheongan-4" class="text-center">-</td>
+              <td id="seuun-cheongan-5" class="text-center">-</td>
+              <td id="seuun-cheongan-6" class="text-center">-</td>
+              <td id="seuun-cheongan-7" class="text-center">-</td>
+              <td id="seuun-cheongan-8" class="text-center">-</td>
+              <td id="seuun-cheongan-9" class="text-center">-</td>
+              <td id="seuun-cheongan-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">지지십성</th>
+              <td id="seuun-jiji-1" class="text-center">-</td>
+              <td id="seuun-jiji-2" class="text-center">-</td>
+              <td id="seuun-jiji-3" class="text-center">-</td>
+              <td id="seuun-jiji-4" class="text-center">-</td>
+              <td id="seuun-jiji-5" class="text-center">-</td>
+              <td id="seuun-jiji-6" class="text-center">-</td>
+              <td id="seuun-jiji-7" class="text-center">-</td>
+              <td id="seuun-jiji-8" class="text-center">-</td>
+              <td id="seuun-jiji-9" class="text-center">-</td>
+              <td id="seuun-jiji-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">신살</th>
+              <td id="seuun-sal-1" class="text-center">-</td>
+              <td id="seuun-sal-2" class="text-center">-</td>
+              <td id="seuun-sal-3" class="text-center">-</td>
+              <td id="seuun-sal-4" class="text-center">-</td>
+              <td id="seuun-sal-5" class="text-center">-</td>
+              <td id="seuun-sal-6" class="text-center">-</td>
+              <td id="seuun-sal-7" class="text-center">-</td>
+              <td id="seuun-sal-8" class="text-center">-</td>
+              <td id="seuun-sal-9" class="text-center">-</td>
+              <td id="seuun-sal-10" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">12운성</th>
+              <td id="seuun-12unsung-1" class="text-center">-</td>
+              <td id="seuun-12unsung-2" class="text-center">-</td>
+              <td id="seuun-12unsung-3" class="text-center">-</td>
+              <td id="seuun-12unsung-4" class="text-center">-</td>
+              <td id="seuun-12unsung-5" class="text-center">-</td>
+              <td id="seuun-12unsung-6" class="text-center">-</td>
+              <td id="seuun-12unsung-7" class="text-center">-</td>
+              <td id="seuun-12unsung-8" class="text-center">-</td>
+              <td id="seuun-12unsung-9" class="text-center">-</td>
+              <td id="seuun-12unsung-10" class="text-center">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 월운 테이블 -->
+      <div class="mb-5">
+        <h3>월운</h3>
+        <table class="table table-dark table-striped align-middle">
+          <colgroup>
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+            <col style="width:7.7%">
+          </colgroup>
+          <tbody>
+            <tr>
+              <th class="bg-secondary text-center">월운월</th>
+              <td id="wolun-month-1" class="text-center">-</td>
+              <td id="wolun-month-2" class="text-center">-</td>
+              <td id="wolun-month-3" class="text-center">-</td>
+              <td id="wolun-month-4" class="text-center">-</td>
+              <td id="wolun-month-5" class="text-center">-</td>
+              <td id="wolun-month-6" class="text-center">-</td>
+              <td id="wolun-month-7" class="text-center">-</td>
+              <td id="wolun-month-8" class="text-center">-</td>
+              <td id="wolun-month-9" class="text-center">-</td>
+              <td id="wolun-month-10" class="text-center">-</td>
+              <td id="wolun-month-11" class="text-center">-</td>
+              <td id="wolun-month-12" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">간지</th>
+              <td id="wolun-gan-1" class="text-center">-</td>
+              <td id="wolun-gan-2" class="text-center">-</td>
+              <td id="wolun-gan-3" class="text-center">-</td>
+              <td id="wolun-gan-4" class="text-center">-</td>
+              <td id="wolun-gan-5" class="text-center">-</td>
+              <td id="wolun-gan-6" class="text-center">-</td>
+              <td id="wolun-gan-7" class="text-center">-</td>
+              <td id="wolun-gan-8" class="text-center">-</td>
+              <td id="wolun-gan-9" class="text-center">-</td>
+              <td id="wolun-gan-10" class="text-center">-</td>
+              <td id="wolun-gan-11" class="text-center">-</td>
+              <td id="wolun-gan-12" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">천간십성</th>
+              <td id="wolun-cheongan-1" class="text-center">-</td>
+              <td id="wolun-cheongan-2" class="text-center">-</td>
+              <td id="wolun-cheongan-3" class="text-center">-</td>
+              <td id="wolun-cheongan-4" class="text-center">-</td>
+              <td id="wolun-cheongan-5" class="text-center">-</td>
+              <td id="wolun-cheongan-6" class="text-center">-</td>
+              <td id="wolun-cheongan-7" class="text-center">-</td>
+              <td id="wolun-cheongan-8" class="text-center">-</td>
+              <td id="wolun-cheongan-9" class="text-center">-</td>
+              <td id="wolun-cheongan-10" class="text-center">-</td>
+              <td id="wolun-cheongan-11" class="text-center">-</td>
+              <td id="wolun-cheongan-12" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">지지십성</th>
+              <td id="wolun-jiji-1" class="text-center">-</td>
+              <td id="wolun-jiji-2" class="text-center">-</td>
+              <td id="wolun-jiji-3" class="text-center">-</td>
+              <td id="wolun-jiji-4" class="text-center">-</td>
+              <td id="wolun-jiji-5" class="text-center">-</td>
+              <td id="wolun-jiji-6" class="text-center">-</td>
+              <td id="wolun-jiji-7" class="text-center">-</td>
+              <td id="wolun-jiji-8" class="text-center">-</td>
+              <td id="wolun-jiji-9" class="text-center">-</td>
+              <td id="wolun-jiji-10" class="text-center">-</td>
+              <td id="wolun-jiji-11" class="text-center">-</td>
+              <td id="wolun-jiji-12" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">신살</th>
+              <td id="wolun-sal-1" class="text-center">-</td>
+              <td id="wolun-sal-2" class="text-center">-</td>
+              <td id="wolun-sal-3" class="text-center">-</td>
+              <td id="wolun-sal-4" class="text-center">-</td>
+              <td id="wolun-sal-5" class="text-center">-</td>
+              <td id="wolun-sal-6" class="text-center">-</td>
+              <td id="wolun-sal-7" class="text-center">-</td>
+              <td id="wolun-sal-8" class="text-center">-</td>
+              <td id="wolun-sal-9" class="text-center">-</td>
+              <td id="wolun-sal-10" class="text-center">-</td>
+              <td id="wolun-sal-11" class="text-center">-</td>
+              <td id="wolun-sal-12" class="text-center">-</td>
+            </tr>
+            <tr>
+              <th class="bg-secondary text-center">12운성</th>
+              <td id="wolun-12unsung-1" class="text-center">-</td>
+              <td id="wolun-12unsung-2" class="text-center">-</td>
+              <td id="wolun-12unsung-3" class="text-center">-</td>
+              <td id="wolun-12unsung-4" class="text-center">-</td>
+              <td id="wolun-12unsung-5" class="text-center">-</td>
+              <td id="wolun-12unsung-6" class="text-center">-</td>
+              <td id="wolun-12unsung-7" class="text-center">-</td>
+              <td id="wolun-12unsung-8" class="text-center">-</td>
+              <td id="wolun-12unsung-9" class="text-center">-</td>
+              <td id="wolun-12unsung-10" class="text-center">-</td>
+              <td id="wolun-12unsung-11" class="text-center">-</td>
+              <td id="wolun-12unsung-12" class="text-center">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // 천간 십성 매핑
+    const GAN_TEN_GODS = {
+      '甲': {'甲':'비견','乙':'겁재','丙':'식신','丁':'상관','戊':'편재','己':'정재','庚':'편관','辛':'정관','壬':'편인','癸':'정인'},
+      '乙': {'甲':'겁재','乙':'비견','丙':'상관','丁':'식신','戊':'정재','己':'편재','庚':'정관','辛':'편관','壬':'정인','癸':'편인'},
+      '丙': {'甲':'편인','乙':'정인','丙':'비견','丁':'겁재','戊':'식신','己':'상관','庚':'편재','辛':'정재','壬':'편관','癸':'정관'},
+      '丁': {'甲':'정인','乙':'편인','丙':'겁재','丁':'비견','戊':'상관','己':'식신','庚':'정재','辛':'편재','壬':'정관','癸':'편관'},
+      '戊': {'甲':'편관','乙':'정관','丙':'편인','丁':'정인','戊':'비견','己':'겁재','庚':'식신','辛':'상관','壬':'편재','癸':'정재'},
+      '己': {'甲':'정관','乙':'편관','丙':'정인','丁':'편인','戊':'겁재','己':'비견','庚':'상관','辛':'식신','壬':'정재','癸':'편재'},
+      '庚': {'甲':'편재','乙':'정재','丙':'편관','丁':'정관','戊':'편인','己':'정인','庚':'비견','辛':'겁재','壬':'식신','癸':'상관'},
+      '辛': {'甲':'정재','乙':'편재','丙':'정관','丁':'편관','戊':'정인','己':'편인','庚':'겁재','辛':'비견','壬':'상관','癸':'식신'},
+      '壬': {'甲':'식신','乙':'상관','丙':'편재','丁':'정재','戊':'편관','己':'정관','庚':'편인','辛':'정인','壬':'비견','癸':'겁재'},
+      '癸': {'甲':'상관','乙':'식신','丙':'정재','丁':'편재','戊':'정관','己':'정관','庚':'정인','辛':'편인','壬':'겁재','癸':'비견'}
+    };
+
+    // 지지 지장간 매핑 (정기만)
+    const BRANCH_HIDDEN_GANS = {
+      '子': '癸', '丑': '己', '寅': '甲', '卯': '乙',
+      '辰': '戊', '巳': '丙', '午': '丁', '未': '己',
+      '申': '庚', '酉': '辛', '戌': '戊', '亥': '壬'
+    };
+
+    // 천간, 지지 배열
+    const HEAVENLY_STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+    const EARTHLY_BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+
+    // 십성 계산 함수
+    function getGanTenGod(dayGan, otherGan) {
+      return GAN_TEN_GODS[dayGan]?.[otherGan] || '미정';
+    }
+
+    // 지장간 정기 천간 구하기
+    function getBranchHiddenGan(branch) {
+      return BRANCH_HIDDEN_GANS[branch] || '';
+    }
+
+    // 연간지 계산 (간단한 방법)
+    function getYearGanZhi(year) {
+      const ganIndex = (year - 4) % 10;
+      const zhiIndex = (year - 4) % 12;
+      return HEAVENLY_STEMS[ganIndex] + EARTHLY_BRANCHES[zhiIndex];
+    }
+
+    // 윤달 활성화 토글
+    function updateLeap() {
+      const leap = document.getElementById('leap');
+      leap.disabled = document.getElementById('calendar').value !== 'lunar';
+      if (leap.disabled) leap.checked = false;
+    }
+
+    // 전역 변수로 현재 Form 데이터 저장
+    let currentFormData = null;
+
+    function saveFormData(data) {
+      currentFormData = data;
+    }
+
+    function getCurrentFormData() {
+      return currentFormData;
+    }
+
+    // 12운성 계산 함수
+    function calculateSeyun12Unsung(dayGan, yearBranch) {
+      const ganToBranch = {
+        '甲': { '亥': '장생', '子': '목욕', '丑': '관대', '寅': '건록', '卯': '제왕', '辰': '쇠', '巳': '병', '午': '사', '未': '묘', '申': '절', '酉': '태', '戌': '양' },
+        '乙': { '午': '장생', '巳': '목욕', '辰': '관대', '卯': '건록', '寅': '제왕', '丑': '쇠', '子': '병', '亥': '사', '戌': '묘', '酉': '절', '申': '태', '未': '양' },
+        '丙': { '寅': '장생', '卯': '목욕', '辰': '관대', '巳': '건록', '午': '제왕', '未': '쇠', '申': '병', '酉': '사', '戌': '묘', '亥': '절', '子': '태', '丑': '양' },
+        '丁': { '酉': '장생', '申': '목욕', '未': '관대', '午': '건록', '巳': '제왕', '辰': '쇠', '卯': '병', '寅': '사', '丑': '묘', '子': '절', '亥': '태', '戌': '양' },
+        '戊': { '寅': '장생', '卯': '목욕', '辰': '관대', '巳': '건록', '午': '제왕', '未': '쇠', '申': '병', '酉': '사', '戌': '묘', '亥': '절', '子': '태', '丑': '양' },
+        '己': { '酉': '장생', '申': '목욕', '未': '관대', '午': '건록', '巳': '제왕', '辰': '쇠', '卯': '병', '寅': '사', '丑': '묘', '子': '절', '亥': '태', '戌': '양' },
+        '庚': { '巳': '장생', '辰': '목욕', '卯': '관대', '寅': '건록', '丑': '제왕', '子': '쇠', '亥': '병', '戌': '사', '酉': '묘', '申': '절', '未': '태', '午': '양' },
+        '辛': { '子': '장생', '亥': '목욕', '戌': '관대', '酉': '건록', '申': '제왕', '未': '쇠', '午': '병', '巳': '사', '辰': '묘', '卯': '절', '寅': '태', '丑': '양' },
+        '壬': { '申': '장생', '酉': '목욕', '戌': '관대', '亥': '건록', '子': '제왕', '丑': '쇠', '寅': '병', '卯': '사', '辰': '묘', '巳': '절', '午': '태', '未': '양' },
+        '癸': { '卯': '장생', '寅': '목욕', '丑': '관대', '子': '건록', '亥': '제왕', '戌': '쇠', '酉': '병', '申': '사', '未': '묘', '午': '절', '巳': '태', '辰': '양' }
+      };
+
+      return ganToBranch[dayGan]?.[yearBranch] || '-';
+    }
+
+    // DOM 로드 시 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+      updateLeap();
+      document.getElementById('calendar').addEventListener('change', updateLeap);
+    });
+
+    // 폼 제출 함수 (전역 함수로 정의)
+    async function submitForm() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('error-container').style.display = 'none';
+      document.getElementById('results-container').style.display = 'none';
+
+      try {
+        const genderRadio = document.querySelector('input[name="gender"]:checked');
+        const params = new URLSearchParams({
+          y: document.getElementById('y').value,
+          m: document.getElementById('m').value,
+          d: document.getElementById('d').value,
+          hh: document.getElementById('hh').value,
+          mm: document.getElementById('mm').value,
+          calendar: document.getElementById('calendar').value,
+          gender: genderRadio ? genderRadio.value : '여'
+        });
+
+        if (document.getElementById('leap').checked) {
+          params.append('leap', 'true');
+        }
+
+        const response = await fetch(`/api/saju?${params}`);
+        const data = await response.json();
+
+        document.getElementById('loading').style.display = 'none';
+
+        if (!response.ok) {
+          throw new Error(data.error || '계산 중 오류가 발생했습니다.');
+        }
+
+        saveFormData(data.input);
+        displayResults(data);
+
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error-message').textContent = error.message;
+        document.getElementById('error-container').style.display = 'block';
+      }
+    }
+
+    // 결과 렌더링
+    function displayResults(data) {
+      const dt = new Date(data.converted_datetime);
+      const formatted =
+        `${dt.getFullYear()}.${dt.getMonth()+1}.${dt.getDate()}.` +
+        `${dt.getHours()}시 ${dt.getMinutes()}분 ${dt.getSeconds()}초`;
+      document.getElementById('converted-date').textContent = formatted;
+
+      // 성별 표시
+      const gender = data.input.gender;
+      const genderText = gender === '남' ? '남성' : '여성';
+      document.getElementById('pillars-title').textContent = `사주 4주 (${genderText})`;
+
+      ['hour','day','month','year'].forEach((p,i)=>{
+        const ids=['pillar-hour','pillar-day','pillar-month','pillar-year'];
+        document.getElementById(ids[i]).innerText = data.pillars[p]||'';
+      });
+      ['목','화','토','금','수'].forEach(e=>{
+        document.getElementById(`elem-${e}`).innerText = data.five_elements[e]??'0';
+      });
+      // 십성·12운성
+      const deepTypes=['십성','정기지지십성','지지십성','봉법12운성','거법12운성'];
+      let html='';
+      deepTypes.forEach(type=>{
+        html+=`<tr><th class="bg-secondary">${type}</th>`;
+        ['hour','day','month','year'].forEach(p=>{
+          html+=`<td>${data.deep[type]?.[p]||''}</td>`;
+        });
+        html+='</tr>';
+      });
+      document.getElementById('deep-body').innerHTML=html;
+      // 천간 특수관계
+      const stemCont=document.getElementById('stem-relation-container');
+      const stemList=document.getElementById('stem-relation-list');
+      stemList.innerHTML='';
+      if(data.stemRelations?.length){
+        stemCont.style.display='block';
+        data.stemRelations.forEach(r=>{
+          const li=document.createElement('li');
+          li.className='list-group-item bg-dark text-white';
+          const names={hour:'시주',day:'일주',month:'월주',year:'연주'};
+          li.innerText=`${names[r.pillar]} ▶ ${r.desc}`;
+          stemList.appendChild(li);
+        });
+      } else stemCont.style.display='none';
+      // 지지형충회합
+      Object.keys(data.branchRelations||{}).forEach(cat=>{
+        ['hour','day','month','year'].forEach(p=>{
+          document.getElementById(`rel-${cat}-${p}`).innerText=
+            data.branchRelations[cat]?.[p]||'';
+        });
+      });
+      // 신살 종합
+      ['hour','day','month','year'].forEach(pos => {
+        const branch12 = data.branchSals[pos] || [];
+        document.getElementById(`sal-stem-${pos}`)
+          .innerText = branch12.length ? branch12.join(', ') : '–';
+
+        const gan = data.ganSals[pos] || [];
+        const special = data.specialSals[pos] || [];
+        const gods = [...gan, ...special];
+        document.getElementById(`sal-god-${pos}`)
+          .innerText = gods.length ? gods.join(', ') : '–';
+      });
+
+      // 대운 테이블 채우기
+      if (data.fortune && data.fortune.dayun) {
+        let closestDayun = null;
+        const currentYear = new Date().getFullYear();
+        let currentYearDaeunAge = null;
+
+        data.fortune.dayun.forEach(dayun => {
+          const startAge = parseInt(dayun.age_range);
+          if (isNaN(startAge)) return;
+
+          if (data.fortune.current_age >= startAge && data.fortune.current_age <= startAge + 9) {
+            closestDayun = dayun;
+            currentYearDaeunAge = startAge;
+          }
+
+          const idx = data.fortune.dayun.indexOf(dayun) + 1;
+
+          const ageCell = document.getElementById(`daeun-age-${idx}`);
+          ageCell.textContent = dayun.age_range || '-';
+          ageCell.style.cursor = 'pointer';
+          ageCell.style.color = '#0dcaf0';
+          ageCell.style.textDecoration = 'underline';
+
+          ageCell.addEventListener('click', function() {
+            const startAge = parseInt(dayun.age_range);
+            if (!isNaN(startAge)) {
+              updateSeyunByAge(startAge, data);
+            }
+          });
+
+          document.getElementById(`daeun-gan-${idx}`).textContent = dayun.ganzhi || '-';
+
+          if (dayun.stem) {
+            const dayGan = data.pillars.day[0];
+            const tenGod = getGanTenGod(dayGan, dayun.stem);
+            document.getElementById(`daeun-ji-${idx}`).textContent = tenGod;
+          }
+
+          if (dayun.branch) {
+            const dayGan = data.pillars.day[0];
+            const hiddenGan = getBranchHiddenGan(dayun.branch);
+            const branchTenGod = getGanTenGod(dayGan, hiddenGan);
+            document.getElementById(`daeun-sipseong-${idx}`).textContent = branchTenGod;
+          }
+
+          const salText = dayun.sal && dayun.sal.length > 0 ? dayun.sal.join(', ') : '-';
+          document.getElementById(`daeun-sal-${idx}`).textContent = salText;
+
+          const unsung12Text = dayun['12unsung'] || '-';
+          document.getElementById(`daeun-12unsung-${idx}`).textContent = unsung12Text;
+        });
+
+        if (data.fortune && data.fortune.dayun && currentYearDaeunAge !== null) {
+          for (let i = 1; i <= 10; i++) {
+            const ageCell = document.getElementById(`daeun-age-${i}`);
+            if (ageCell && ageCell.textContent &&
+                parseInt(ageCell.textContent) === currentYearDaeunAge) {
+              ageCell.style.backgroundColor = '#28a745';
+              ageCell.style.fontWeight = 'bold';
+              ageCell.style.borderRadius = '8px';
+              ageCell.style.border = '2px solid #fff';
+              break;
+            }
+          }
+        }
+      }
+
+      // 세운 테이블 채우기
+      let closestDayun = null;
+      data.fortune.dayun.forEach(dayun => {
+        const startAge = parseInt(dayun.age_range);
+        const endAge = startAge + 9;
+        if (data.fortune.current_age >= startAge && data.fortune.current_age <= endAge) {
+          closestDayun = dayun;
+        }
+      });
+
+      // 현재 연도를 기준으로 세운 계산 (2025년이 중앙에 오도록)
+      const currentYear = new Date().getFullYear(); // 2025년
+      const baseYear = currentYear;
+
+      for (let i = 0; i < 10; i++) {
+        // 현재 연도를 중심으로 좌우 5년씩 배치 (왼쪽부터 내림차순)
+        // 순서: 2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020
+        const year = baseYear + 5 - i;
+        const idx = i + 1;
+        const currentYear = new Date().getFullYear();
+        const isCurrentYear = (year === currentYear);
+
+        const seuunYearElement = document.getElementById(`seuun-year-${idx}`);
+        seuunYearElement.textContent = `${year}년`;
+        seuunYearElement.style.cursor = 'pointer';
+        seuunYearElement.style.color = '#0dcaf0';
+        seuunYearElement.style.textDecoration = 'underline';
+
+        if (seuunYearElement.clickHandler) {
+          seuunYearElement.removeEventListener('click', seuunYearElement.clickHandler);
+        }
+        seuunYearElement.clickHandler = function() {
+          for (let j = 1; j <= 10; j++) {
+            const cell = document.getElementById(`seuun-year-${j}`);
+            if (cell) {
+              cell.style.backgroundColor = '';
+              cell.style.fontWeight = '';
+              cell.style.borderRadius = '';
+              cell.style.border = '';
+              cell.style.color = '#0dcaf0';
+            }
+          }
+
+          seuunYearElement.style.backgroundColor = '#28a745';
+          seuunYearElement.style.fontWeight = 'bold';
+          seuunYearElement.style.borderRadius = '8px';
+          seuunYearElement.style.border = '2px solid #fff';
+          seuunYearElement.style.color = 'white';
+
+          const seuunTitle = document.getElementById('seuun-title');
+          if (seuunTitle) {
+            seuunTitle.textContent = `세운(년운) (${year}년)`;
+          }
+
+          updateWolunBySeuunYear(year, data);
+        };
+        seuunYearElement.addEventListener('click', seuunYearElement.clickHandler);
+
+        const yearGanZhi = getYearGanZhi(year);
+        document.getElementById(`seuun-gan-${idx}`).textContent = yearGanZhi;
+
+        const yearStem = yearGanZhi[0];
+        const dayGan = data.pillars.day[0];
+        const yearTenGod = getGanTenGod(dayGan, yearStem);
+        document.getElementById(`seuun-cheongan-${idx}`).textContent = yearTenGod;
+
+        const yearBranch = yearGanZhi[1];
+        const yearHiddenGan = getBranchHiddenGan(yearBranch);
+        const yearBranchTenGod = getGanTenGod(dayGan, yearHiddenGan);
+        document.getElementById(`seuun-jiji-${idx}`).textContent = yearBranchTenGod;
+
+        const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+        const twelveSalsOrder = ['년살', '월살', '망신살', '장성살', '반안살', '역마살', '육해살', '화개살', '겁살', '재살', '천살', '지살'];
+        const branchIdx = branchOrder.indexOf(yearBranch);
+        const salText = branchIdx >= 0 ? twelveSalsOrder[branchIdx] : '-';
+        document.getElementById(`seuun-sal-${idx}`).textContent = salText;
+
+        const seyun12unsung = calculateSeyun12Unsung(dayGan, yearBranch);
+        const seyunUnsungDefaultElement = document.getElementById(`seuun-12unsung-${idx}`);
+        if (seyunUnsungDefaultElement) {
+          seyunUnsungDefaultElement.textContent = seyun12unsung;
+        }
+
+        if (isCurrentYear) {
+          seuunYearElement.style.backgroundColor = '#28a745';
+          seuunYearElement.style.fontWeight = 'bold';
+          seuunYearElement.style.borderRadius = '8px';
+          seuunYearElement.style.border = '2px solid #fff';
+          seuunYearElement.style.color = 'white';
+
+          const seuunTitle = document.getElementById('seuun-title');
+          if (seuunTitle) {
+            seuunTitle.textContent = `세운(년운) (${year}년)`;
+          }
+
+          setTimeout(() => updateWolunBySeuunYear(year, data), 100);
+        }
+      }
+
+      if (closestDayun) {
+        const closestStartAge = parseInt(closestDayun.age_range);
+
+        const daeunTitle = document.getElementById('daeun-title');
+        if (daeunTitle && !isNaN(closestStartAge)) {
+          daeunTitle.innerHTML = `대운 (${closestStartAge}세) <small style="font-size: 0.6rem;">[한국천문연구원 기준]</small>`;
+        }
+
+        for (let i = 1; i <= 10; i++) {
+          const ageCell = document.getElementById(`daeun-age-${i}`);
+          if (ageCell && ageCell.textContent === closestDayun.age_range) {
+            ageCell.style.backgroundColor = '#28a745';
+            ageCell.style.fontWeight = 'bold';
+            ageCell.style.color = 'white';
+            break;
+          }
+        }
+      }
+
+      document.getElementById('copy-btn').style.display = 'block';
+      document.getElementById('copy-info').style.display = 'block';
+      document.getElementById('results-container').style.display = 'block';
+
+      document.getElementById('results-container')
+        .scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 대운 나이에 따른 세운 업데이트 함수
+    function updateSeyunByAge(startAge, data) {
+      const birthYear = new Date(data.converted_datetime).getFullYear();
+      const baseYear = birthYear + startAge;
+
+      const daeunTitle = document.getElementById('daeun-title');
+      if (daeunTitle) {
+        daeunTitle.innerHTML = `대운 (${startAge}세) <small style="font-size: 0.6rem;">[한국천문연구원 기준]</small>`;
+      }
+
+      for (let i = 1; i <= 10; i++) {
+        const ageCell = document.getElementById(`daeun-age-${i}`);
+        if (ageCell) {
+          ageCell.style.backgroundColor = '';
+          ageCell.style.fontWeight = '';
+          ageCell.style.color = '#0dcaf0';
+          ageCell.style.borderRadius = '';
+          ageCell.style.border = '';
+        }
+      }
+      if (event && event.target) {
+        event.target.style.backgroundColor = '#dc3545';
+        event.target.style.fontWeight = 'bold';
+        event.target.style.color = 'white';
+        event.target.style.borderRadius = '8px';
+        event.target.style.border = '2px solid #fff';
+      }
+
+      for (let i = 0; i < 10; i++) {
+        // 클릭된 대운 나이를 기준으로 좌우 5년씩 배치 (왼쪽부터 내림차순)
+        const year = baseYear + 5 - i;
+        const idx = i + 1;
+
+        const seuunYearElement = document.getElementById(`seuun-year-${idx}`);
+        seuunYearElement.textContent = `${year}년`;
+        seuunYearElement.style.cursor = 'pointer';
+        seuunYearElement.style.color = '#0dcaf0';
+        seuunYearElement.style.textDecoration = 'underline';
+
+        if (seuunYearElement.clickHandler) {
+          seuunYearElement.removeEventListener('click', seuunYearElement.clickHandler);
+        }
+        seuunYearElement.clickHandler = function() {
+          for (let j = 1; j <= 10; j++) {
+            const cell = document.getElementById(`seuun-year-${j}`);
+            if (cell) {
+              cell.style.backgroundColor = '';
+              cell.style.fontWeight = '';
+              cell.style.borderRadius = '';
+              cell.style.border = '';
+              cell.style.color = '#0dcaf0';
+            }
+          }
+
+          seuunYearElement.style.backgroundColor = '#28a745';
+          seuunYearElement.style.fontWeight = 'bold';
+          seuunYearElement.style.borderRadius = '8px';
+          seuunYearElement.style.border = '2px solid #fff';
+          seuunYearElement.style.color = 'white';
+
+          const seuunTitle = document.getElementById('seuun-title');
+          if (seuunTitle) {
+            seuunTitle.textContent = `세운(년운) (${year}년)`;
+          }
+
+          updateWolunBySeuunYear(year, data);
+        };
+        seuunYearElement.addEventListener('click', seuunYearElement.clickHandler);
+
+        const yearGanZhi = getYearGanZhi(year);
+        document.getElementById(`seuun-gan-${idx}`).textContent = yearGanZhi;
+
+        const yearStem = yearGanZhi[0];
+        const dayGan = data.pillars.day[0];
+        const yearTenGod = getGanTenGod(dayGan, yearStem);
+        document.getElementById(`seuun-cheongan-${idx}`).textContent = yearTenGod;
+
+        const yearBranch = yearGanZhi[1];
+        const yearHiddenGan = getBranchHiddenGan(yearBranch);
+        const yearBranchTenGod = getGanTenGod(dayGan, yearHiddenGan);
+        document.getElementById(`seuun-jiji-${idx}`).textContent = yearBranchTenGod;
+
+        const branchOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+        const twelveSalsOrder = ['년살', '월살', '망신살', '장성살', '반안살', '역마살', '육해살', '화개살', '겁살', '재살', '천살', '지살'];
+        const branchIdx = branchOrder.indexOf(yearBranch);
+        const salText = branchIdx >= 0 ? twelveSalsOrder[branchIdx] : '-';
+        document.getElementById(`seuun-sal-${idx}`).textContent = salText;
+
+        const seyun12unsung = calculateSeyun12Unsung(dayGan, yearBranch);
+        document.getElementById(`seuun-12unsung-${idx}`).textContent = seyun12unsung;
+      }
+    }
+
+    // 세운연도에 따른 월운 업데이트 함수
+    async function updateWolunBySeuunYear(year, data) {
+      try {
+        const formData = getCurrentFormData();
+        if (!formData) {
+          console.error('Form 데이터가 없습니다.');
+          return;
+        }
+
+        const response = await fetch(`/api/saju?y=${formData.y}&m=${formData.m}&d=${formData.d}&hh=${formData.hh}&mm=${formData.mm}&calendar=${formData.calendar}&gender=${encodeURIComponent(formData.gender)}&fortune_year=${year}`);
+
+        if (!response.ok) {
+          console.error(`월운 데이터 요청 실패: ${response.status}`);
+          return;
+        }
+
+        const sajuData = await response.json();
+        const wolyunData = sajuData.fortune?.wolyun || [];
+
+        if (wolyunData && wolyunData.length > 0) {
+          displayWolunData(wolyunData);
+          console.log(`${year}년 월운 데이터 업데이트 완료`);
+        } else {
+          console.warn(`${year}년 월운 데이터가 없습니다.`);
+          displayWolunData([]);
+        }
+      } catch (error) {
+        console.error('월운 데이터 업데이트 오류:', error);
+        displayWolunData([]);
+      }
+    }
+
+    // 월운 데이터 표시 함수
+    function displayWolunData(wolyunData) {
+      for (let i = 1; i <= 12; i++) {
+        const monthCell = document.getElementById(`wolun-month-${i}`);
+        const ganjiCell = document.getElementById(`wolun-gan-${i}`);
+        const salCell = document.getElementById(`wolun-sal-${i}`);
+        const unCell = document.getElementById(`wolun-12unsung-${i}`);
+        const stemTengodCell = document.getElementById(`wolun-cheongan-${i}`);
+        const branchTengodCell = document.getElementById(`wolun-jiji-${i}`);
+
+        if (monthCell) monthCell.textContent = '-';
+        if (ganjiCell) ganjiCell.textContent = '-';
+        if (salCell) salCell.textContent = '-';
+        if (unCell) unCell.textContent = '-';
+        if (stemTengodCell) stemTengodCell.textContent = '-';
+        if (branchTengodCell) branchTengodCell.textContent = '-';
+      }
+
+      wolyunData.forEach((wolyun, index) => {
+        const position = index + 1;
+
+        const monthCell = document.getElementById(`wolun-month-${position}`);
+        if (monthCell) {
+          monthCell.textContent = wolyun.month_name || `${wolyun.month}월`;
+        }
+
+        const ganjiCell = document.getElementById(`wolun-gan-${position}`);
+        if (ganjiCell) {
+          ganjiCell.textContent = wolyun.ganzhi || '-';
+        }
+
+        const salCell = document.getElementById(`wolun-sal-${position}`);
+        if (salCell) {
+          salCell.textContent = (wolyun.sal && wolyun.sal.length > 0) ? wolyun.sal.join(', ') : '-';
+        }
+
+        const unCell = document.getElementById(`wolun-12unsung-${position}`);
+        if (unCell) {
+          unCell.textContent = wolyun['12unsung'] || '-';
+        }
+
+        const stemTengodCell = document.getElementById(`wolun-cheongan-${position}`);
+        if (stemTengodCell) {
+          stemTengodCell.textContent = wolyun.stem_tengod || '-';
+        }
+
+        const branchTengodCell = document.getElementById(`wolun-jiji-${position}`);
+        if (branchTengodCell) {
+          branchTengodCell.textContent = wolyun.branch_tengod || '-';
+        }
+      });
+    }
+
+    // Markdown 복사
+    function copyAll() {
+      let md = '';
+      const tables = document.querySelectorAll('#results-container table');
+
+      tables.forEach((table, idx) => {
+        if (idx === 0) {
+          const sajuTitle = document.getElementById('pillars-title').textContent || '사주 4주';
+          md += `## ${sajuTitle}\n`;
+        }
+        if (idx === 1) md += '## 오행 분포\n';
+        if (idx === 2) md += '## 심층 분석: 십성 & 12운성\n';
+
+        if (idx <= 2) {
+          const heads = Array.from(table.querySelectorAll('thead th'))
+                             .map(th => th.innerText.trim());
+          md += `| ${heads.join(' | ')} |\n`;
+          md += `|${heads.map(() => ':---:').join('|')}|\n`;
+          table.querySelectorAll('tbody tr').forEach(tr => {
+            const cells = Array.from(tr.children).map(td => td.innerText.trim());
+            md += `| ${cells.join(' | ')} |\n`;
+          });
+          md += '\n';
+        }
+
+        if (idx === 2) {
+          const lis = document.querySelectorAll('#stem-relation-list li');
+          if (lis.length) {
+            md += '## 천간 특수관계\n';
+            md += '| 기둥 | 관계 설명 |\n';
+            md += '|:---:|:---:|\n';
+            lis.forEach(li => {
+              const [pillar, desc] = li.innerText.split('▶').map(s => s.trim());
+              md += `| ${pillar} | ${desc} |\n`;
+            });
+            md += '\n';
+          }
+        }
+
+        if (idx === 3) md += '## 지지형충회합 해석\n';
+        if (idx === 4) md += '## 천간·지지 신살 종합\n';
+
+        if (idx >= 3 && idx <= 4) {
+          const heads = Array.from(table.querySelectorAll('thead th'))
+                             .map(th => th.innerText.trim());
+          md += `| ${heads.join(' | ')} |\n`;
+          md += `|${heads.map(() => ':---:').join('|')}|\n`;
+          table.querySelectorAll('tbody tr').forEach(tr => {
+            const cells = Array.from(tr.children).map(td => td.innerText.trim());
+            md += `| ${cells.join(' | ')} |\n`;
+          });
+          md += '\n';
+        }
+      });
+
+      const daeunTitleElement = document.getElementById('daeun-title');
+      const daeunTitle = daeunTitleElement ? daeunTitleElement.textContent : '대운';
+      md += `## ${daeunTitle}\n`;
+      md += '| 구분 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |\n';
+      md += '|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n';
+
+      const daeunRows = [
+        { label: '**대운나이**', prefix: 'daeun-age' },
+        { label: '**간지**', prefix: 'daeun-gan' },
+        { label: '**천간십성**', prefix: 'daeun-ji' },
+        { label: '**지지십성**', prefix: 'daeun-sipseong' },
+        { label: '**신살**', prefix: 'daeun-sal' },
+        { label: '**12운성**', prefix: 'daeun-12unsung' }
+      ];
+
+      daeunRows.forEach(row => {
+        const rowData = [row.label];
+        for (let i = 1; i <= 10; i++) {
+          const element = document.getElementById(`${row.prefix}-${i}`);
+          const value = element ? element.textContent.trim() : '-';
+          rowData.push(value || '-');
+        }
+        md += `| ${rowData.join(' | ')} |\n`;
+      });
+      md += '\n';
+
+      const seuunTitleElement = document.getElementById('seuun-title');
+      const seuunTitle = seuunTitleElement ? seuunTitleElement.textContent : '세운(년운)';
+      md += `## ${seuunTitle}\n`;
+      md += '| 구분 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |\n';
+      md += '|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n';
+
+      const seuunRows = [
+        { label: '**세운연도**', prefix: 'seuun-year' },
+        { label: '**간지**', prefix: 'seuun-gan' },
+        { label: '**천간십성**', prefix: 'seuun-cheongan' },
+        { label: '**지지십성**', prefix: 'seuun-jiji' },
+        { label: '**신살**', prefix: 'seuun-sal' },
+        { label: '**12운성**', prefix: 'seuun-12unsung' }
+      ];
+
+      seuunRows.forEach(row => {
+        const rowData = [row.label];
+        for (let i = 1; i <= 10; i++) {
+          const element = document.getElementById(`${row.prefix}-${i}`);
+          const value = element ? element.textContent.trim() : '-';
+          rowData.push(value || '-');
+        }
+        md += `| ${rowData.join(' | ')} |\n`;
+      });
+      md += '\n';
+
+      md += '## 월운\n';
+      md += '| 구분 | 1월 | 2월 | 3월 | 4월 | 5월 | 6월 | 7월 | 8월 | 9월 | 10월 | 11월 | 12월 |\n';
+      md += '|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n';
+
+      const wolunRows = [
+        { label: '**월운월**', prefix: 'wolun-month' },
+        { label: '**간지**', prefix: 'wolun-gan' },
+        { label: '**천간십성**', prefix: 'wolun-cheongan' },
+        { label: '**지지십성**', prefix: 'wolun-jiji' },
+        { label: '**신살**', prefix: 'wolun-sal' },
+        { label: '**12운성**', prefix: 'wolun-12unsung' }
+      ];
+
+      wolunRows.forEach(row => {
+        const rowData = [row.label];
+        for (let i = 1; i <= 12; i++) {
+          const element = document.getElementById(`${row.prefix}-${i}`);
+          const value = element ? element.textContent.trim() : '-';
+          rowData.push(value || '-');
+        }
+        md += `| ${rowData.join(' | ')} |\n`;
+      });
+      md += '\n';
+
+      md = md.trimEnd();
+
+      navigator.clipboard.writeText(md)
+        .then(() => {
+          alert('사주 결과가 복사되었습니다! ChatGPT에 붙여넣기 하세요.');
+
+          const referrer = document.referrer;
+          const isFromGPT = referrer && referrer.includes('chatgpt.com');
+
+          if (isFromGPT) {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              window.close();
+            }
+          } else {
+            window.open('https://chatgpt.com/g/g-bOHE77cGN-sajupalja-myeongrihag-bangmunyul-1wi-unse-saju-gunghab-insaeng-saeob-janyeo-gilil', '_blank');
+          }
+        })
+        .catch(err => {
+          console.error('복사 실패:', err);
+          alert('복사에 실패했습니다. 브라우저에서 수동으로 복사해주세요.');
+        });
+    }
+
+  </script>
+    <!-- 개인정보처리방침 footer -->
+  <footer class="text-center mt-5 py-4 border-top border-secondary">
+    <small>
+      <a href="https://www.notion.so/1ed8f27934448056993ee972299dc66f"
+         target="_blank"
+         class="text-decoration-none text-light">
+        📄 개인정보처리방침
+      </a>
+    </small>
+  </footer>
+</body>
+</html>
