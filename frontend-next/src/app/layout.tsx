@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const notoSerif = Noto_Serif_KR({
   variable: "--font-noto-serif",
   weight: ["400", "700"],
-  subsets: ["latin"], // Using latin as it's often the default fallback, but adding korean if supported or keeping it simple
+  preload: false,
 });
 
 export const metadata: Metadata = {
