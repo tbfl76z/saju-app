@@ -144,7 +144,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                             <Label className="text-slate-600 font-bold ml-1">달력 유형</Label>
                             <Select
                                 value={formData.calendar_type}
-                                onValueChange={(val) => setFormData({ ...formData, calendar_type: val })}
+                                onValueChange={(val: string) => setFormData({ ...formData, calendar_type: val })}
                             >
                                 <SelectTrigger className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12">
                                     <SelectValue />
