@@ -23,14 +23,20 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
 
     // 초기 대운 선택 (현재 나이에 맞는 대운)
     useEffect(() => {
-        if (sajuData?.fortune?.list) {
-            const birthYear = parseInt(sajuData.birth_date.split("-")[0]);
-            const nowYear = new Date().getFullYear();
-            const age = nowYear - birthYear + 1;
+        if (sajuData?.fortune?.list?.length > 0) {
+            try {
+                const birthYearStr = sajuData.birth_date?.split("-")?.[0];
+                if (!birthYearStr) return;
+                const birthYear = parseInt(birthYearStr);
+                const nowYear = new Date().getFullYear();
+                const age = nowYear - birthYear + 1;
 
-            const current = sajuData.fortune.list.find((d: any) => age >= d.age && age < d.age + 10);
-            if (current) {
-                handleDaeunSelect(current);
+                const current = sajuData.fortune.list.find((d: any) => age >= d.age && age < d.age + 10);
+                if (current) {
+                    handleDaeunSelect(current);
+                }
+            } catch (err) {
+                console.error("Error in automatic daeun selection", err);
             }
         }
     }, [sajuData]);
@@ -150,7 +156,7 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                     <span className="text-sm text-amber-600 font-medium bg-amber-50 px-3 py-1 rounded-full border border-amber-100">현재 대운수: {sajuData.fortune.num} ({sajuData.fortune.direction})</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    {sajuData.fortune.list.map((item: any) => (
+                    {sajuData?.fortune?.list?.map((item: any) => (
                         <LuckCard
                             key={item.age}
                             header={`${item.age}세 대운`}
@@ -177,11 +183,12 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                         rowLabels={["간지", "원국 십성", "대운 적용 운성", "상호 관계 분석"]}
                         terms={terms}
                         data={[
-                            ['hour', 'day', 'month', 'year'].map(k => sajuData.pillars[k].pillar),
-                            ['hour', 'day', 'month', 'year'].map(k => `${sajuData.ten_gods[k] || '본인'} | ${sajuData.jiji_ten_gods[k]}`),
-                            ['hour', 'day', 'month', 'year'].map(k => sajuData.twelve_growth[k]),
+                            ['hour', 'day', 'month', 'year'].map(k => sajuData?.pillars?.[k]?.pillar || "-"),
+                            ['hour', 'day', 'month', 'year'].map(k => `${sajuData?.ten_gods?.[k] || (k === 'day' ? '본인' : '-')} | ${sajuData?.jiji_ten_gods?.[k] || '-'}`),
+                            ['hour', 'day', 'month', 'year'].map(k => sajuData?.twelve_growth?.[k] || "-"),
                             ['hour', 'day', 'month', 'year'].map(k => {
-                                return selectedDaeun.relations?.split(',').filter((r: string) => r.includes(k === 'year' ? '년' : k === 'month' ? '월' : k === 'day' ? '일' : '시')).join(', ') || "평온";
+                                if (!selectedDaeun?.relations) return "평온";
+                                return selectedDaeun.relations.split(',').filter((r: string) => r.includes(k === 'year' ? '년' : k === 'month' ? '월' : k === 'day' ? '일' : '시')).join(', ') || "평온";
                             })
                         ]}
                     />
@@ -230,12 +237,13 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                         rowLabels={["간지", "대상 십성", "세운 적용 운성", "상호 관계 분석"]}
                         terms={terms}
                         data={[
-                            ['hour', 'day', 'month', 'year'].map(k => sajuData.pillars[k].pillar).concat([selectedDaeun.ganzhi]),
-                            ['hour', 'day', 'month', 'year'].map(k => `${sajuData.ten_gods[k] || '본인'}`).concat([`${selectedDaeun.stem_ten_god}`]),
-                            ['hour', 'day', 'month', 'year'].map(k => sajuData.twelve_growth[k]).concat([selectedDaeun.twelve_growth]),
+                            ['hour', 'day', 'month', 'year'].map(k => sajuData?.pillars?.[k]?.pillar || "-").concat([selectedDaeun?.ganzhi || "-"]),
+                            ['hour', 'day', 'month', 'year'].map(k => `${sajuData?.ten_gods?.[k] || (k === 'day' ? '본인' : '-')}`).concat([`${selectedDaeun?.stem_ten_god || '-'}`]),
+                            ['hour', 'day', 'month', 'year'].map(k => sajuData?.twelve_growth?.[k] || "-").concat([selectedDaeun?.twelve_growth || "-"]),
                             ['hour', 'day', 'month', 'year'].map(k => {
-                                return selectedSeyun.relations?.split(',').filter((r: string) => r.includes(k === 'year' ? '년' : k === 'month' ? '월' : k === 'day' ? '일' : '시')).join(', ') || "평온";
-                            }).concat([selectedSeyun.relations?.split(',').filter((r: string) => r.includes('대운')).join(', ') || "평온"])
+                                if (!selectedSeyun?.relations) return "평온";
+                                return selectedSeyun.relations.split(',').filter((r: string) => r.includes(k === 'year' ? '년' : k === 'month' ? '월' : k === 'day' ? '일' : '시')).join(', ') || "평온";
+                            }).concat([selectedSeyun?.relations?.split(',')?.filter((r: string) => r.includes('대운')).join(', ') || "평온"])
                         ]}
                     />
                 </div>
@@ -283,14 +291,15 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                         rowLabels={["간지", "대상 십성", "월운 적용 운성", "상호 관계 분석"]}
                         terms={terms}
                         data={[
-                            ['hour', 'day', 'month', 'year'].map(k => sajuData.pillars[k].pillar).concat([selectedDaeun.ganzhi, selectedSeyun.ganzhi]),
-                            ['hour', 'day', 'month', 'year'].map(k => `${sajuData.ten_gods[k] || '본인'}`).concat([`${selectedDaeun.stem_ten_god}`, `${selectedSeyun.stem_ten_god}`]),
-                            ['hour', 'day', 'month', 'year'].map(k => sajuData.twelve_growth[k]).concat([selectedDaeun.twelve_growth, selectedSeyun.twelve_growth]),
+                            ['hour', 'day', 'month', 'year'].map(k => sajuData?.pillars?.[k]?.pillar || "-").concat([selectedDaeun?.ganzhi || "-", selectedSeyun?.ganzhi || "-"]),
+                            ['hour', 'day', 'month', 'year'].map(k => `${sajuData?.ten_gods?.[k] || (k === 'day' ? '본인' : '-')}`).concat([`${selectedDaeun?.stem_ten_god || '-'}`, `${selectedSeyun?.stem_ten_god || '-'}`]),
+                            ['hour', 'day', 'month', 'year'].map(k => sajuData?.twelve_growth?.[k] || "-").concat([selectedDaeun?.twelve_growth || "-", selectedSeyun?.twelve_growth || "-"]),
                             ['hour', 'day', 'month', 'year'].map(k => {
-                                return selectedWolun.relations?.split(',').filter((r: string) => r.includes(k === 'year' ? '년' : k === 'month' ? '월' : k === 'day' ? '일' : '시')).join(', ') || "평온";
+                                if (!selectedWolun?.relations) return "평온";
+                                return selectedWolun.relations.split(',').filter((r: string) => r.includes(k === 'year' ? '년' : k === 'month' ? '월' : k === 'day' ? '일' : '시')).join(', ') || "평온";
                             }).concat([
-                                selectedWolun.relations?.split(',').filter((r: string) => r.includes('대운')).join(', ') || "평온",
-                                selectedWolun.relations?.split(',').filter((r: string) => r.includes('년') || r.includes('세운')).join(', ') || "평온"
+                                selectedWolun?.relations?.split(',')?.filter((r: string) => r.includes('대운')).join(', ') || "평온",
+                                selectedWolun?.relations?.split(',')?.filter((r: string) => r.includes('년') || r.includes('세운')).join(', ') || "평온"
                             ])
                         ]}
                     />

@@ -18,40 +18,42 @@ function PillarCard({ label, ganzhi, tenGod, growth, sinsal, relations, terms }:
     };
 
     return (
-        <Card className="h-full border-[#d4af37]/20 hover:border-[#d4af37]/50 transition-colors shadow-sm">
-            <CardContent className="p-1 md:p-4 flex flex-col items-center justify-between h-full text-center">
-                <div className="text-[8px] md:text-[10px] text-muted-foreground uppercase tracking-tight md:tracking-wider mb-1">{label}</div>
+        <Card className="h-full border-[#d4af37]/20 hover:border-[#d4af37]/50 transition-all hover:scale-105 shadow-md bg-white/40 backdrop-blur-sm rounded-2xl overflow-hidden group">
+            <CardContent className="p-2 md:p-6 flex flex-col items-center justify-between h-full text-center">
+                <div className="text-[10px] md:text-sm text-slate-500 font-medium uppercase tracking-widest mb-2 opacity-70">{label}</div>
 
-                <div className="flex flex-col items-center justify-center my-1 md:my-3">
-                    <div className="text-xl md:text-3xl font-bold text-slate-900 leading-none mb-1">{ganzhi[0]}</div>
-                    <div className="text-xl md:text-3xl font-bold text-slate-700 leading-none">{ganzhi[1]}</div>
+                <div className="flex flex-col items-center justify-center my-2 md:my-5">
+                    <div className="text-2xl md:text-5xl font-bold text-slate-900 leading-tight mb-1 font-noto-serif">{ganzhi[0]}</div>
+                    <div className="text-2xl md:text-5xl font-bold text-slate-800 leading-tight font-noto-serif group-hover:text-[#d4af37] transition-colors">{ganzhi[1]}</div>
                 </div>
 
-                <div className="w-full pt-2 md:pt-4 border-t border-slate-100">
-                    <div className="flex justify-between items-center text-[10px] md:text-xs mb-1">
-                        <span className="text-muted-foreground">십성</span>
-                        <span className="font-bold text-rose-600">{tenGod}</span>
+                <div className="w-full pt-3 md:pt-6 border-t border-slate-200/50 space-y-2">
+                    <div className="flex justify-between items-center text-[10px] md:text-sm">
+                        <span className="text-slate-500">십성</span>
+                        <span className="font-bold text-rose-700">{tenGod}</span>
                     </div>
-                    <div className="flex justify-between items-center text-[10px] md:text-xs">
-                        <span className="text-muted-foreground">운성</span>
-                        <span className="font-bold text-blue-600">{growth}</span>
+                    <div className="flex justify-between items-center text-[10px] md:text-sm">
+                        <span className="text-slate-500">운성</span>
+                        <span className="font-bold text-blue-700">{growth}</span>
                     </div>
                 </div>
 
-                <div className="mt-2 md:mt-4 w-full space-y-1">
+                <div className="mt-3 md:mt-6 w-full space-y-2">
                     <Popover>
                         <PopoverTrigger asChild>
-                            <div className="text-[9px] md:text-[11px] text-amber-700 font-medium cursor-pointer hover:bg-amber-50 rounded py-0.5 px-1 transition-colors text-center border border-amber-100">
+                            <div className="text-[10px] md:text-xs text-amber-800 font-semibold cursor-pointer hover:bg-amber-100/50 rounded-lg py-1.5 px-2 transition-all text-center border border-amber-200/50 bg-amber-50/50 shadow-sm">
                                 ✨ {sinsal || "기본"}
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="w-64 text-sm p-4">
-                            <h4 className="font-bold mb-2 text-[#d4af37]">신살 분석</h4>
-                            <p className="text-xs leading-relaxed">{getDesc(sinsal)}</p>
+                        <PopoverContent className="w-72 glass-card p-5 border-none shadow-2xl">
+                            <h4 className="font-bold mb-3 text-amber-900 flex items-center gap-2 border-b border-amber-200 pb-2">
+                                <span className="text-lg">✨</span> 신살 분석
+                            </h4>
+                            <p className="text-xs leading-relaxed text-slate-700">{getDesc(sinsal)}</p>
                         </PopoverContent>
                     </Popover>
 
-                    <div className="text-[9px] md:text-[11px] text-purple-700 font-medium py-0.5 px-1 border border-purple-100 rounded bg-purple-50/30 text-center">
+                    <div className="text-[10px] md:text-xs text-indigo-800 font-semibold py-1.5 px-2 border border-indigo-200/50 rounded-lg bg-indigo-50/50 text-center shadow-sm">
                         🔗 {relations || "평온"}
                     </div>
                 </div>
@@ -77,11 +79,11 @@ export function SajuPillars({ data, terms }: { data: any; terms: any }) {
                     <PillarCard
                         key={p.key}
                         label={p.label}
-                        ganzhi={data.pillars[p.key].pillar}
-                        tenGod={p.key === 'day' ? '본인' : data.ten_gods[p.key]}
-                        growth={data.twelve_growth[p.key]}
-                        sinsal={data.sinsal[p.key]}
-                        relations={data.sinsal_details[p.key].relations}
+                        ganzhi={data.pillars?.[p.key]?.pillar || "--"}
+                        tenGod={p.key === 'day' ? '본인' : data.ten_gods?.[p.key] || "-"}
+                        growth={data.twelve_growth?.[p.key] || "-"}
+                        sinsal={data.sinsal?.[p.key] || "-"}
+                        relations={data.sinsal_details?.[p.key]?.relations || "-"}
                         terms={terms}
                     />
                 ))}
