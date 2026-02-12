@@ -12,6 +12,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").re
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sajuData, setSajuData] = useState<any | null>(null);
   const [terms, setTerms] = useState<Record<string, string>>({});
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
@@ -27,7 +28,8 @@ export default function Home() {
       .catch((err) => console.error("Failed to fetch terms", err));
   }, []);
 
-  const handleCalculate = async (formData: Record<string, any>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleCalculate = async (formData: any) => {
     setIsLoading(true);
     setAiAnalysis("");
     try {
