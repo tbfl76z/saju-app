@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { LuckCard } from "./LuckCard";
-import { AnalysisTable } from "./AnalysisTable";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface LuckSectionProps {
     sajuData: any;
@@ -55,7 +55,7 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
         } finally {
             setIsLoadingSeyun(false);
         }
-    }, [apiBase, sajuData]);
+    }, [apiBase, sajuData, handleSeyunSelect]);
 
     const handleSeyunSelect = useCallback(async (seyun: any) => {
         setSelectedSeyun(seyun);
@@ -151,7 +151,13 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                     {sajuData?.fortune?.list?.map((d: any, idx: number) => (
                         <LuckCard
                             key={idx}
-                            data={d}
+                            header={`${d.age}세`}
+                            ganzhi={d.ganzhi}
+                            stemTenGod={d.stem_ten_god}
+                            branchTenGod={d.jiji_ten_god}
+                            growth={d.twelve_growth}
+                            sinsal={d.sinsal || "-"}
+                            relations={d.relations || "-"}
                             isSelected={selectedDaeun?.age === d.age}
                             onClick={() => handleDaeunSelect(d)}
                         />
@@ -185,10 +191,15 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                             {seyunList.map((s, idx) => (
                                 <LuckCard
                                     key={idx}
-                                    data={s}
+                                    header={`${s.year}년`}
+                                    ganzhi={s.ganzhi}
+                                    stemTenGod={s.stem_ten_god}
+                                    branchTenGod={s.jiji_ten_god}
+                                    growth={s.twelve_growth}
+                                    sinsal={s.sinsal || "-"}
+                                    relations={s.relations || "-"}
                                     isSelected={selectedSeyun?.year === s.year}
                                     onClick={() => handleSeyunSelect(s)}
-                                    type="seyun"
                                 />
                             ))}
                         </div>
@@ -222,10 +233,15 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                             {wolunList.map((w, idx) => (
                                 <LuckCard
                                     key={idx}
-                                    data={w}
+                                    header={`${w.month}월`}
+                                    ganzhi={w.ganzhi}
+                                    stemTenGod={w.stem_ten_god}
+                                    branchTenGod={w.jiji_ten_god}
+                                    growth={w.twelve_growth}
+                                    sinsal={w.sinsal || "-"}
+                                    relations={w.relations || "-"}
                                     isSelected={selectedWolun?.month === w.month}
-                                    onClick={() => setSelectedWolun(w)}
-                                    type="wolun"
+                                    onClick={() => handleWolunSelect(w)}
                                 />
                             ))}
                         </div>
