@@ -20,6 +20,32 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
     const [isLoadingWolun, setIsLoadingWolun] = useState(false);
     const [selectedWolun, setSelectedWolun] = useState<any>(null);
 
+    // handleSeyunSelect를 handleDaeunSelect보다 먼저 선언하여 참조 에러 방지
+    const handleSeyunSelect = useCallback(async (seyun: any) => {
+        setSelectedSeyun(seyun);
+        setSelectedWolun(null);
+        setIsLoadingWolun(true);
+        try {
+            const res = await fetch(`${apiBase}/wolun`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    day_gan: sajuData.pillars.day.stem,
+                    year_branch: sajuData.pillars.year.branch,
+                    year_pillar: seyun.ganzhi,
+                    pillars: sajuData.pillars,
+                    day_branch: sajuData.pillars.day.branch
+                }),
+            });
+            const data = await res.json();
+            setWolunList(data);
+        } catch (err) {
+            console.error("Failed to fetch Wolun", err);
+        } finally {
+            setIsLoadingWolun(false);
+        }
+    }, [apiBase, sajuData]);
+
     const handleDaeunSelect = useCallback(async (daeun: any) => {
         setSelectedDaeun(daeun);
         setSelectedSeyun(null);
@@ -56,31 +82,6 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
             setIsLoadingSeyun(false);
         }
     }, [apiBase, sajuData, handleSeyunSelect]);
-
-    const handleSeyunSelect = useCallback(async (seyun: any) => {
-        setSelectedSeyun(seyun);
-        setSelectedWolun(null);
-        setIsLoadingWolun(true);
-        try {
-            const res = await fetch(`${apiBase}/wolun`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    day_gan: sajuData.pillars.day.stem,
-                    year_branch: sajuData.pillars.year.branch,
-                    year_pillar: seyun.ganzhi,
-                    pillars: sajuData.pillars,
-                    day_branch: sajuData.pillars.day.branch
-                }),
-            });
-            const data = await res.json();
-            setWolunList(data);
-        } catch (err) {
-            console.error("Failed to fetch Wolun", err);
-        } finally {
-            setIsLoadingWolun(false);
-        }
-    }, [apiBase, sajuData]);
 
     const handleWolunSelect = (wolun: any) => {
         setSelectedWolun(wolun);
