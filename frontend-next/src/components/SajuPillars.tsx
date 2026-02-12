@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -62,7 +64,8 @@ function PillarCard({ label, ganzhi, tenGod, growth, sinsal, relations, terms }:
     );
 }
 
-export function SajuPillars({ data, terms }: { data: Record<string, unknown>; terms: Record<string, string> }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function SajuPillars({ data, terms }: { data: any; terms: Record<string, string> }) {
     if (!data || !data.pillars) return null;
 
     const pillars = [

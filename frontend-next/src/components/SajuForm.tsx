@@ -14,7 +14,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 
 interface SajuFormProps {
-    onCalculate: (data: Record<string, any>) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onCalculate: (data: any) => void;
     isLoading: boolean;
 }
 
