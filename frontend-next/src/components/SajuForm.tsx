@@ -14,7 +14,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 
 interface SajuFormProps {
-    onCalculate: (data: any) => void;
+    onCalculate: (data: Record<string, any>) => void;
     isLoading: boolean;
 }
 
