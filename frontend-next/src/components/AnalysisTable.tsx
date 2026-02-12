@@ -30,7 +30,7 @@ export function AnalysisTable({
         if (terms[item]) return terms[item];
 
         // 2. 괄호 제거 및 정규화
-        let baseTerm = item.replace(/\(.*\)/, "").trim();
+        const baseTerm = item.replace(/\(.*\)/, "").trim();
 
         // 3. 복합 관계 처리 (년-월 충 -> 충)
         if (baseTerm.includes(" ")) {

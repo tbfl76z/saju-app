@@ -12,10 +12,11 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").re
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
-  const [sajuData, setSajuData] = useState<any>(null);
+  const [sajuData, setSajuData] = useState<any | null>(null);
   const [terms, setTerms] = useState<Record<string, string>>({});
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiQuery, setAiQuery] = useState("");
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -26,9 +27,7 @@ export default function Home() {
       .catch((err) => console.error("Failed to fetch terms", err));
   }, []);
 
-  if (!isMounted) return null;
-
-  const handleCalculate = async (formData: any) => {
+  const handleCalculate = async (formData: Record<string, any>) => {
     setIsLoading(true);
     setAiAnalysis("");
     try {
@@ -46,8 +45,6 @@ export default function Home() {
       setIsLoading(false);
     }
   };
-
-  const [aiQuery, setAiQuery] = useState("");
 
   const handleAiAnalyze = async (type: string = "total") => {
     if (!sajuData) return;
@@ -72,6 +69,8 @@ export default function Home() {
       setIsAiLoading(false);
     }
   };
+
+  if (!isMounted) return null;
 
   return (
     <main className="min-h-screen pb-20 selection:bg-amber-100">

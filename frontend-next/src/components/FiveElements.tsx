@@ -1,4 +1,4 @@
-import { Progress } from "@/components/ui/progress";
+// import { Progress } from "@/components/ui/progress"; // Removed for lint
 
 interface FiveElementsProps {
     elements: Record<string, number>;
