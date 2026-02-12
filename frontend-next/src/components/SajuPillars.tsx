@@ -62,7 +62,7 @@ function PillarCard({ label, ganzhi, tenGod, growth, sinsal, relations, terms }:
     );
 }
 
-export function SajuPillars({ data, terms }: { data: any; terms: any }) {
+export function SajuPillars({ data, terms }: { data: Record<string, any>; terms: Record<string, string> }) {
     if (!data || !data.pillars) return null;
 
     const pillars = [
