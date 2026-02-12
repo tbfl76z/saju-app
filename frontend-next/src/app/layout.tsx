@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const notoSerif = Noto_Serif_KR({
   variable: "--font-noto-serif",
   weight: ["400", "700"],
-  subsets: ["latin"],
+  subsets: ["latin"], // Using latin as it's often the default fallback, but adding korean if supported or keeping it simple
 });
 
 export const metadata: Metadata = {
@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} font-noto antialiased bg-slate-50`}
       >

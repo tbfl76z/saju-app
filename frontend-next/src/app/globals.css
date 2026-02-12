@@ -48,98 +48,77 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --radius: 1rem;
+  --background: oklch(0.99 0.005 240);
+  --foreground: oklch(0.2 0.02 240);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --card-foreground: oklch(0.2 0.02 240);
+  --primary: oklch(0.45 0.15 45);
+  /* Goldish */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  --border: oklch(0.9 0.02 240);
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Saju Element Colors (Modernized) */
+  --saju-wood: #2D5A27;
+  /* Deep Green */
+  --saju-fire: #C0392B;
+  /* Deep Red */
+  --saju-earth: #D4AF37;
+  /* Royal Gold */
+  --saju-metal: #7F8C8D;
+  /* Silver Gray */
+  --saju-water: #2C3E50;
+  /* Midnight Blue */
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
   body {
-    @apply bg-slate-50 text-foreground;
+    @apply bg-slate-50 text-foreground antialiased;
     font-family: var(--font-noto-serif), serif;
+    background-image:
+      radial-gradient(at 0% 0%, hsla(45, 60%, 92%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(220, 30%, 95%, 1) 0, transparent 50%);
+    background-attachment: fixed;
   }
 }
 
 @layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-xl rounded-3xl overflow-hidden;
+  }
+
   .premium-report {
-    @apply leading-relaxed text-slate-800;
+    @apply leading-relaxed text-slate-800 font-sans;
   }
+
   .premium-report p {
-    @apply mb-4;
+    @apply mb-6;
   }
-  .premium-report h1, .premium-report h2, .premium-report h3 {
-    @apply font-bold text-slate-900 mt-8 mb-4 border-l-4 border-slate-800 pl-4;
+
+  .premium-report h1,
+  .premium-report h2,
+  .premium-report h3 {
+    @apply font-bold text-slate-900 mt-10 mb-6 border-b-2 border-[#d4af37]/30 pb-2 font-noto-serif;
   }
-  .premium-report ul, .premium-report ol {
-    @apply ml-6 mb-4 list-disc;
+
+  .saju-pillar-box {
+    @apply flex flex-col items-center justify-center p-4 rounded-2xl transition-all hover:scale-105 shadow-sm;
   }
-  .premium-report li {
-    @apply mb-2;
+
+  /* Custom Animations */
+  .fade-up {
+    animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
