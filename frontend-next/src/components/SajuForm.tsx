@@ -55,7 +55,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                             <Label className="text-slate-600 font-bold ml-1">성별</Label>
                             <Select
                                 value={formData.gender}
-                                onValueChange={(val) => setFormData({ ...formData, gender: val })}
+                                onValueChange={(val: string) => setFormData({ ...formData, gender: val })}
                             >
                                 <SelectTrigger className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12">
                                     <SelectValue placeholder="성별 선택" />
