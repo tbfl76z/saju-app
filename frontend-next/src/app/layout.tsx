@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Serif_KR } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,6 +17,7 @@ const geistMono = Geist_Mono({
 const notoSerif = Noto_Serif_KR({
   variable: "--font-noto-serif",
   weight: ["400", "700"],
+  display: "swap",
   preload: false,
 });
 
@@ -31,9 +34,12 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} font-noto antialiased bg-slate-50`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} font-noto antialiased bg-slate-50 dark:bg-slate-950`}
       >
-        {children}
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

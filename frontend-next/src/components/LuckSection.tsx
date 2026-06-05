@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { LuckCard } from "./LuckCard";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AnalyzeButtons } from "@/components/AnalyzeButtons";
 
 interface LuckSectionProps {
     sajuData: any;
-    terms: any;
+    terms?: any;
     apiBase: string;
 }
 
-export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
+export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
     const [selectedDaeun, setSelectedDaeun] = useState<any>(null);
     const [seyunList, setSeyunList] = useState<any[]>([]);
     const [selectedSeyun, setSelectedSeyun] = useState<any>(null);
@@ -37,10 +37,18 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                     day_branch: sajuData.pillars.day.branch
                 }),
             });
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText || `Wolun request failed with status ${res.status}`);
+            }
             const data = await res.json();
+            if (!Array.isArray(data)) {
+                throw new Error("Invalid wolun response");
+            }
             setWolunList(data);
         } catch (err) {
             console.error("Failed to fetch Wolun", err);
+            setWolunList([]);
         } finally {
             setIsLoadingWolun(false);
         }
@@ -68,7 +76,14 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                     day_branch: sajuData.pillars.day.branch
                 }),
             });
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText || `Seyun request failed with status ${res.status}`);
+            }
             const data = await res.json();
+            if (!Array.isArray(data)) {
+                throw new Error("Invalid seyun response");
+            }
             setSeyunList(data);
 
             const nowYear = new Date().getFullYear();
@@ -78,6 +93,7 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
             }
         } catch (err) {
             console.error("Failed to fetch Seyun", err);
+            setSeyunList([]);
         } finally {
             setIsLoadingSeyun(false);
         }
@@ -107,40 +123,6 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
         }
     }, [sajuData, handleDaeunSelect]);
 
-    const [analysisResult, setAnalysisResult] = useState("");
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [activeTab, setActiveTab] = useState<string | null>(null);
-
-    const handleAnalyze = async (type: string) => {
-        setIsAnalyzing(true);
-        setAnalysisResult("");
-        setActiveTab(type);
-        try {
-            const res = await fetch(`${apiBase}/analyze`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    saju_data: sajuData,
-                    analysis_type: type,
-                    query: (type === 'daeun' ? `${selectedDaeun?.age}세 대운 분석` :
-                        type === 'seyun' ? `${selectedSeyun?.year}년 세운 분석` :
-                            type === 'wolun' ? `${selectedWolun?.month}월 월운 분석` : "")
-                }),
-            });
-            const data = await res.json();
-            setAnalysisResult(data.result);
-
-            setTimeout(() => {
-                document.getElementById('analysis-result')?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-        } catch (err) {
-            console.error("Analysis failed", err);
-            setAnalysisResult("분석 중 오류가 발생했습니다. 다시 시도해 주세요.");
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
-
     return (
         <div className="space-y-12">
             <section className="fade-up">
@@ -165,15 +147,11 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                     ))}
                 </div>
                 {selectedDaeun && (
-                    <div className="mt-8 flex justify-center">
-                        <Button
-                            onClick={() => handleAnalyze('daeun')}
-                            disabled={isAnalyzing}
-                            className="rounded-full px-8 bg-slate-900 hover:bg-slate-800 text-white"
-                        >
-                            {isAnalyzing && activeTab === 'daeun' ? "분석 중..." : `${selectedDaeun.age}세 대운 AI 분석`}
-                        </Button>
-                    </div>
+                    <AnalyzeButtons
+                        apiBase={apiBase}
+                        className="mt-8"
+                        body={{ saju_data: sajuData, analysis_type: 'daeun', query: `${selectedDaeun.age}세 대운 분석` }}
+                    />
                 )}
             </section>
 
@@ -206,15 +184,11 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                         </div>
                     )}
                     {selectedSeyun && (
-                        <div className="mt-8 flex justify-center">
-                            <Button
-                                onClick={() => handleAnalyze('seyun')}
-                                disabled={isAnalyzing}
-                                className="rounded-full px-8 bg-slate-900 hover:bg-slate-800 text-white"
-                            >
-                                {isAnalyzing && activeTab === 'seyun' ? "분석 중..." : `${selectedSeyun.year}년 세운 AI 분석`}
-                            </Button>
-                        </div>
+                        <AnalyzeButtons
+                            apiBase={apiBase}
+                            className="mt-8"
+                            body={{ saju_data: sajuData, analysis_type: 'seyun', query: `${selectedSeyun.year}년 세운 분석` }}
+                        />
                     )}
                 </section>
             )}
@@ -248,29 +222,13 @@ export function LuckSection({ sajuData, terms, apiBase }: LuckSectionProps) {
                         </div>
                     )}
                     {selectedWolun && (
-                        <div className="mt-8 flex justify-center">
-                            <Button
-                                onClick={() => handleAnalyze('wolun')}
-                                disabled={isAnalyzing}
-                                className="rounded-full px-8 bg-slate-900 hover:bg-slate-800 text-white"
-                            >
-                                {isAnalyzing && activeTab === 'wolun' ? "분석 중..." : `${selectedWolun.month}월 월운 AI 분석`}
-                            </Button>
-                        </div>
+                        <AnalyzeButtons
+                            apiBase={apiBase}
+                            className="mt-8"
+                            body={{ saju_data: sajuData, analysis_type: 'wolun', query: `${selectedWolun.month}월 월운 분석` }}
+                        />
                     )}
                 </section>
-            )}
-
-            {analysisResult && (
-                <div id="analysis-result" className="glass-card p-8 border-amber-200/50 bg-amber-50/30 animate-in zoom-in-95 duration-500">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl">✨</div>
-                        <h4 className="text-xl font-bold text-slate-900 font-noto-serif">AI 프리미엄 운세 분석</h4>
-                    </div>
-                    <div className="premium-report whitespace-pre-wrap text-slate-700 leading-relaxed text-lg">
-                        {analysisResult}
-                    </div>
-                </div>
             )}
         </div>
     );

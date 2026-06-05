@@ -29,27 +29,27 @@ export function LuckCard({
             onClick={onClick}
             className={cn(
                 "cursor-pointer transition-all hover:scale-[1.02] border-[#d4af37]/20",
-                isSelected ? " ring-2 ring-[#d4af37] bg-[#d4af37]/5" : "bg-white"
+                isSelected ? " ring-2 ring-[#d4af37] bg-[#d4af37]/5" : "bg-white dark:bg-slate-900/70"
             )}
         >
             <CardContent className="p-3 text-center space-y-2">
                 <div className="text-[10px] text-muted-foreground uppercase">{header}</div>
-                <div className="text-xl font-bold text-slate-800">{ganzhi}</div>
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{ganzhi}</div>
 
-                <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px]">
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-2 gap-1 text-[10px]">
                     <div className="text-left">
                         <div className="text-muted-foreground">십성</div>
-                        <div className="font-semibold text-rose-600 truncate">{stemTenGod} | {branchTenGod}</div>
+                        <div className="font-semibold text-rose-600 dark:text-rose-400 truncate">{stemTenGod} | {branchTenGod}</div>
                     </div>
                     <div className="text-right">
                         <div className="text-muted-foreground">운성</div>
-                        <div className="font-semibold text-blue-600">{growth}</div>
+                        <div className="font-semibold text-blue-600 dark:text-blue-400">{growth}</div>
                     </div>
                 </div>
 
                 <div className="space-y-0.5">
-                    <div className="text-[9px] text-amber-600 truncate">✨ {sinsal}</div>
-                    <div className="text-[9px] text-purple-600 truncate">🔗 {relations}</div>
+                    <div className="text-[9px] text-amber-600 dark:text-amber-400 truncate">✨ {sinsal}</div>
+                    <div className="text-[9px] text-purple-600 dark:text-purple-400 truncate">🔗 {relations}</div>
                 </div>
             </CardContent>
         </Card>

@@ -90,12 +90,12 @@ export function AnalysisTable({
                                                         {value}
                                                     </div>
                                                 </PopoverTrigger>
-                                                <PopoverContent className="w-64 p-4 z-50">
+                                                <PopoverContent className="w-64 p-4 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl rounded-2xl">
                                                     <div className="space-y-4">
                                                         {value.split('|').map(v => v.trim()).map((item, idx) => (
-                                                            <div key={idx} className={idx > 0 ? "pt-2 border-t border-slate-100" : ""}>
+                                                            <div key={idx} className={idx > 0 ? "pt-2 border-t border-slate-100 dark:border-slate-700" : ""}>
                                                                 <div className="font-bold text-[#d4af37] mb-1">{item}</div>
-                                                                <div className="text-xs leading-relaxed text-slate-600">{getDesc(item)}</div>
+                                                                <div className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">{getDesc(item)}</div>
                                                             </div>
                                                         ))}
                                                     </div>

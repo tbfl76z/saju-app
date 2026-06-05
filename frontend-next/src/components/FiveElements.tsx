@@ -6,25 +6,26 @@ interface FiveElementsProps {
 
 export function FiveElements({ elements }: FiveElementsProps) {
     const labels = ["목", "화", "토", "금", "수"];
-    const colors: Record<string, string> = {
-        목: "bg-[#2D5A27]", // Deep Wood
-        화: "bg-[#C0392B]", // Deep Fire
-        토: "bg-[#D4AF37]", // Royal Earth
-        금: "bg-[#7F8C8D]", // Industrial Metal
-        수: "bg-[#2C3E50]", // Deep Water
+    // 막대 색은 globals.css의 --saju-* CSS 변수를 사용(다크모드에서 자동 보정)
+    const barVars: Record<string, string> = {
+        목: "var(--saju-wood)",
+        화: "var(--saju-fire)",
+        토: "var(--saju-earth)",
+        금: "var(--saju-metal)",
+        수: "var(--saju-water)",
     };
 
     const lightColors: Record<string, string> = {
-        목: "bg-green-50",
-        화: "bg-red-50",
-        토: "bg-amber-50",
-        금: "bg-slate-50",
-        수: "bg-blue-50",
+        목: "bg-green-50 dark:bg-green-950/30",
+        화: "bg-red-50 dark:bg-red-950/30",
+        토: "bg-amber-50 dark:bg-amber-950/30",
+        금: "bg-slate-50 dark:bg-slate-800/40",
+        수: "bg-blue-50 dark:bg-blue-950/30",
     };
 
     return (
         <div className="my-12 fade-up">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
                 <span className="text-2xl">🔮</span>
                 <span className="border-b-2 border-[#d4af37]/30 pb-1">오행의 기운 분포</span>
             </h3>
@@ -38,12 +39,12 @@ export function FiveElements({ elements }: FiveElementsProps) {
                             className={`glass-card p-4 transition-all hover:scale-105 ${lightColors[label]} border-white/20`}
                             style={{ animationDelay: `${idx * 0.1}s` }}
                         >
-                            <div className="text-xs md:text-sm font-bold text-slate-600 mb-2">{label}</div>
-                            <div className="text-xl md:text-3xl font-light mb-4 text-slate-900">{val}<span className="text-xs md:text-sm text-slate-400 ml-0.5">개</span></div>
-                            <div className="h-2 w-full bg-white/50 rounded-full overflow-hidden">
+                            <div className="text-xs md:text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">{label}</div>
+                            <div className="text-xl md:text-3xl font-light mb-4 text-slate-900 dark:text-slate-100">{val}<span className="text-xs md:text-sm text-slate-400 dark:text-slate-500 ml-0.5">개</span></div>
+                            <div className="h-2 w-full bg-white/50 dark:bg-white/10 rounded-full overflow-hidden">
                                 <div
-                                    className={`h-full ${colors[label]} transition-all duration-1000 ease-out`}
-                                    style={{ width: `${percentage}%` }}
+                                    className="h-full transition-all duration-1000 ease-out"
+                                    style={{ width: `${percentage}%`, backgroundColor: barVars[label] }}
                                 />
                             </div>
                         </div>

@@ -23,6 +23,10 @@ knowledge_base.txt
 *.pdf
 !data/.gitkeep
 
+# SQLite (공유 링크 저장소 - 런타임 생성물)
+*.db
+shares.db
+
 # OS
 .DS_Store
 Thumbs.db

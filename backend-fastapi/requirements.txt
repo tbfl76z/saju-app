@@ -5,3 +5,5 @@ python-dotenv
 sajupy
 pandas
 geopy
+python-telegram-bot
+pymupdf

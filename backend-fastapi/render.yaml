@@ -1,0 +1,11 @@
+services:
+  - type: worker
+    name: saju-telegram-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false  # Render 대시보드에서 직접 입력
+      - key: GOOGLE_API_KEY
+        sync: false  # Render 대시보드에서 직접 입력

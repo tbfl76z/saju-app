@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { notify } from "@/lib/useToast";
 
 interface SajuFormProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,8 +33,24 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
         is_leap: false,
     });
 
+    // 클라이언트 입력 검증으로 백엔드 500을 예방한다
+    const validate = (): string | null => {
+        const { year, month, day, hour, minute } = formData;
+        if (!year || year < 1900 || year > 2100) return "연도는 1900~2100 사이여야 합니다.";
+        if (!month || month < 1 || month > 12) return "월은 1~12 사이여야 합니다.";
+        if (!day || day < 1 || day > 31) return "일은 1~31 사이여야 합니다.";
+        if (hour < 0 || hour > 23) return "시는 0~23 사이여야 합니다.";
+        if (minute < 0 || minute > 59) return "분은 0~59 사이여야 합니다.";
+        return null;
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const error = validate();
+        if (error) {
+            notify.error("입력값을 확인해 주세요", error);
+            return;
+        }
         onCalculate(formData);
     };
 
@@ -43,22 +60,22 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                 <form onSubmit={handleSubmit} className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-3">
-                            <Label htmlFor="name" className="text-slate-600 font-bold ml-1">성함 (선택)</Label>
+                            <Label htmlFor="name" className="text-slate-600 dark:text-slate-300 font-bold ml-1">성함 (선택)</Label>
                             <Input
                                 id="name"
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 placeholder="홍길동"
-                                className="bg-white/50 border-slate-200 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] rounded-xl h-12 transition-all"
+                                className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] rounded-xl h-12 transition-all"
                             />
                         </div>
                         <div className="space-y-3">
-                            <Label className="text-slate-600 font-bold ml-1">성별</Label>
+                            <Label className="text-slate-600 dark:text-slate-300 font-bold ml-1">성별</Label>
                             <Select
                                 value={formData.gender}
                                 onValueChange={(val: string) => setFormData({ ...formData, gender: val })}
                             >
-                                <SelectTrigger className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12">
+                                <SelectTrigger className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12">
                                     <SelectValue placeholder="성별 선택" />
                                 </SelectTrigger>
                                 <SelectContent className="glass-card border-none shadow-xl">
@@ -70,7 +87,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="flex items-center gap-2 text-slate-600 font-bold ml-1">
+                        <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold ml-1">
                             <span className="text-lg">📅</span> 생년월일
                         </Label>
                         <div className="grid grid-cols-3 gap-3">
@@ -81,7 +98,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
                                     min={1900}
                                     max={2100}
-                                    className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">년</span>
                             </div>
@@ -92,7 +109,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
                                     min={1}
                                     max={12}
-                                    className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">월</span>
                             </div>
@@ -103,7 +120,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, day: parseInt(e.target.value) })}
                                     min={1}
                                     max={31}
-                                    className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">일</span>
                             </div>
@@ -111,7 +128,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="flex items-center gap-2 text-slate-600 font-bold ml-1">
+                        <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold ml-1">
                             <span className="text-lg">⏰</span> 태어난 시간
                         </Label>
                         <div className="grid grid-cols-2 gap-6">
@@ -122,7 +139,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, hour: parseInt(e.target.value) })}
                                     min={0}
                                     max={23}
-                                    className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">시</span>
                             </div>
@@ -133,7 +150,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, minute: parseInt(e.target.value) })}
                                     min={0}
                                     max={59}
-                                    className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">분</span>
                             </div>
@@ -142,12 +159,12 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
 
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-3">
-                            <Label className="text-slate-600 font-bold ml-1">달력 유형</Label>
+                            <Label className="text-slate-600 dark:text-slate-300 font-bold ml-1">달력 유형</Label>
                             <Select
                                 value={formData.calendar_type}
                                 onValueChange={(val: string) => setFormData({ ...formData, calendar_type: val })}
                             >
-                                <SelectTrigger className="bg-white/50 border-slate-200 focus:border-[#d4af37] rounded-xl h-12">
+                                <SelectTrigger className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="glass-card border-none shadow-xl">
