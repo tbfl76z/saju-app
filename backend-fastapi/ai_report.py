@@ -13,15 +13,19 @@ import google.generativeai as genai
 from saju_utils import get_ilun_data, get_seyun_data
 
 # 모델 우선순위 (최신 → 구형 폴백). list_models 검증으로 미존재 모델은 자동 제외된다.
+# 각 모델은 무료등급에서 별도 일일 한도(RPD)를 가지므로, 체인이 길수록 하루 가용 횟수가 늘어난다.
 PRIORITY_MODELS = [
+    'models/gemini-3.5-flash',
     'models/gemini-2.5-flash',
     'models/gemini-2.0-flash',
     'models/gemini-1.5-flash',
     'models/gemini-pro',
 ]
 
-KNOWLEDGE_CONTEXT_LIMIT = int(os.getenv("KNOWLEDGE_CONTEXT_LIMIT", "240000"))
-KNOWLEDGE_FALLBACK_LIMIT = int(os.getenv("KNOWLEDGE_FALLBACK_LIMIT", "60000"))
+# 지식베이스 컨텍스트 한도(글자수). 무료등급 TPM(분당 토큰)·비용·속도를 고려해 축소.
+# 더 깊은 풀이가 필요하면 환경변수로 키울 수 있다.
+KNOWLEDGE_CONTEXT_LIMIT = int(os.getenv("KNOWLEDGE_CONTEXT_LIMIT", "50000"))
+KNOWLEDGE_FALLBACK_LIMIT = int(os.getenv("KNOWLEDGE_FALLBACK_LIMIT", "20000"))
 
 # 분석 타입별 리포트 헤더 (단일 출처)
 HEADERS = {
