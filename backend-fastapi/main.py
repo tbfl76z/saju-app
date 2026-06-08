@@ -275,6 +275,7 @@ class AnalysisRequest(BaseModel):
     partner_saju_data: Optional[Dict[str, Any]] = None  # 궁합 분석용 상대 명식
     target_year: Optional[int] = None  # 신년/오늘 기준 연도
     level: Optional[str] = "advanced"  # 'easy'(쉬운 설명) | 'advanced'(고급 풀이)
+    category: Optional[str] = None  # love|wealth|career|health (newyear 분야별 운세)
 
 @app.post("/analyze")
 async def analyze(req: AnalysisRequest):

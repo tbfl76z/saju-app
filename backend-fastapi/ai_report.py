@@ -38,6 +38,20 @@ HEADERS = {
 # 원국/전체는 매뉴얼 우선, 그 외(시간 운세·오늘·궁합·신년)는 sample_knowledge 우선
 MANUAL_TYPES = {"total", "original"}
 
+# 올해(세운) 분야별 운세 — 같은 세운 데이터에 '이 분야에 집중' 지시를 주입한다
+CATEGORY_FOCUS = {
+    "love": "이 해의 '연애·인연운'에 집중하세요. 세운 천간/지지가 원국의 재성(정재·편재)·관성(정관·편관)과 맺는 관계, 도화·홍염살, 일지의 합·충을 근거로 만남·관계의 흐름을 풀이하세요.",
+    "wealth": "이 해의 '금전·재물운'에 집중하세요. 세운과 원국 재성의 왕쇠, 식상생재 구조, 비겁의 재성 극(劫財) 여부를 근거로 수입·지출·투자의 흐름을 풀이하세요.",
+    "career": "이 해의 '진로·직업운'에 집중하세요. 관성(직장·조직)·식상(사업·표현)·인성(학업·자격)의 동향과 세운의 작용을 근거로 이직·승진·시험·창업의 흐름을 풀이하세요.",
+    "health": "이 해의 '건강운'에 집중하세요. 오행의 과다·고립, 일간의 신강/신약, 세운으로 인한 충·형·합의 자극을 근거로 주의할 신체 영역과 양생법을 풀이하세요.",
+}
+CATEGORY_HEADERS = {
+    "love": "💕 올해의 연애운",
+    "wealth": "💰 올해의 금전운",
+    "career": "🧭 올해의 진로운",
+    "health": "🌿 올해의 건강운",
+}
+
 SYSTEM_INSTRUCTION = (
     "당신은 사주 명리학의 깊이 있는 통찰을 전하는 인격 고매한 대가입니다.\n"
     "지식 참조 원칙:\n"
@@ -192,7 +206,12 @@ def build_prompt(req: Any) -> str:
     data = req.saju_data
     pillars = data.get("pillars", {})
     atype = getattr(req, "analysis_type", "total") or "total"
-    report_header = HEADERS.get(atype, HEADERS["total"])
+    category = getattr(req, "category", None)
+    # 분야별 운세(newyear+category)는 전용 헤더로 톤을 분야에 수렴
+    if atype == "newyear" and category in CATEGORY_HEADERS:
+        report_header = CATEGORY_HEADERS[category]
+    else:
+        report_header = HEADERS.get(atype, HEADERS["total"])
     knowledge_context = build_knowledge_context(atype)
     query = build_query(req)
     name = sanitize(data.get("name", "사용자")) or "사용자"
@@ -236,6 +255,11 @@ def build_prompt(req: Any) -> str:
     except Exception as e:
         print(f"time_block 산출 오류: {e}")
 
+    # 올해 분야별 운세: 집중 분석 지시 주입
+    category_block = ""
+    if atype == "newyear" and category in CATEGORY_FOCUS:
+        category_block = f"\n        [집중 분석 지시]\n        - {CATEGORY_FOCUS[category]}"
+
     prompt = f"""
         {report_header}
 
@@ -249,7 +273,7 @@ def build_prompt(req: Any) -> str:
         - 십성 구성: 년({data.get('ten_gods', {}).get('year', '-')}/{data.get('jiji_ten_gods', {}).get('year', '-')}), 일(본인/{data.get('jiji_ten_gods', {}).get('day', '-')})
         - 십이운성: {data.get('twelve_growth', {})}
         - 신살 및 상호관계: {data.get('sinsal', '없음')}, {data.get('relations', '특이사항 없음')}
-        {fortune_line}{partner_block}{time_block}
+        {fortune_line}{partner_block}{time_block}{category_block}
 
         [분석 요청 사항]
         {query}

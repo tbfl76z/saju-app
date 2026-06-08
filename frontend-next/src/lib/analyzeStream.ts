@@ -12,6 +12,7 @@ export interface AnalyzeBody {
     partner_saju_data?: any;
     target_year?: number;
     level?: "easy" | "advanced";
+    category?: "love" | "wealth" | "career" | "health";
 }
 
 // onDelta는 누적된 전체 텍스트를 전달한다. 최종 전체 텍스트를 반환.
