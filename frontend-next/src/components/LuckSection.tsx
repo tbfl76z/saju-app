@@ -150,6 +150,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                     <AnalyzeButtons
                         apiBase={apiBase}
                         className="mt-8"
+                        title={`${selectedDaeun.age}세 대운`}
                         body={{ saju_data: sajuData, analysis_type: 'daeun', query: `${selectedDaeun.age}세 대운 분석` }}
                     />
                 )}
@@ -187,6 +188,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                         <AnalyzeButtons
                             apiBase={apiBase}
                             className="mt-8"
+                            title={`${selectedSeyun.year}년 세운`}
                             body={{ saju_data: sajuData, analysis_type: 'seyun', query: `${selectedSeyun.year}년 세운 분석` }}
                         />
                     )}
@@ -225,6 +227,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                         <AnalyzeButtons
                             apiBase={apiBase}
                             className="mt-8"
+                            title={`${selectedWolun.month}월 월운`}
                             body={{ saju_data: sajuData, analysis_type: 'wolun', query: `${selectedWolun.month}월 월운 분석` }}
                         />
                     )}

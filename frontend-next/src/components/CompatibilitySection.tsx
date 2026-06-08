@@ -169,6 +169,7 @@ export function CompatibilitySection({ apiBase, terms }: CompatibilitySectionPro
                     {/* 3단계: AI 궁합 풀이 — 쉬운 설명 / 고급 풀이 */}
                     <AnalyzeButtons
                         apiBase={apiBase}
+                        title="궁합 풀이"
                         body={{ saju_data: personA, partner_saju_data: personB, analysis_type: "compatibility" }}
                     />
                 </div>

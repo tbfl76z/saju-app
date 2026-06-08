@@ -139,6 +139,7 @@ export function NewYearSection({ sajuData, apiBase }: NewYearSectionProps) {
             {result && (
                 <AnalyzeButtons
                     apiBase={apiBase}
+                    title={`${selectedYear}년 신년운세`}
                     body={{ saju_data: sajuData, analysis_type: "newyear", target_year: selectedYear, query: `${selectedYear}년 신년운세` }}
                 />
             )}

@@ -1,10 +1,11 @@
 services:
   # FastAPI 웹 API (프론트엔드가 호출하는 /calculate, /ilun, /analyze 등)
-  # 같은 Dockerfile을 재사용하되 실행 명령만 uvicorn으로 override 한다.
+  # 백엔드 코드는 backend-fastapi/ 하위에 있으므로 rootDir로 지정한다.
   - type: web
     name: saju-api
     runtime: docker
     plan: free
+    rootDir: backend-fastapi
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -13,10 +14,12 @@ services:
       - key: GOOGLE_API_KEY
         sync: false  # Render 대시보드에서 직접 입력
 
-  # 텔레그램 봇 (기존 유지 — 변경 없음)
+  # 텔레그램 봇 (같은 Dockerfile의 기본 CMD = python telegram_bot.py 사용)
   - type: worker
     name: saju-telegram-bot
     runtime: docker
+    plan: free
+    rootDir: backend-fastapi
     dockerfilePath: ./Dockerfile
     dockerContext: .
     envVars:

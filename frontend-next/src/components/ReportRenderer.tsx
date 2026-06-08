@@ -1,11 +1,29 @@
 "use client";
 
+import { Fragment, type ReactNode } from "react";
+
 // AI 리포트 렌더러. '## 헤딩' 단위로 섹션 카드를 구성한다(경량 자체 파서).
 // 스트리밍 중 부분 텍스트도 안전하게 렌더한다.
 
 interface ReportRendererProps {
     text: string;
     streaming?: boolean;
+}
+
+// **굵게** 표시를 <strong>으로 렌더한다(줄바꿈은 whitespace-pre-wrap이 유지).
+function renderInline(text: string): ReactNode[] {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+        const m = part.match(/^\*\*([^*]+)\*\*$/);
+        if (m) {
+            return (
+                <strong key={i} className="font-bold text-slate-900 dark:text-amber-200">
+                    {m[1]}
+                </strong>
+            );
+        }
+        return <Fragment key={i}>{part}</Fragment>;
+    });
 }
 
 // 헤딩 키워드별 아이콘 매핑
@@ -65,7 +83,7 @@ export function ReportRenderer({ text, streaming = false }: ReportRendererProps)
     if (!hasHeadings) {
         return (
             <div className="premium-report whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed text-lg">
-                {text}
+                {renderInline(text)}
                 {streaming && <span className="inline-block w-2 h-5 ml-0.5 bg-[#d4af37] animate-pulse align-middle" />}
             </div>
         );
@@ -85,7 +103,7 @@ export function ReportRenderer({ text, streaming = false }: ReportRendererProps)
                         </h4>
                     )}
                     <div className="premium-report whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed">
-                        {s.body.trim()}
+                        {renderInline(s.body.trim())}
                         {streaming && idx === sections.length - 1 && (
                             <span className="inline-block w-2 h-5 ml-0.5 bg-[#d4af37] animate-pulse align-middle" />
                         )}
