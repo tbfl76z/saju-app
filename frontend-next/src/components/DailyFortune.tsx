@@ -64,7 +64,7 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
     const [month, setMonth] = useState<FortuneCard | null>(null);
     const [year, setYear] = useState<FortuneCard | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [selected, setSelected] = useState<PeriodKey>("total");
+    const [selected, setSelected] = useState<PeriodKey>("year");
     const [category, setCategory] = useState<CategoryKey | null>(null);
 
     const lastDateRef = useRef<string>("");
