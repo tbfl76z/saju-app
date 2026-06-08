@@ -10,7 +10,8 @@ function resolveBackground(): string {
 }
 
 async function capture(node: HTMLElement): Promise<HTMLCanvasElement> {
-    const { default: html2canvas } = await import("html2canvas");
+    // html2canvas-pro: Tailwind v4의 oklch()/lab()/color() 등 최신 색상 함수 지원
+    const { default: html2canvas } = await import("html2canvas-pro");
     return html2canvas(node, {
         backgroundColor: resolveBackground(),
         scale: 2, // 고해상도
