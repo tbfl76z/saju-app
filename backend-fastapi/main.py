@@ -55,13 +55,15 @@ class SajuRequest(BaseModel):
     minute: int = 0
     calendar_type: str = "양력"
     is_leap: bool = False
+    unknown_time: bool = False  # 태어난 시간 모름 (시주는 참고용 처리)
 
 @app.post("/calculate")
 async def calculate(req: SajuRequest):
     try:
         b_year, b_month, b_day = req.year, req.month, req.day
-        b_hour, b_minute = req.hour, req.minute
-        
+        # 시간 미상이면 정오(12:00)로 계산해 자시 경계 오류를 피하고 시주는 참고용으로 표시한다
+        b_hour, b_minute = (12, 0) if req.unknown_time else (req.hour, req.minute)
+
         # 1. Calculate Saju
         saju_res = calc.calculate_saju(
             b_year, b_month, b_day, 
@@ -83,9 +85,10 @@ async def calculate(req: SajuRequest):
         # 3. Extend data
         details = get_extended_saju_data(details, gender=req.gender)
 
-        # 4. 입력 정보(이름/성별)를 응답에 포함 (저장·표시·AI 분석용)
+        # 4. 입력 정보(이름/성별/시간미상)를 응답에 포함 (저장·표시·AI 분석용)
         details['name'] = req.name
         details['gender'] = req.gender
+        details['unknown_time'] = bool(req.unknown_time)
 
         return details
     except Exception as e:

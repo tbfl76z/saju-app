@@ -24,7 +24,7 @@ interface DailyFortuneProps {
     apiBase: string;
 }
 
-type PeriodKey = "today" | "month" | "year";
+type PeriodKey = "total" | "today" | "month" | "year";
 
 // 표준 JS 날짜 객체로 오늘 날짜를 YYYY-MM-DD로 구한다
 function getTodayISO(): string {
@@ -43,7 +43,7 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
     const [month, setMonth] = useState<FortuneCard | null>(null);
     const [year, setYear] = useState<FortuneCard | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [selected, setSelected] = useState<PeriodKey>("today");
+    const [selected, setSelected] = useState<PeriodKey>("total");
 
     // 자정 갱신 비교용
     const lastDateRef = useRef<string>("");
@@ -120,10 +120,27 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         };
     }, [fetchAll]);
 
+    // '전체' 카드는 원국 일주(본인)를 대표로 표시 (별도 호출 없이 명식에서 구성)
+    const dayP = sajuData?.pillars?.day;
+    const totalCard: FortuneCard | null = dayP
+        ? {
+            ganzhi: dayP.pillar,
+            stem_ten_god: "본인",
+            branch_ten_god: sajuData?.jiji_ten_gods?.day || "-",
+            twelve_growth: sajuData?.twelve_growth?.day || "-",
+            sinsal: sajuData?.sinsal?.day || "-",
+            relations: sajuData?.sinsal_details?.day?.relations || "-",
+        }
+        : null;
+
     // 기간별 메타 (라벨 / 카드데이터 / 분석 요청)
     const periods: { key: PeriodKey; label: string; data: FortuneCard | null; title: string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: any }[] = [
+        {
+            key: "total", label: "전체", data: totalCard, title: "나의 전체 운세",
+            body: { saju_data: sajuData, analysis_type: "total", query: "타고난 사주 전체를 깊이 있게 풀이" },
+        },
         {
             key: "today", label: "오늘", data: today, title: "오늘의 운세",
             body: { saju_data: sajuData, analysis_type: "today", query: `${getTodayISO()} 일진 분석` },
@@ -143,17 +160,17 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
     return (
         <section className="fade-up">
             <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
-                <span className="border-b-2 border-[#d4af37]/30 pb-1">🌗 오늘 · 이달 · 올해의 운세</span>
+                <span className="border-b-2 border-[#d4af37]/30 pb-1">🔮 나의 운세 — 전체 · 오늘 · 이달 · 올해</span>
             </h3>
 
             {isLoading ? (
-                <div className="grid grid-cols-3 gap-2 md:gap-3 max-w-2xl">
-                    {[0, 1, 2].map((i) => (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 max-w-3xl">
+                    {[0, 1, 2, 3].map((i) => (
                         <Skeleton key={i} className="h-40 rounded-2xl bg-slate-200/70 dark:bg-slate-700/50" />
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-2 md:gap-3 max-w-2xl">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 max-w-3xl">
                     {periods.map((p) => (
                         <div key={p.key}>
                             <div className="text-center text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">{p.label}</div>

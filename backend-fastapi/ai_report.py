@@ -202,6 +202,11 @@ def build_prompt(req: Any) -> str:
     if fortune and fortune.get("list"):
         fortune_line = f"- 현재 대운 정보: {fortune.get('num')}대운 / {fortune['list'][0].get('ganzhi', '-')}"
 
+    # 태어난 시간 미상이면 시주에 의존한 단정을 피하도록 명시
+    unknown_time_note = ""
+    if data.get("unknown_time"):
+        unknown_time_note = "\n        - ※ 태어난 시간 미상: 시주(時柱)는 불확실하므로 시주에 근거한 단정적 해석은 피하고, 년·월·일주 중심으로 풀이하세요."
+
     partner_block = ""
     if atype == "compatibility":
         partner_block = _compat_summary(getattr(req, "partner_saju_data", None))

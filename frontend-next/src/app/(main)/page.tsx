@@ -114,6 +114,13 @@ export default function Home() {
 
             <SaveShareBar sajuData={sajuData} aiAnalysis={aiAnalysis} captureRef={captureRef as React.RefObject<HTMLElement | null>} apiBase={API_BASE} />
 
+            {sajuData?.unknown_time && (
+              <div className="flex items-center gap-2 text-sm bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-600 dark:text-slate-300">
+                <span>⏱️</span>
+                <span>태어난 시간을 모름으로 입력하셨습니다. <b>시주(時)</b>는 참고용이며, 년·월·일주 중심으로 풀이됩니다.</span>
+              </div>
+            )}
+
             <div ref={captureRef} className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <SajuPillars data={sajuData} terms={terms} />
 

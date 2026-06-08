@@ -31,16 +31,20 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
         minute: 0,
         calendar_type: "양력",
         is_leap: false,
+        unknown_time: false,
     });
 
     // 클라이언트 입력 검증으로 백엔드 500을 예방한다
     const validate = (): string | null => {
-        const { year, month, day, hour, minute } = formData;
+        const { year, month, day, hour, minute, unknown_time } = formData;
         if (!year || year < 1900 || year > 2100) return "연도는 1900~2100 사이여야 합니다.";
         if (!month || month < 1 || month > 12) return "월은 1~12 사이여야 합니다.";
         if (!day || day < 1 || day > 31) return "일은 1~31 사이여야 합니다.";
-        if (hour < 0 || hour > 23) return "시는 0~23 사이여야 합니다.";
-        if (minute < 0 || minute > 59) return "분은 0~59 사이여야 합니다.";
+        // 시간 모름이면 시·분 검증 생략
+        if (!unknown_time) {
+            if (hour < 0 || hour > 23) return "시는 0~23 사이여야 합니다.";
+            if (minute < 0 || minute > 59) return "분은 0~59 사이여야 합니다.";
+        }
         return null;
     };
 
@@ -128,18 +132,33 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold ml-1">
-                            <span className="text-lg">⏰</span> 태어난 시간
-                        </Label>
+                        <div className="flex items-center justify-between ml-1">
+                            <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold">
+                                <span className="text-lg">⏰</span> 태어난 시간
+                            </Label>
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, unknown_time: !formData.unknown_time })}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${formData.unknown_time
+                                    ? "bg-[#d4af37] text-white border-[#d4af37]"
+                                    : "bg-white/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-[#d4af37]"}`}
+                            >
+                                {formData.unknown_time ? "✓ 시간 모름" : "시간 모름"}
+                            </button>
+                        </div>
+                        {formData.unknown_time && (
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">시간을 모르면 시주(時)는 참고용으로만 풀이됩니다.</p>
+                        )}
                         <div className="grid grid-cols-2 gap-6">
                             <div className="relative">
                                 <Input
                                     type="number"
                                     value={formData.hour}
+                                    disabled={formData.unknown_time}
                                     onChange={(e) => setFormData({ ...formData, hour: parseInt(e.target.value) })}
                                     min={0}
                                     max={23}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10 disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">시</span>
                             </div>
@@ -147,10 +166,11 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                 <Input
                                     type="number"
                                     value={formData.minute}
+                                    disabled={formData.unknown_time}
                                     onChange={(e) => setFormData({ ...formData, minute: parseInt(e.target.value) })}
                                     min={0}
                                     max={59}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10 disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">분</span>
                             </div>
