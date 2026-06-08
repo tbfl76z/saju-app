@@ -102,7 +102,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
                                     min={1900}
                                     max={2100}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">년</span>
                             </div>
@@ -113,7 +113,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
                                     min={1}
                                     max={12}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">월</span>
                             </div>
@@ -124,7 +124,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, day: parseInt(e.target.value) })}
                                     min={1}
                                     max={31}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">일</span>
                             </div>
@@ -158,7 +158,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, hour: parseInt(e.target.value) })}
                                     min={0}
                                     max={23}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">시</span>
                             </div>
@@ -170,7 +170,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                                     onChange={(e) => setFormData({ ...formData, minute: parseInt(e.target.value) })}
                                     min={0}
                                     max={59}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-4 pr-10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">분</span>
                             </div>

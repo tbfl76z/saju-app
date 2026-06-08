@@ -137,7 +137,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                             header={`${d.age}세`}
                             ganzhi={d.ganzhi}
                             stemTenGod={d.stem_ten_god}
-                            branchTenGod={d.jiji_ten_god}
+                            branchTenGod={d.branch_ten_god ?? d.jiji_ten_god}
                             growth={d.twelve_growth}
                             sinsal={d.sinsal || "-"}
                             relations={d.relations || "-"}
@@ -151,7 +151,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                         apiBase={apiBase}
                         className="mt-8"
                         title={`${selectedDaeun.age}세 대운`}
-                        body={{ saju_data: sajuData, analysis_type: 'daeun', query: `${selectedDaeun.age}세 대운 분석` }}
+                        body={{ saju_data: sajuData, analysis_type: 'daeun', query: `${selectedDaeun.age}세 대운 분석`, period_ganzhi: selectedDaeun.ganzhi, period_label: `${selectedDaeun.age}세 대운` }}
                     />
                 )}
             </section>
@@ -174,7 +174,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                                     header={`${s.year}년`}
                                     ganzhi={s.ganzhi}
                                     stemTenGod={s.stem_ten_god}
-                                    branchTenGod={s.jiji_ten_god}
+                                    branchTenGod={s.branch_ten_god ?? s.jiji_ten_god}
                                     growth={s.twelve_growth}
                                     sinsal={s.sinsal || "-"}
                                     relations={s.relations || "-"}
@@ -189,7 +189,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                             apiBase={apiBase}
                             className="mt-8"
                             title={`${selectedSeyun.year}년 세운`}
-                            body={{ saju_data: sajuData, analysis_type: 'seyun', query: `${selectedSeyun.year}년 세운 분석` }}
+                            body={{ saju_data: sajuData, analysis_type: 'seyun', query: `${selectedSeyun.year}년 세운 분석`, period_ganzhi: selectedSeyun.ganzhi, period_label: `${selectedSeyun.year}년 세운` }}
                         />
                     )}
                 </section>
@@ -213,7 +213,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                                     header={`${w.month}월`}
                                     ganzhi={w.ganzhi}
                                     stemTenGod={w.stem_ten_god}
-                                    branchTenGod={w.jiji_ten_god}
+                                    branchTenGod={w.branch_ten_god ?? w.jiji_ten_god}
                                     growth={w.twelve_growth}
                                     sinsal={w.sinsal || "-"}
                                     relations={w.relations || "-"}
@@ -228,7 +228,7 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                             apiBase={apiBase}
                             className="mt-8"
                             title={`${selectedWolun.month}월 월운`}
-                            body={{ saju_data: sajuData, analysis_type: 'wolun', query: `${selectedWolun.month}월 월운 분석` }}
+                            body={{ saju_data: sajuData, analysis_type: 'wolun', query: `${selectedSeyun?.year}년 명리 ${selectedWolun.month}월 월운 분석`, period_ganzhi: selectedWolun.ganzhi, period_label: `${selectedSeyun?.year}년 명리 ${selectedWolun.month}월(${selectedWolun.ganzhi})` }}
                         />
                     )}
                 </section>

@@ -276,6 +276,8 @@ class AnalysisRequest(BaseModel):
     target_year: Optional[int] = None  # 신년/오늘 기준 연도
     level: Optional[str] = "advanced"  # 'easy'(쉬운 설명) | 'advanced'(고급 풀이)
     category: Optional[str] = None  # love|wealth|career|health (newyear 분야별 운세)
+    period_ganzhi: Optional[str] = None  # 대운/세운/월운 분석 대상 간지 (프론트가 선택한 카드)
+    period_label: Optional[str] = None   # 그 시기의 사람이 읽는 라벨 (예: '2026년 6월(未월)')
 
 @app.post("/analyze")
 async def analyze(req: AnalysisRequest):

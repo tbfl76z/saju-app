@@ -163,7 +163,7 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         },
         {
             key: "daeun", label: daeun ? `${daeun.age}세 대운` : "대운", data: daeunCard, title: "대운 흐름",
-            body: { saju_data: sajuData, analysis_type: "daeun", query: `${daeun?.age ?? ""}세 대운 분석` },
+            body: { saju_data: sajuData, analysis_type: "daeun", query: `${daeun?.age ?? ""}세 대운 분석`, period_ganzhi: daeun?.ganzhi, period_label: daeun ? `${daeun.age}세 대운` : undefined },
         },
         {
             key: "year", label: `${curYear}년`, data: year, title: "올해의 운세",
@@ -171,7 +171,7 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         },
         {
             key: "month", label: `${curMonth}월`, data: month, title: "이달의 운세",
-            body: { saju_data: sajuData, analysis_type: "wolun", query: `${curYear}년 ${curMonth}월 월운 분석` },
+            body: { saju_data: sajuData, analysis_type: "wolun", query: `${curYear}년 ${curMonth}월 월운 분석`, period_ganzhi: month?.ganzhi, period_label: `${curYear}년 ${curMonth}월(절기 기준 ${month?.ganzhi ?? ""})` },
         },
         {
             key: "today", label: "오늘", data: today, title: "오늘의 운세",

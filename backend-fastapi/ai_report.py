@@ -82,9 +82,10 @@ SCOPE_FOCUS = {
 SYSTEM_INSTRUCTION = (
     "당신은 사주 명리학의 깊이 있는 통찰을 전하는 인격 고매한 대가입니다.\n"
     "지식 참조 원칙:\n"
-    "1. 전체사주 및 원국 해석 시, 반드시 '[분석 대원칙 및 방향성 가이드]'로 명시된 '명리학 핵심 이론과 실전 분석 매뉴얼.pdf'의 해석 방향을 '최우선 대원칙'으로 삼으세요.\n"
-    "2. 십성, 12운성, 신살 등 개별 항목의 구체적인 풀이는 해당 주제와 관련된 개별 PDF 소스(예: 12신살.pdf, 12운성.pdf 등)의 상세 내용을 적극 인용하여 분석의 깊이를 더하세요.\n"
-    "3. 대운/세운/월운/오늘/신년 분석 시에는 '[시간 운세 분석 핵심 기준]'으로 명시된 정보를 절대적 기준으로 삼아 해석의 일관성을 유지하세요.\n\n"
+    "1. 제공된 전문 지식을 자연스럽게 녹여 깊이 있는 해석의 근거로 삼으세요.\n"
+    "2. 십성, 12운성, 신살 등 개별 항목은 그 의미를 풀어 설명하되, 자연스러운 상담 문장으로 녹여내세요.\n"
+    "3. 대운/세운/월운/오늘/신년 분석 시에는 제공된 시간 운세 기준 정보를 토대로 해석의 일관성을 유지하세요.\n"
+    "4. [매우 중요] 참고 자료의 파일명·출처·'.pdf'·'.md'·'SOURCE' 같은 표현이나 '~자료에 따르면', '~매뉴얼에 의하면' 같은 출처 언급을 절대 하지 마세요. 지식은 당신의 통찰인 것처럼 자연스럽게 전하세요.\n\n"
     "출력 형식 (매우 중요):\n"
     "- 반드시 다음 네 개의 마크다운 헤딩만 사용하여 구조화하세요: '## 총평', '## 정밀 분석', '## 개운법', '## 대가의 한마디'.\n"
     "- 위 네 개의 '## 헤딩' 외에 다른 헤딩(#, ###)이나 기울임(*), 코드블록(`)은 사용하지 마세요.\n"
@@ -142,32 +143,49 @@ def build_knowledge_context(analysis_type: str) -> str:
     def is_reference_source(part: str) -> bool:
         return any(ext in part.lower() for ext in [".pdf", ".md", ".txt"])
 
+    def body(part: str) -> str:
+        # 각 파트 첫 줄은 파일경로이므로 제거(파일명이 해석에 노출되지 않게)
+        return part.split("\n", 1)[1] if "\n" in part else part
+
     manual_source = "명리학 핵심 이론과 실전 분석 매뉴얼"
-    learning_parts = [p for p in parts if is_reference_source(p) and "학습자료/" in p]
+    learning_parts = [body(p) for p in parts if is_reference_source(p) and "학습자료/" in p]
     relevant_parts: list[str] = []
 
     if analysis_type in MANUAL_TYPES:
         # 핵심 매뉴얼을 최상단(대원칙)에 배치
         manual_part = next((p for p in parts if manual_source in p), "")
         if manual_part:
-            relevant_parts.append(f"### [분석 대원칙 및 방향성 가이드]\n{manual_part}")
+            relevant_parts.append(f"### [분석 대원칙 및 방향성 가이드]\n{body(manual_part)}")
         relevant_parts.extend(learning_parts)
         for p in parts:
             if is_reference_source(p) and manual_source not in p and "학습자료/" not in p:
-                relevant_parts.append(p)
+                relevant_parts.append(body(p))
     else:
         # 대운/세운/월운/오늘/궁합/신년: sample_knowledge 우선
         sample_part = next((p for p in parts if "sample_knowledge.txt" in p), "")
         if sample_part:
-            relevant_parts.append(f"### [시간 운세 분석 핵심 기준]\n{sample_part}")
+            relevant_parts.append(f"### [시간 운세 분석 핵심 기준]\n{body(sample_part)}")
         relevant_parts.extend(learning_parts)
         for p in parts:
             if is_reference_source(p) and "sample_knowledge.txt" not in p and "학습자료/" not in p:
-                relevant_parts.append(p)
+                relevant_parts.append(body(p))
 
-    if relevant_parts:
-        return "\n".join(relevant_parts)[:KNOWLEDGE_CONTEXT_LIMIT]
-    return full_content[:KNOWLEDGE_FALLBACK_LIMIT]
+    result = "\n".join(relevant_parts) if relevant_parts else full_content[:KNOWLEDGE_FALLBACK_LIMIT]
+    result = _scrub_sources(result)
+    return result[:KNOWLEDGE_CONTEXT_LIMIT]
+
+
+def _scrub_sources(text: str) -> str:
+    """지식 컨텍스트에서 파일명·출처 흔적 제거(해석에 노출 방지)."""
+    if not text:
+        return text
+    # 따옴표로 인용된 파일명 → 중립어
+    text = re.sub(r"['\"‘’][^'\"‘’\n]{0,60}\.(?:pdf|md|txt)['\"‘’]", "이 이론", text, flags=re.IGNORECASE)
+    # 남은 확장자 토큰 제거 (11.지지심화.pdf → 11.지지심화)
+    text = re.sub(r"\.(?:pdf|md|txt)\b", "", text, flags=re.IGNORECASE)
+    # SOURCE 토큰 잔재 제거
+    text = re.sub(r"#{0,3}\s*SOURCE\s*:?", "", text, flags=re.IGNORECASE)
+    return text
 
 
 def sanitize(text: Any) -> str:
@@ -279,6 +297,9 @@ def build_prompt(req: Any) -> str:
     partner_block = ""
     if atype == "compatibility":
         partner_block = _compat_summary(getattr(req, "partner_saju_data", None))
+        if not partner_block:
+            # 상대 명식이 없으면 AI가 상대를 지어내지 않도록 명시
+            partner_block = "\n        [주의] 상대방 명식 데이터가 제공되지 않았습니다. 상대방의 사주를 임의로 지어내지 말고, 궁합을 보려면 상대 정보가 필요하다고 안내하세요."
 
     # 시점 운세(오늘/신년)는 해당 시점의 간지를 직접 산출해 프롬프트에 주입한다
     time_block = ""
@@ -287,7 +308,8 @@ def build_prompt(req: Any) -> str:
             day_gan = pillars.get("day", {}).get("stem")
             year_branch = pillars.get("year", {}).get("branch")
             day_branch = pillars.get("day", {}).get("branch")
-            target_year = getattr(req, "target_year", None)
+            # newyear인데 연도 미지정이면 올해로 기본(세운 간지 누락→환각 방지)
+            target_year = getattr(req, "target_year", None) or datetime.date.today().year
             if atype == "today":
                 tinfo = get_ilun_data(day_gan, year_branch, query_date(req), pillars=pillars, day_branch=day_branch)
                 if tinfo:
@@ -304,6 +326,17 @@ def build_prompt(req: Any) -> str:
                     )
     except Exception as e:
         print(f"time_block 산출 오류: {e}")
+
+    # 대운/세운/월운: 프론트가 선택한 시기의 실제 간지/라벨을 명시(없으면 query만 사용 → 환각 방지)
+    period_ganzhi = getattr(req, "period_ganzhi", None)
+    period_label = getattr(req, "period_label", None)
+    if not time_block and period_ganzhi and atype in ("daeun", "seyun", "wolun"):
+        label = period_label or {"daeun": "대운", "seyun": "세운", "wolun": "월운"}.get(atype, "해당 시기")
+        time_block = (
+            f"\n        [분석 대상 시기]\n"
+            f"        - {label}: 간지 {period_ganzhi}\n"
+            f"        - 반드시 이 시기({label}, {period_ganzhi})에 대해서만 풀이하고, 다른 달/해/시기를 임의로 지어내지 마세요."
+        )
 
     # 올해 분야별 운세: 집중 분석 지시 주입
     category_block = ""
@@ -334,7 +367,7 @@ def build_prompt(req: Any) -> str:
 
         [대가의 리포트 작성 가이드]
         1. 위 '[이 풀이의 범위]'를 엄격히 지키세요. 이 리포트 고유의 주제에 집중하고, 다른 운세 풀이(전체운·대운·올해 등)와 겹치는 타고난 성격·원국 일반론의 반복을 피하세요.
-        2. 개별 데이터(신살, 운성 등)에 대해서는 관련 PDF의 상세 설명을 인용하여 '근거 있는 분석'을 제시하세요.
+        2. 개별 데이터(신살, 운성 등)는 전문 지식의 상세 설명을 토대로 '근거 있는 분석'을 제시하되, 자료 출처·파일명은 언급하지 마세요.
         3. '## 총평 / ## 정밀 분석 / ## 개운법 / ## 대가의 한마디' 네 개의 헤딩으로만 구조화하여 품격 있는 결과물을 도출하세요.
         4. 각 섹션은 충분한 분량(섹션당 3~6문장 이상)으로 알차게 작성하고, 너무 짧게 끝내지 마세요.
         """
