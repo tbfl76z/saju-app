@@ -67,6 +67,18 @@ CATEGORY_HEADERS = {
     "health": "🌿 올해의 건강운",
 }
 
+# 분석 타입별 '범위 지시' — 풀이마다 자기 주제에만 집중하고 일반론 반복을 막는다(전체/대운/올해 중복 방지)
+SCOPE_FOCUS = {
+    "total": "이 리포트는 '타고난 사주 원국 전체'를 다룹니다. 성격·기질·강약점·인생 전반의 큰 그림에 집중하세요(이것이 기준 리포트입니다).",
+    "original": "이 리포트는 '사주 원국(타고난 자아)'만 다룹니다. 성격·기질·재능 분석에 집중하세요.",
+    "daeun": "이 리포트는 '현재 대운(10년 시기)'만 다룹니다. 타고난 성격·원국 총론은 한두 문장으로만 짚고, 이 대운 10년의 환경 변화·기회·과제·시기 흐름에 집중하세요.",
+    "seyun": "이 리포트는 해당 '세운(그 해)'만 다룹니다. 원국·대운 일반론 반복을 피하고 그 해의 구체적 흐름에 집중하세요.",
+    "wolun": "이 리포트는 '이번 달(월운)'만 다룹니다. 원국·대운·세운 일반론을 반복하지 말고 이 달의 흐름과 처세에 집중하세요.",
+    "today": "이 리포트는 '오늘 하루(일진)'만 다룹니다. 원국·대운 일반론 반복을 피하고 오늘의 기운·할 일·주의점에 집중하세요.",
+    "newyear": "이 리포트는 '올해 한 해(세운)'만 다룹니다. 타고난 성격·원국 총론은 한두 문장 이내로만 언급하고, 올해의 구체적 흐름·시기별 변화·올해 해야 할 일에 집중하세요.",
+    "compatibility": "이 리포트는 '두 사람의 궁합'만 다룹니다. 개인 원국 총론보다 두 명식의 상호작용·관계 역학에 집중하세요.",
+}
+
 SYSTEM_INSTRUCTION = (
     "당신은 사주 명리학의 깊이 있는 통찰을 전하는 인격 고매한 대가입니다.\n"
     "지식 참조 원칙:\n"
@@ -176,6 +188,25 @@ def _pillar(pillars: dict, key: str) -> str:
         return "-"
 
 
+def _current_daeun(data: dict) -> Optional[dict]:
+    """생년+현재연도로 현재 나이에 해당하는 대운을 고른다(없으면 첫 대운)."""
+    fortune = data.get("fortune") or {}
+    lst = fortune.get("list") or []
+    if not lst:
+        return None
+    try:
+        birth_year = int(str(data.get("birth_date", "")).split("-")[0])
+        age = datetime.date.today().year - birth_year + 1
+    except Exception:
+        return lst[0]
+    for x in lst:
+        a = x.get("age", 0)
+        if a <= age < a + 10:
+            return x
+    # 범위를 벗어나면 가장 가까운 쪽
+    return lst[-1] if age >= lst[-1].get("age", 0) else lst[0]
+
+
 def query_date(req: Any) -> str:
     """오늘의 운세 기준 날짜를 반환한다(target_date 미지정 시 서버 오늘)."""
     td = getattr(req, "target_date", None)
@@ -232,9 +263,13 @@ def build_prompt(req: Any) -> str:
     name = sanitize(data.get("name", "사용자")) or "사용자"
 
     fortune_line = ""
-    fortune = data.get("fortune")
-    if fortune and fortune.get("list"):
-        fortune_line = f"- 현재 대운 정보: {fortune.get('num')}대운 / {fortune['list'][0].get('ganzhi', '-')}"
+    cur_daeun = _current_daeun(data)
+    if cur_daeun:
+        b = cur_daeun.get("jiji_ten_god") or cur_daeun.get("branch_ten_god") or "-"
+        fortune_line = (
+            f"- 현재 대운: {cur_daeun.get('age')}세 대운 / {cur_daeun.get('ganzhi')} "
+            f"(십성 {cur_daeun.get('stem_ten_god', '-')}·{b}, 십이운성 {cur_daeun.get('twelve_growth', '-')})"
+        )
 
     # 태어난 시간 미상이면 시주에 의존한 단정을 피하도록 명시
     unknown_time_note = ""
@@ -275,8 +310,12 @@ def build_prompt(req: Any) -> str:
     if atype == "newyear" and category in CATEGORY_FOCUS:
         category_block = f"\n        [집중 분석 지시]\n        - {CATEGORY_FOCUS[category]}"
 
+    scope_focus = SCOPE_FOCUS.get(atype, "")
+    scope_block = f"\n        [이 풀이의 범위]\n        - {scope_focus}" if scope_focus else ""
+
     prompt = f"""
         {report_header}
+        {scope_block}
 
         [제공된 전문 지식 베이스]
         {knowledge_context}
@@ -294,7 +333,7 @@ def build_prompt(req: Any) -> str:
         {query}
 
         [대가의 리포트 작성 가이드]
-        1. 지식 베이스에서 명시된 '분석 대원칙'에 따라 전체적인 해석의 톤을 잡으세요.
+        1. 위 '[이 풀이의 범위]'를 엄격히 지키세요. 이 리포트 고유의 주제에 집중하고, 다른 운세 풀이(전체운·대운·올해 등)와 겹치는 타고난 성격·원국 일반론의 반복을 피하세요.
         2. 개별 데이터(신살, 운성 등)에 대해서는 관련 PDF의 상세 설명을 인용하여 '근거 있는 분석'을 제시하세요.
         3. '## 총평 / ## 정밀 분석 / ## 개운법 / ## 대가의 한마디' 네 개의 헤딩으로만 구조화하여 품격 있는 결과물을 도출하세요.
         """

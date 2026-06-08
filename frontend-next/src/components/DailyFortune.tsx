@@ -80,32 +80,23 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         setIsLoading(true);
         const common = { day_gan: p.day.stem, year_branch: p.year.branch, pillars: p, day_branch: p.day.branch };
         try {
-            const ilunReq = fetch(`${apiBase}/ilun`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(common),
-            }).then((r) => (r.ok ? r.json() : null));
-
-            const yearRes = await fetch(`${apiBase}/newyear`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ saju_data: sajuData, target_year: curYear }),
-            }).then((r) => (r.ok ? r.json() : null));
-
-            let monthRes: FortuneCard | null = null;
-            if (yearRes?.ganzhi) {
-                const list = await fetch(`${apiBase}/wolun`, {
+            // /ilun 응답에 오늘 일진 + 이달(절기 기준) 월주가 함께 온다
+            const [ilunRes, yearRes] = await Promise.all([
+                fetch(`${apiBase}/ilun`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...common, year_pillar: yearRes.ganzhi }),
-                }).then((r) => (r.ok ? r.json() : null));
-                if (Array.isArray(list)) monthRes = list[curMonth - 1] ?? null;
-            }
+                    body: JSON.stringify(common),
+                }).then((r) => (r.ok ? r.json() : null)),
+                fetch(`${apiBase}/newyear`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ saju_data: sajuData, target_year: curYear }),
+                }).then((r) => (r.ok ? r.json() : null)),
+            ]);
 
-            const ilunRes = await ilunReq;
             setToday(ilunRes);
+            setMonth(ilunRes?.month ?? null);  // 절기 기준 이달 월주
             setYear(yearRes);
-            setMonth(monthRes);
             lastDateRef.current = getTodayISO();
         } catch (e) {
             console.error(e);

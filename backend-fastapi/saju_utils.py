@@ -267,6 +267,12 @@ def get_ilun_data(day_gan, year_branch, target_date, pillars=None, day_branch=No
         data = get_ganzhi_details(day_gan, year_branch, res.get('day_pillar'), pillars=pillars, day_branch=day_branch)
         if data:
             data['date'] = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+            # 이달(절기 기준) 월주도 함께 산출 — 달력월↔명리월 불일치 방지
+            mp = res.get('month_pillar')
+            if mp:
+                mdet = get_ganzhi_details(day_gan, year_branch, mp, pillars=pillars, day_branch=day_branch)
+                mdet['ganzhi'] = mp
+                data['month'] = mdet
         return data
     except Exception as e:
         print(f"Error in get_ilun_data: {e}")
@@ -291,9 +297,10 @@ def get_wolun_data(day_gan, year_branch, year_pillar, target_month, pillars=None
         # 월두법 (Month Stem Calculation Rule)
         # 甲/己 -> 丙寅(3) 시작, 乙/庚 -> 戊寅(5) 시작, 丙/辛 -> 庚寅(7) 시작, 丁/壬 -> 壬寅(9) 시작, 戊/癸 -> 甲寅(1) 시작
         m_map = {'甲': 2, '己': 2, '乙': 4, '庚': 4, '丙': 6, '辛': 6, '丁': 8, '壬': 8, '戊': 0, '癸': 0}
-        
-        # 명리학에서 1월은 寅월이므로, target_month가 1일 때 index 2(寅)를 가리켜야 함
-        s_idx = (m_map.get(y_stem, 0) + (int(target_month) - 1) * 2) % 10
+
+        # 명리학에서 1월은 寅월. 월간은 매월 1칸씩 전진한다(60갑자가 한 칸씩 나아가므로).
+        # (기존 *2 버그: 천간이 한 칸씩 건너뛰어 壬卯·庚未 같은 잘못된 간지가 나왔음)
+        s_idx = (m_map.get(y_stem, 0) + (int(target_month) - 1)) % 10
         b_idx = (EARTHLY_BRANCHES.index('寅') + int(target_month) - 1) % 12
         
         pillar = HEAVENLY_STEMS[s_idx] + EARTHLY_BRANCHES[b_idx]
