@@ -7,6 +7,7 @@ import os
 import re
 import json
 import datetime
+import urllib.request
 from typing import Any, Optional, Iterator
 
 import google.generativeai as genai
@@ -26,6 +27,16 @@ PRIORITY_MODELS = [
 # 더 깊은 풀이가 필요하면 환경변수로 키울 수 있다.
 KNOWLEDGE_CONTEXT_LIMIT = int(os.getenv("KNOWLEDGE_CONTEXT_LIMIT", "50000"))
 KNOWLEDGE_FALLBACK_LIMIT = int(os.getenv("KNOWLEDGE_FALLBACK_LIMIT", "20000"))
+
+# OpenRouter 폴백: Gemini 무료 한도 소진 시 OpenAI 호환 API로 자동 전환.
+# OPENROUTER_API_KEY 환경변수가 있으면 활성화. 모델은 무료(:free) 위주로 환경변수로 조절 가능.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODELS = [
+    m.strip() for m in os.getenv(
+        "OPENROUTER_MODELS",
+        "deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-3.3-70b-instruct:free,google/gemini-2.0-flash-exp:free",
+    ).split(",") if m.strip()
+]
 
 # 분석 타입별 리포트 헤더 (단일 출처)
 HEADERS = {
@@ -318,31 +329,75 @@ def _system_for(req: Any) -> str:
     return SYSTEM_INSTRUCTION_EASY if level == "easy" else SYSTEM_INSTRUCTION
 
 
-def generate_report(req: Any) -> str:
-    """동기 방식 AI 리포트 생성. 평문(마크다운 헤딩 포함) 문자열을 반환한다."""
-    prompt = build_prompt(req)
-    system_instruction = _system_for(req)
-    models_to_try = _get_models_to_try()
-    response = None
-    error_msg = ""
-
-    for model_name in models_to_try:
+def _gemini_generate(prompt: str, system_instruction: str) -> Optional[str]:
+    """Gemini 모델 체인으로 생성 시도. 모두 실패하면 None."""
+    for model_name in _get_models_to_try():
         try:
             print(f"Attempting analysis with: {model_name}")
             model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
             response = model.generate_content(prompt)
             if response and response.text:
-                break
+                return _clean(response.text)
         except Exception as e:
-            error_msg = str(e)
-            if "429" in error_msg or "quota" in error_msg.lower():
+            msg = str(e)
+            if "429" in msg or "quota" in msg.lower():
                 print(f"Model {model_name} quota exceeded, trying next...")
                 continue
-            raise e
+            # 429 외 오류도 OpenRouter 폴백을 위해 멈추지 않고 다음으로
+            print(f"Model {model_name} error: {msg}")
+            continue
+    return None
 
-    if not response or not response.text:
-        return f"죄송합니다. 현재 모든 AI 모델의 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요. (에러: {error_msg})"
-    return _clean(response.text)
+
+def _openrouter_generate(prompt: str, system_instruction: str) -> Optional[str]:
+    """OpenRouter(OpenAI 호환) 폴백 생성. API 키 없으면 None."""
+    if not OPENROUTER_API_KEY:
+        return None
+    body = {
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    for model in OPENROUTER_MODELS:
+        try:
+            payload = json.dumps({**body, "model": model}).encode("utf-8")
+            req = urllib.request.Request(
+                "https://openrouter.ai/api/v1/chat/completions",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://saju-app-coral.vercel.app",
+                    "X-Title": "Destiny Code",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            if text:
+                print(f"OpenRouter fallback success: {model}")
+                return _clean(text)
+        except Exception as e:
+            print(f"OpenRouter {model} 실패: {e}")
+            continue
+    return None
+
+
+def generate_report(req: Any) -> str:
+    """동기 방식 AI 리포트 생성. Gemini → OpenRouter 순으로 폴백."""
+    prompt = build_prompt(req)
+    system_instruction = _system_for(req)
+
+    text = _gemini_generate(prompt, system_instruction)
+    if text:
+        return text
+    # Gemini 전 모델 실패 시 OpenRouter로 폴백
+    text = _openrouter_generate(prompt, system_instruction)
+    if text:
+        return text
+    return "죄송합니다. 현재 AI 모델 사용량이 한도에 도달했습니다. 잠시 후 다시 시도해 주세요."
 
 
 def _sse(payload: dict) -> str:
@@ -372,15 +427,21 @@ def stream_report(req: Any) -> Iterator[str]:
                 return
         except Exception as e:
             error_msg = str(e)
-            if not produced and ("429" in error_msg or "quota" in error_msg.lower()):
-                # 첫 청크 전 할당량 초과 → 다음 모델로 폴백
+            if not produced:
+                # 첫 청크 전 오류(할당량 등) → 다음 모델로 폴백
                 continue
             # 스트리밍 도중 오류 → 에러 플래그와 함께 종료
             yield _sse({"done": True, "error": str(e)})
             return
 
+    # Gemini 전 모델이 아무것도 못 내면 OpenRouter로 폴백(비스트리밍 → 한 번에 전달)
     if not produced:
+        fb = _openrouter_generate(prompt, system_instruction)
+        if fb:
+            yield _sse({"delta": fb})
+            yield _sse({"done": True})
+            return
         yield _sse({
-            "delta": f"죄송합니다. 현재 모든 AI 모델의 할당량이 초과되었습니다. 잠시 후 다시 시도해 주세요. (에러: {error_msg})"
+            "delta": "죄송합니다. 현재 AI 모델 사용량이 한도에 도달했습니다. 잠시 후 다시 시도해 주세요."
         })
         yield _sse({"done": True, "error": error_msg or "no_model"})
