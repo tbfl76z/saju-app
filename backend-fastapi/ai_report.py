@@ -349,6 +349,23 @@ def build_prompt(req: Any) -> str:
     scope_focus = SCOPE_FOCUS.get(atype, "")
     scope_block = f"\n        [이 풀이의 범위]\n        - {scope_focus}" if scope_focus else ""
 
+    # 지장간(여기·중기·정기) + 통근·투출 사실값 주입 (규칙은 지식베이스, 판정은 코드)
+    jijang_block = ""
+    jj = data.get("jijanggan") or {}
+    if jj:
+        parts = []
+        for p, ko in (("year", "년"), ("month", "월"), ("day", "일"), ("hour", "시")):
+            gans = jj.get(p) or []
+            if gans:
+                parts.append(f"{ko}지({pillars.get(p, {}).get('branch', '')}) {''.join(gans)}")
+        tugan = data.get("tugan") or []
+        tonggeun = data.get("tonggeun") or []
+        jijang_block = (
+            f"\n        - 지장간(지지 속 숨은 천간): {', '.join(parts)}"
+            f"\n        - 투출(천간에 드러난 지장간): {', '.join(tugan) or '없음'}"
+            f"\n        - 일간 통근(일간이 뿌리내린 지지): {', '.join(tonggeun) or '없음(무근·뿌리 약함)'}"
+        )
+
     prompt = f"""
         {report_header}
         {scope_block}
@@ -362,7 +379,7 @@ def build_prompt(req: Any) -> str:
         - 오행 분포: {data.get('five_elements', {})}
         - 십성 구성: 년({data.get('ten_gods', {}).get('year', '-')}/{data.get('jiji_ten_gods', {}).get('year', '-')}), 일(본인/{data.get('jiji_ten_gods', {}).get('day', '-')})
         - 십이운성: {data.get('twelve_growth', {})}
-        - 신살 및 상호관계: {data.get('sinsal', '없음')}, {data.get('relations', '특이사항 없음')}
+        - 신살 및 상호관계: {data.get('sinsal', '없음')}, {data.get('relations', '특이사항 없음')}{jijang_block}
         {fortune_line}{partner_block}{time_block}{category_block}
 
         [분석 요청 사항]
@@ -370,7 +387,7 @@ def build_prompt(req: Any) -> str:
 
         [대가의 리포트 작성 가이드]
         1. 위 '[이 풀이의 범위]'를 엄격히 지키세요. 이 리포트 고유의 주제에 집중하고, 다른 운세 풀이(전체운·대운·올해 등)와 겹치는 타고난 성격·원국 일반론의 반복을 피하세요.
-        2. 개별 데이터(신살, 운성 등)는 전문 지식의 상세 설명을 토대로 '근거 있는 분석'을 제시하되, 자료 출처·파일명은 언급하지 마세요.
+        2. 개별 데이터(신살, 운성, 지장간·통근·투출 등)는 전문 지식의 상세 설명을 토대로 '근거 있는 분석'을 제시하되, 자료 출처·파일명은 언급하지 마세요. 특히 지장간·통근·투출은 천간이 지지에 뿌리내린 세력의 강약을 판단하는 핵심 근거로 활용하세요.
         3. '## 총평 / ## 정밀 분석 / ## 개운법 / ## 대가의 한마디' 네 개의 헤딩으로만 구조화하여 품격 있는 결과물을 도출하세요.
         4. 각 섹션은 충분한 분량(섹션당 3~6문장 이상)으로 알차게 작성하고, 너무 짧게 끝내지 마세요.
         """

@@ -62,6 +62,22 @@ TWELVE_GROWTH = {
     '癸': {'卯':'장생','辰':'양','巳':'태','午':'절','未':'묘','申':'사','酉':'병','戌':'쇠','亥':'제왕','子':'건록','丑':'관대','寅':'목욕'}
 }
 
+# 지장간 전체(여기·중기·정기) — (천간, 월률분야 일수). 정기가 맨 뒤(대표 오행).
+BRANCH_HIDDEN_FULL = {
+    '子': [('壬', 10), ('癸', 20)],
+    '丑': [('癸', 9), ('辛', 3), ('己', 18)],
+    '寅': [('戊', 7), ('丙', 7), ('甲', 16)],
+    '卯': [('甲', 10), ('乙', 20)],
+    '辰': [('乙', 9), ('癸', 3), ('戊', 18)],
+    '巳': [('戊', 7), ('庚', 7), ('丙', 16)],
+    '午': [('丙', 10), ('己', 9), ('丁', 11)],
+    '未': [('丁', 9), ('乙', 3), ('己', 18)],
+    '申': [('戊', 7), ('壬', 7), ('庚', 16)],
+    '酉': [('庚', 10), ('辛', 20)],
+    '戌': [('辛', 9), ('丁', 3), ('戊', 18)],
+    '亥': [('戊', 7), ('甲', 7), ('壬', 16)],
+}
+
 # 천간 충합
 STEM_RELATIONS = {
     '충': {'甲':'庚', '庚':'甲', '乙':'辛', '辛':'乙', '丙':'壬', '壬':'丙', '丁':'癸', '癸':'丁'},
@@ -342,6 +358,28 @@ def get_extended_saju_data(details, gender='여'):
             'year': get_gongmang(pillars['year']['pillar']),
             'day': get_gongmang(pillars['day']['pillar'])
         }
+
+        # 지장간(여기·중기·정기) 및 통근·투출 — 해석 정밀도용 사실값
+        # (규칙은 학습자료에 있으므로, '이 명식의 실제 판정'만 계산해 AI에 넘긴다)
+        gan_keys = ['year', 'month', 'day', 'hour']
+        gan_names = {'year': '년주', 'month': '월주', 'day': '일주', 'hour': '시주'}
+        details['jijanggan'] = {
+            p: [g for g, _ in BRANCH_HIDDEN_FULL.get(pillars[p]['branch'], [])] for p in gan_keys
+        }
+        all_stems = {pillars[p]['stem'] for p in gan_keys}
+        # 투출(透出): 지지 지장간이 천간에 그대로 드러난 글자
+        tugan = []
+        for p in gan_keys:
+            for g in details['jijanggan'][p]:
+                if g in all_stems and g not in tugan:
+                    tugan.append(g)
+        details['tugan'] = tugan
+        # 통근(通根): 일간 오행이 어느 지지 지장간에 뿌리내렸는가
+        day_el = ELEMENTS_MAP.get(day_gan)
+        details['tonggeun'] = [
+            gan_names[p] for p in gan_keys
+            if any(ELEMENTS_MAP.get(g) == day_el for g in details['jijanggan'][p])
+        ]
         
         rels = []
         keys = ['year', 'month', 'day', 'hour']
