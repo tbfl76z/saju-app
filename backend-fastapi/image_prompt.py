@@ -14,6 +14,69 @@ from typing import Any, Optional
 
 # ai_report의 모델 폴백 체인 + 현재 대운 계산을 재사용한다
 from ai_report import _gemini_generate, _openrouter_generate, _current_daeun
+# 합충형파해 판정 테이블 재사용 (운과 원국의 상호작용)
+from saju_utils import STEM_RELATIONS, BRANCH_RELATIONS
+
+# 합충형파해 종류 → 분위기 그룹 (harmony=조화 / tension=충돌·마찰)
+_REL_MOOD = {
+    "천간합": "harmony", "지지합": "harmony",
+    "천간충": "tension", "지지충": "tension",
+    "형": "tension", "파": "tension", "해": "tension",
+}
+_PILLAR_KO = {"year": "연주", "month": "월주", "day": "일주", "hour": "시주"}
+
+MOOD_KO = {
+    "harmony": "원국과 부드럽게 어우러지는 조화",
+    "tension": "원국과 맞부딪히는 긴장",
+    "dynamic": "원국과 어우러지면서도 부딪히는 역동",
+    "flow": "원국 위로 잔잔히 흐름",
+}
+MOOD_EN = {
+    "harmony": "merging harmoniously with the natal scene — light and mist blending in serene union",
+    "tension": "clashing against the natal scene — dramatic colliding currents, lightning and crashing waves, a charged, tense atmosphere",
+    "dynamic": "both blending with and colliding against the natal scene — a dynamic interplay of merging light and gathering storm",
+    "flow": "drifting calmly over the natal scene",
+}
+
+
+def _interactions(sky_stem: str, sky_branch: str, pillars: dict) -> list:
+    """대운/세운 간지가 원국 4기둥과 이루는 합충형파해를 판정한다. [(종류, 기둥한글, 글자)]."""
+    out = []
+    for k in ("year", "month", "day", "hour"):
+        p = pillars.get(k) or {}
+        ps, pb = (p.get("stem") or ""), (p.get("branch") or "")
+        name = _PILLAR_KO[k]
+        if ps:
+            if STEM_RELATIONS["합"].get(sky_stem) == ps:
+                out.append(("천간합", name, ps))
+            if STEM_RELATIONS["충"].get(sky_stem) == ps:
+                out.append(("천간충", name, ps))
+        if pb:
+            if BRANCH_RELATIONS["합"].get(sky_branch) == pb:
+                out.append(("지지합", name, pb))
+            if BRANCH_RELATIONS["충"].get(sky_branch) == pb:
+                out.append(("지지충", name, pb))
+            hv = BRANCH_RELATIONS["형"].get(sky_branch)
+            if hv and (pb in hv if isinstance(hv, (list, tuple)) else hv == pb):
+                out.append(("형", name, pb))
+            if BRANCH_RELATIONS["파"].get(sky_branch) == pb:
+                out.append(("파", name, pb))
+            if BRANCH_RELATIONS["해"].get(sky_branch) == pb:
+                out.append(("해", name, pb))
+    return out
+
+
+def _mood_of(interactions: list) -> str:
+    """상호작용 목록 → 전체 분위기(harmony/tension/dynamic/flow)."""
+    groups = {_REL_MOOD.get(kind) for kind, _, _ in interactions}
+    has_h, has_t = "harmony" in groups, "tension" in groups
+    if has_h and has_t:
+        return "dynamic"
+    if has_h:
+        return "harmony"
+    if has_t:
+        return "tension"
+    return "flow"
 
 # 60갑자 산출용 (세운=올해 연주 간지 자동 계산)
 _STEMS = "甲乙丙丁戊己庚辛壬癸"
@@ -134,11 +197,19 @@ def _build_sky(data: dict, scope: str, period_ganzhi: Optional[str], period_labe
     stem, branch = gz[0], gz[1]
     s = STEM_IMAGERY.get(stem)
     b = BRANCH_IMAGERY.get(branch)
+
+    # 운(대운/세운) 간지가 원국과 이루는 합충형파해 → 그림 분위기
+    pillars = data.get("pillars") or {}
+    interactions = _interactions(stem, branch, pillars)
+    mood = _mood_of(interactions)
+    rel_summary_ko = ", ".join(f"{tgt} {kind}" for kind, tgt, _ in interactions) or "뚜렷한 합충 없음"
+
     return {
         "scope": scope, "ganzhi": gz, "label": label or scope_ko,
         "scope_ko": scope_ko, "scope_en": scope_en,
         "stem": stem, "stem_el": s[0] if s else "", "stem_img_en": s[1] if s else "", "stem_img_ko": s[2] if s else "",
         "branch": branch, "branch_el": b[0] if b else "", "branch_img_en": b[1] if b else "", "branch_img_ko": b[2] if b else "",
+        "mood": mood, "mood_ko": MOOD_KO[mood], "mood_en": MOOD_EN[mood], "rel_summary_ko": rel_summary_ko,
     }
 
 
@@ -231,6 +302,7 @@ def _concept_ko(sym: dict, name: Optional[str]) -> str:
     sky = sym.get("sky")
     if sky:
         lines.append(f"☁ 하늘에 흐르는 {sky['scope_ko']} — {sky['label']}({sky['ganzhi']}): {_sky_phrase_ko(sky)}, 원국 전체를 감싼다.")
+        lines.append(f"   ↳ 원국과의 관계: {sky['rel_summary_ko']} → {sky['mood_ko']}.")
     lines.append(f"화면 전체에 {sym['palette_ko']} 기운({sym['dom_element']})이 흐르는 {sym['season_ko']} 풍경.")
     return "\n".join(lines)
 
@@ -252,7 +324,7 @@ def _base_prompt_en(sym: dict) -> str:
     if sky:
         sky_line = (
             f"Across the sky above, {sky['scope_en']} flows over the whole scene as {sky['label']} ({sky['ganzhi']}): "
-            f"{_sky_phrase_en(sky)}, tinting the entire landscape with its energy. "
+            f"{_sky_phrase_en(sky)}, {sky['mood_en']}, tinting the entire landscape with its energy. "
         )
     return (
         f"A symbolic oriental landscape painting visualizing a person's destiny from Korean Saju (Four Pillars) "
@@ -292,7 +364,7 @@ def _enrich_prompt_en(sym: dict) -> str:
     if sky:
         anchor_lines.append(
             f"- ACROSS THE SKY ABOVE (overlaying the whole scene) = {sky['scope_en']}, {sky['label']} ({sky['ganzhi']}): "
-            f"{_sky_phrase_en(sky)}"
+            f"{_sky_phrase_en(sky)}. Interaction with the natal chart: {sky['mood_en']}"
         )
     anchors = (
         "Build one cohesive oriental landscape, preserving this exact spatial depth ordering "
