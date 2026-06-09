@@ -8,6 +8,7 @@ import { AnalysisTable } from "@/components/AnalysisTable";
 import { LuckSection } from "@/components/LuckSection";
 import { DailyFortune } from "@/components/DailyFortune";
 import { NewYearSection } from "@/components/NewYearSection";
+import { ImagePromptCard } from "@/components/ImagePromptCard";
 import SaveShareBar from "@/components/SaveShareBar";
 import SavedProfilesModal from "@/components/SavedProfilesModal";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,10 @@ export default function Home() {
               </div>
 
               <FiveElements elements={sajuData.five_elements} />
+
+              <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
+                <ImagePromptCard sajuData={sajuData} apiBase={API_BASE} />
+              </div>
 
               <AnalysisTable
                 title="사주 4주 명식 상세"

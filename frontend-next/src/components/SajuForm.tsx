@@ -94,39 +94,42 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                         <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold ml-1">
                             <span className="text-lg">📅</span> 생년월일
                         </Label>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="relative">
+                        <div className="grid grid-cols-4 gap-2">
+                            <div className="relative col-span-2">
                                 <Input
                                     type="number"
+                                    inputMode="numeric"
                                     value={formData.year}
                                     onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
                                     min={1900}
                                     max={2100}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base"
+                                    className="no-spinner bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-7 text-base"
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">년</span>
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">년</span>
                             </div>
                             <div className="relative">
                                 <Input
                                     type="number"
+                                    inputMode="numeric"
                                     value={formData.month}
                                     onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
                                     min={1}
                                     max={12}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base"
+                                    className="no-spinner bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-7 text-base"
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">월</span>
+                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">월</span>
                             </div>
                             <div className="relative">
                                 <Input
                                     type="number"
+                                    inputMode="numeric"
                                     value={formData.day}
                                     onChange={(e) => setFormData({ ...formData, day: parseInt(e.target.value) })}
                                     min={1}
                                     max={31}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base"
+                                    className="no-spinner bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-7 text-base"
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">일</span>
+                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">일</span>
                             </div>
                         </div>
                     </div>
@@ -153,24 +156,26 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                             <div className="relative">
                                 <Input
                                     type="number"
+                                    inputMode="numeric"
                                     value={formData.hour}
                                     disabled={formData.unknown_time}
                                     onChange={(e) => setFormData({ ...formData, hour: parseInt(e.target.value) })}
                                     min={0}
                                     max={23}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="no-spinner bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-7 text-base disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">시</span>
                             </div>
                             <div className="relative">
                                 <Input
                                     type="number"
+                                    inputMode="numeric"
                                     value={formData.minute}
                                     disabled={formData.unknown_time}
                                     onChange={(e) => setFormData({ ...formData, minute: parseInt(e.target.value) })}
                                     min={0}
                                     max={59}
-                                    className="bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-6 text-base disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="no-spinner bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-[#d4af37] rounded-xl h-12 pl-3 pr-7 text-base disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">분</span>
                             </div>

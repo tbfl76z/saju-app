@@ -18,6 +18,7 @@ from saju_utils import (
 )
 from saju_data import SAJU_TERMS
 import ai_report
+import image_prompt as image_prompt_mod
 import share_store
 
 load_dotenv()
@@ -278,6 +279,21 @@ class AnalysisRequest(BaseModel):
     category: Optional[str] = None  # love|wealth|career|health (newyear 분야별 운세)
     period_ganzhi: Optional[str] = None  # 대운/세운/월운 분석 대상 간지 (프론트가 선택한 카드)
     period_label: Optional[str] = None   # 그 시기의 사람이 읽는 라벨 (예: '2026년 6월(未월)')
+
+class ImagePromptRequest(BaseModel):
+    saju_data: Dict[str, Any]
+
+
+@app.post("/image-prompt")
+async def image_prompt(req: ImagePromptRequest):
+    """명식(천간지지) 기반 이미지 생성 프롬프트 반환 — ChatGPT/DALL-E에 바로 입력 가능."""
+    try:
+        return image_prompt_mod.generate_image_prompt(req.saju_data)
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/analyze")
 async def analyze(req: AnalysisRequest):
