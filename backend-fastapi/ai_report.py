@@ -15,12 +15,13 @@ from saju_utils import get_ilun_data, get_seyun_data
 
 # 모델 우선순위 (최신 → 구형 폴백). list_models 검증으로 미존재 모델은 자동 제외된다.
 # 각 모델은 무료등급에서 별도 일일 한도(RPD)를 가지므로, 체인이 길수록 하루 가용 횟수가 늘어난다.
+# 죽은 모델(gemini-1.5-flash, gemini-pro: 404) 제거. flash + lite(별도 한도)로 가용 횟수 확보.
 PRIORITY_MODELS = [
     'models/gemini-3.5-flash',
     'models/gemini-2.5-flash',
+    'models/gemini-2.5-flash-lite',
     'models/gemini-2.0-flash',
-    'models/gemini-1.5-flash',
-    'models/gemini-pro',
+    'models/gemini-2.0-flash-lite',
 ]
 
 # 지식베이스 컨텍스트 한도(글자수). 무료등급 TPM(분당 토큰)·비용·속도를 고려해 축소.
@@ -31,10 +32,12 @@ KNOWLEDGE_FALLBACK_LIMIT = int(os.getenv("KNOWLEDGE_FALLBACK_LIMIT", "20000"))
 # OpenRouter 폴백: Gemini 무료 한도 소진 시 OpenAI 호환 API로 자동 전환.
 # OPENROUTER_API_KEY 환경변수가 있으면 활성화. 모델은 무료(:free) 위주로 환경변수로 조절 가능.
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# 2026-06 기준 가용 무료 모델로 갱신(기존 deepseek:free/gemini-flash-exp:free는 종료됨).
+# openrouter/free = OpenRouter 자동 무료 라우팅(한 모델이 죽어도 알아서 대체) → 가장 안정적.
 OPENROUTER_MODELS = [
     m.strip() for m in os.getenv(
         "OPENROUTER_MODELS",
-        "deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-3.3-70b-instruct:free,google/gemini-2.0-flash-exp:free",
+        "openrouter/free,openai/gpt-oss-120b:free,qwen/qwen3-next-80b-a3b-instruct:free,meta-llama/llama-3.3-70b-instruct:free",
     ).split(",") if m.strip()
 ]
 
@@ -387,7 +390,7 @@ def _get_models_to_try() -> list:
             _available_models_cache = []
     if _available_models_cache:
         models = [pm for pm in PRIORITY_MODELS if pm in _available_models_cache]
-        return models or ['models/gemini-pro']
+        return models or ['models/gemini-2.0-flash']
     return PRIORITY_MODELS
 
 
