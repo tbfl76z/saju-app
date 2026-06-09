@@ -94,7 +94,7 @@ export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
                     {/* 국문 컨셉 (명식 기반, 결정론적) */}
                     <div className="bg-[#d4af37]/10 border border-[#d4af37]/30 rounded-2xl px-5 py-4">
                         <div className="text-xs font-bold text-[#bf953f] mb-1.5">✦ 이미지 컨셉</div>
-                        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">{result.concept_ko}</p>
+                        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200 whitespace-pre-line">{result.concept_ko}</p>
                     </div>
 
                     {/* 영문 이미지 프롬프트 */}
