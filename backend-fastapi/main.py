@@ -99,6 +99,17 @@ async def calculate(req: SajuRequest):
 async def get_terms():
     return SAJU_TERMS
 
+
+@app.get("/health/ai")
+async def health_ai():
+    """AI 키·모델 설정 상태 진단 (키 값은 노출하지 않고 존재 여부만 반환)."""
+    return {
+        "google_api_key": bool(GEMINI_API_KEY),
+        "openrouter_api_key": bool(ai_report.OPENROUTER_API_KEY),
+        "openrouter_models": ai_report.OPENROUTER_MODELS,
+        "priority_models": ai_report.PRIORITY_MODELS,
+    }
+
 class SeyunRequest(BaseModel):
     day_gan: str
     year_branch: str

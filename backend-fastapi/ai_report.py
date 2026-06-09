@@ -448,7 +448,8 @@ def _openrouter_generate(prompt: str, system_instruction: str) -> Optional[str]:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            # 무료 모델이 과부하로 응답을 끌면 한 모델에 너무 오래 매이지 않도록 타임아웃 단축
+            with urllib.request.urlopen(req, timeout=45) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
             if text:
