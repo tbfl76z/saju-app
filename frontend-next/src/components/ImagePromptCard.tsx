@@ -11,23 +11,35 @@ interface ImagePromptCardProps {
     apiBase: string;
 }
 
+type Scope = "natal" | "daeun" | "seyun";
+
 interface ImagePromptResult {
     concept_ko: string;
     prompt_en: string;
+    scope: Scope;
+    period_label?: string | null;
+    ganzhi?: string | null;
 }
 
+const SCOPES: { key: Scope; label: string }[] = [
+    { key: "natal", label: "나의 명식" },
+    { key: "daeun", label: "명식 + 대운" },
+    { key: "seyun", label: "명식 + 세운" },
+];
+
 // 명식(천간지지)을 바탕으로 이미지 생성 프롬프트를 만들어, ChatGPT/DALL-E로 바로 넘겨주는 카드
+// 원국(명식) / 명식+대운 / 명식+세운 세 가지로 그릴 수 있다.
 export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
     const [result, setResult] = useState<ImagePromptResult | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState<Scope | null>(null);
 
-    const generate = async () => {
-        setLoading(true);
+    const generate = async (scope: Scope) => {
+        setLoading(scope);
         try {
             const res = await fetch(`${apiBase}/image-prompt`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ saju_data: sajuData }),
+                body: JSON.stringify({ saju_data: sajuData, scope }),
             });
             if (!res.ok) throw new Error(`Image prompt failed: ${res.status}`);
             const data = await res.json();
@@ -37,7 +49,7 @@ export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
             console.error("Failed to generate image prompt", err);
             notify.error("프롬프트 생성에 실패했습니다", "잠시 후 다시 시도해 주세요.");
         } finally {
-            setLoading(false);
+            setLoading(null);
         }
     };
 
@@ -60,6 +72,16 @@ export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
         window.open(url, "_blank", "noopener,noreferrer");
     };
 
+    // 결과 제목 (scope + 시기 라벨)
+    const resultTitle = () => {
+        if (!result) return "";
+        const base = SCOPES.find((s) => s.key === result.scope)?.label ?? "나의 명식";
+        const tail = result.period_label
+            ? ` · ${result.period_label}${result.ganzhi ? `(${result.ganzhi})` : ""}`
+            : "";
+        return `${base}${tail}`;
+    };
+
     return (
         <section className="fade-up">
             <h3 className="text-xl font-bold mb-2 flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
@@ -67,30 +89,49 @@ export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
                 <span className="border-b-2 border-[#d4af37]/30 pb-1">나의 명식 이미지</span>
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                천간지지를 바탕으로 당신만의 운명을 그림으로 표현하는 프롬프트를 만들어 드립니다. ChatGPT로 바로 그려보세요.
+                천간지지를 바탕으로 당신의 운명을 그림으로 표현하는 프롬프트를 만들어 드립니다.
+                원국(명식)에 대운·세운의 기운을 더할 수도 있어요. ChatGPT로 바로 그려보세요.
             </p>
 
-            {!result ? (
-                <div className="flex justify-center">
-                    <Button
-                        onClick={generate}
-                        disabled={loading}
-                        className="rounded-full px-8 py-6 text-base bg-gradient-to-r from-[#d4af37] to-[#bf953f] hover:from-[#bf953f] hover:to-[#aa771c] text-white font-bold shadow-lg transition-all hover:scale-[1.02] border-none"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                상징을 그려내는 중...
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-2">
-                                <Palette className="h-5 w-5" /> 내 명식 그림 프롬프트 만들기
-                            </span>
-                        )}
-                    </Button>
-                </div>
-            ) : (
-                <div className="glass-card p-6 md:p-8 animate-in fade-in zoom-in-95 duration-500 space-y-5">
+            {/* scope 선택 버튼 3종 */}
+            <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+                {SCOPES.map((s) => {
+                    const active = result?.scope === s.key;
+                    return (
+                        <Button
+                            key={s.key}
+                            onClick={() => generate(s.key)}
+                            disabled={loading !== null}
+                            variant={active ? "default" : "outline"}
+                            className={
+                                active
+                                    ? "rounded-full px-5 bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white border-none"
+                                    : "rounded-full px-5 border-[#d4af37]/40 hover:bg-[#d4af37]/10"
+                            }
+                        >
+                            {loading === s.key ? (
+                                <span className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                                    그리는 중...
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1.5">
+                                    <Palette className="h-4 w-4" /> {s.label}
+                                </span>
+                            )}
+                        </Button>
+                    );
+                })}
+            </div>
+
+            {result && (
+                <div className="glass-card p-6 md:p-8 mt-6 animate-in fade-in zoom-in-95 duration-500 space-y-5">
+                    {/* 컨셉 제목 */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">🖼️</span>
+                        <h4 className="text-base font-bold font-noto-serif text-slate-900 dark:text-slate-100">{resultTitle()}</h4>
+                    </div>
+
                     {/* 국문 컨셉 (명식 기반, 결정론적) */}
                     <div className="bg-[#d4af37]/10 border border-[#d4af37]/30 rounded-2xl px-5 py-4">
                         <div className="text-xs font-bold text-[#bf953f] mb-1.5">✦ 이미지 컨셉</div>
@@ -107,8 +148,8 @@ export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
 
                     <div className="flex flex-wrap justify-end gap-2">
                         <Button
-                            onClick={generate}
-                            disabled={loading}
+                            onClick={() => generate(result.scope)}
+                            disabled={loading !== null}
                             variant="ghost"
                             size="sm"
                             className="rounded-full text-slate-500 dark:text-slate-400"

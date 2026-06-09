@@ -9,10 +9,21 @@
   (예: 甲=거목, 丑=꽁꽁 언 땅(土), 午=한여름 태양(火))
 - 컨셉(국문)은 명식에서 결정론적으로 산출(환각 방지)하고, 영문 프롬프트만 AI로 윤색·폴백한다.
 """
+import datetime
 from typing import Any, Optional
 
-# ai_report의 모델 폴백 체인을 재사용한다
-from ai_report import _gemini_generate, _openrouter_generate
+# ai_report의 모델 폴백 체인 + 현재 대운 계산을 재사용한다
+from ai_report import _gemini_generate, _openrouter_generate, _current_daeun
+
+# 60갑자 산출용 (세운=올해 연주 간지 자동 계산)
+_STEMS = "甲乙丙丁戊己庚辛壬癸"
+_BRANCHES = "子丑寅卯辰巳午未申酉戌亥"
+
+
+def _year_ganzhi(year: int) -> str:
+    """연도 → 연주 간지(천간+지지). 예: 2026 → 丙午."""
+    i = year - 4
+    return _STEMS[i % 10] + _BRANCHES[i % 12]
 
 # 천간(天干) 물상 → (오행한글, 영문 물상, 국문 물상)
 STEM_IMAGERY = {
@@ -96,8 +107,44 @@ def _pillar_imagery(pillars: dict, key: str) -> Optional[dict]:
     }
 
 
-def _extract_symbols(data: dict) -> dict:
-    """명식에서 물상·배치 요소를 결정론적으로 추출한다."""
+def _build_sky(data: dict, scope: str, period_ganzhi: Optional[str], period_label: Optional[str]) -> Optional[dict]:
+    """대운/세운을 '하늘에 흐르는 시기의 기운'으로 환산한다.
+    명리: 원국=체질, 대운=기후(climate), 세운=날씨(weather)로 원국 위에 덮여 작용한다."""
+    if scope not in ("daeun", "seyun"):
+        return None
+
+    gz, label = period_ganzhi, period_label
+    if scope == "daeun":
+        if not gz:
+            cur = _current_daeun(data) or {}
+            gz = cur.get("ganzhi")
+            label = label or (f"{cur.get('age')}세 대운" if cur.get("age") else "현재 대운")
+        scope_ko = "10년의 큰 흐름(대운)"
+        scope_en = "the current 10-year great-luck cycle (大運), like the overarching climate of this era of life"
+    else:  # seyun
+        if not gz:
+            year = datetime.date.today().year
+            gz = _year_ganzhi(year)
+            label = label or f"{year}년 세운"
+        scope_ko = "올해의 흐름(세운)"
+        scope_en = "this year's fortune (歲運), like the passing weather of the year"
+
+    if not gz or len(gz) < 2:
+        return None
+    stem, branch = gz[0], gz[1]
+    s = STEM_IMAGERY.get(stem)
+    b = BRANCH_IMAGERY.get(branch)
+    return {
+        "scope": scope, "ganzhi": gz, "label": label or scope_ko,
+        "scope_ko": scope_ko, "scope_en": scope_en,
+        "stem": stem, "stem_el": s[0] if s else "", "stem_img_en": s[1] if s else "", "stem_img_ko": s[2] if s else "",
+        "branch": branch, "branch_el": b[0] if b else "", "branch_img_en": b[1] if b else "", "branch_img_ko": b[2] if b else "",
+    }
+
+
+def _extract_symbols(data: dict, scope: str = "natal",
+                     period_ganzhi: Optional[str] = None, period_label: Optional[str] = None) -> dict:
+    """명식에서 물상·배치 요소를 결정론적으로 추출한다. scope로 대운/세운 기운을 더한다."""
     pillars = data.get("pillars") or {}
     unknown_time = bool(data.get("unknown_time"))
 
@@ -128,6 +175,8 @@ def _extract_symbols(data: dict) -> dict:
             "role_en": role_en, "role_ko": role_ko, "faint": faint, **pi,
         })
 
+    sky = _build_sky(data, scope, period_ganzhi, period_label)
+
     return {
         "day_stem": day_stem,
         "core_el": core_el,
@@ -137,7 +186,23 @@ def _extract_symbols(data: dict) -> dict:
         "palette_en": palette_en,
         "palette_ko": palette_ko,
         "placements": placements,
+        "scope": scope,
+        "sky": sky,
     }
+
+
+def _sky_phrase_ko(sky: dict) -> str:
+    bits = []
+    if sky.get("stem_img_ko"):
+        bits.append(f"{sky['stem_img_ko']}({sky['stem']}·{sky['stem_el']})")
+    if sky.get("branch_img_ko"):
+        bits.append(f"{sky['branch_img_ko']}({sky['branch']}·{sky['branch_el']})")
+    return " · ".join(bits) if bits else "시기의 기운"
+
+
+def _sky_phrase_en(sky: dict) -> str:
+    bits = [b for b in (sky.get("stem_img_en"), sky.get("branch_img_en")) if b]
+    return " together with ".join(bits) if bits else "the incoming seasonal energy"
 
 
 def _pillar_phrase_ko(pl: dict) -> str:
@@ -163,6 +228,9 @@ def _concept_ko(sym: dict, name: Optional[str]) -> str:
     for pl in sym["placements"]:
         faint = " (시간 미상이라 안개처럼 흐릿하게)" if pl["faint"] else ""
         lines.append(f"· {pl['pos_ko']} — {pl['role_ko']}: {_pillar_phrase_ko(pl)}{faint}")
+    sky = sym.get("sky")
+    if sky:
+        lines.append(f"☁ 하늘에 흐르는 {sky['scope_ko']} — {sky['label']}({sky['ganzhi']}): {_sky_phrase_ko(sky)}, 원국 전체를 감싼다.")
     lines.append(f"화면 전체에 {sym['palette_ko']} 기운({sym['dom_element']})이 흐르는 {sym['season_ko']} 풍경.")
     return "\n".join(lines)
 
@@ -179,11 +247,19 @@ def _scene_lines_en(sym: dict) -> str:
 
 def _base_prompt_en(sym: dict) -> str:
     """결정론적 영문 이미지 프롬프트 (물상론 + 원근 배치, AI 폴백용 기본형)."""
+    sky = sym.get("sky")
+    sky_line = ""
+    if sky:
+        sky_line = (
+            f"Across the sky above, {sky['scope_en']} flows over the whole scene as {sky['label']} ({sky['ganzhi']}): "
+            f"{_sky_phrase_en(sky)}, tinting the entire landscape with its energy. "
+        )
     return (
         f"A symbolic oriental landscape painting visualizing a person's destiny from Korean Saju (Four Pillars) "
         f"astrology, composed in the spirit of 物象 elemental imagery, with deliberate spatial depth. "
         f"The day-master ({ELEMENT_EN.get(sym['core_el'], 'Spirit')} element) anchors the self at the center. "
         f"{_scene_lines_en(sym)}. "
+        f"{sky_line}"
         f"Overall mood: {sym['season_en']}. "
         f"Dominant color palette of {sym['palette_en']}, glowing with the energy of the {ELEMENT_EN.get(sym['dom_element'], 'Gold')} element. "
         f"Ink-and-gold landscape style, layered foreground-to-background depth, soft volumetric light, "
@@ -212,6 +288,12 @@ def _enrich_prompt_en(sym: dict) -> str:
     for pl in sym["placements"]:
         faint = " [keep faint/misty — uncertain birth hour]" if pl["faint"] else ""
         anchor_lines.append(f"- {pl['pos_en']} = {pl['role_en']}: {_pillar_phrase_en(pl)}{faint}")
+    sky = sym.get("sky")
+    if sky:
+        anchor_lines.append(
+            f"- ACROSS THE SKY ABOVE (overlaying the whole scene) = {sky['scope_en']}, {sky['label']} ({sky['ganzhi']}): "
+            f"{_sky_phrase_en(sky)}"
+        )
     anchors = (
         "Build one cohesive oriental landscape, preserving this exact spatial depth ordering "
         "(these are natural elements, not animals):\n"
@@ -230,11 +312,17 @@ def _enrich_prompt_en(sym: dict) -> str:
     return _base_prompt_en(sym)
 
 
-def generate_image_prompt(data: dict) -> dict:
-    """명식 → {concept_ko, prompt_en} 반환. ChatGPT/DALL-E에 바로 넣을 수 있다."""
-    sym = _extract_symbols(data)
+def generate_image_prompt(data: dict, scope: str = "natal",
+                          period_ganzhi: Optional[str] = None, period_label: Optional[str] = None) -> dict:
+    """명식 → {concept_ko, prompt_en, scope, period_label, ganzhi} 반환.
+    scope: 'natal'(원국) | 'daeun'(명식+대운) | 'seyun'(명식+세운)."""
+    sym = _extract_symbols(data, scope, period_ganzhi, period_label)
     name = data.get("name")
+    sky = sym.get("sky") or {}
     return {
         "concept_ko": _concept_ko(sym, name),
         "prompt_en": _enrich_prompt_en(sym),
+        "scope": sym.get("scope", "natal"),
+        "period_label": sky.get("label"),
+        "ganzhi": sky.get("ganzhi"),
     }

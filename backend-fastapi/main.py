@@ -351,13 +351,20 @@ class AnalysisRequest(BaseModel):
 
 class ImagePromptRequest(BaseModel):
     saju_data: Dict[str, Any]
+    scope: Optional[str] = "natal"  # natal(원국) | daeun(명식+대운) | seyun(명식+세운)
+    period_ganzhi: Optional[str] = None  # 명시 시 그 간지 사용, 없으면 자동(현재 대운/올해)
+    period_label: Optional[str] = None
 
 
 @app.post("/image-prompt")
 async def image_prompt(req: ImagePromptRequest):
-    """명식(천간지지) 기반 이미지 생성 프롬프트 반환 — ChatGPT/DALL-E에 바로 입력 가능."""
+    """명식(천간지지) 기반 이미지 생성 프롬프트 반환 — ChatGPT/DALL-E에 바로 입력 가능.
+    scope로 원국/대운/세운 기운을 더할 수 있다."""
     try:
-        return image_prompt_mod.generate_image_prompt(req.saju_data)
+        return image_prompt_mod.generate_image_prompt(
+            req.saju_data, scope=req.scope or "natal",
+            period_ganzhi=req.period_ganzhi, period_label=req.period_label,
+        )
     except Exception as e:
         import traceback
         print(traceback.format_exc())
