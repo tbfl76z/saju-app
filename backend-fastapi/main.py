@@ -111,63 +111,6 @@ async def health_ai():
     }
 
 
-@app.get("/health/ai/probe")
-async def health_ai_probe():
-    """Gemini·OpenRouter를 실제로 짧게 호출해 모델별 성공/실패(상태코드·에러)를 진단한다.
-    키 값은 노출하지 않는다. 운영 점검 후 제거 가능."""
-    import urllib.request
-    import urllib.error
-    import json as _json
-
-    results = {"gemini": [], "openrouter": []}
-
-    # 1) Gemini: 모델별로 한 줄 생성 시도
-    for model_name in ai_report.PRIORITY_MODELS:
-        entry = {"model": model_name}
-        try:
-            m = genai.GenerativeModel(model_name)
-            r = m.generate_content("Say OK")
-            entry["ok"] = bool(getattr(r, "text", ""))
-        except Exception as e:
-            entry["ok"] = False
-            entry["error"] = str(e)[:200]
-        results["gemini"].append(entry)
-
-    # 2) OpenRouter: 모델별 실제 호출 → 상태코드/에러 본문 확인
-    if ai_report.OPENROUTER_API_KEY:
-        test_body = {"messages": [{"role": "user", "content": "Say OK"}], "max_tokens": 5}
-        for model in ai_report.OPENROUTER_MODELS:
-            entry = {"model": model}
-            try:
-                payload = _json.dumps({**test_body, "model": model}).encode("utf-8")
-                rq = urllib.request.Request(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    data=payload,
-                    headers={
-                        "Authorization": f"Bearer {ai_report.OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://saju-app-coral.vercel.app",
-                        "X-Title": "Destiny Code",
-                    },
-                    method="POST",
-                )
-                with urllib.request.urlopen(rq, timeout=45) as resp:
-                    data = _json.loads(resp.read().decode("utf-8"))
-                txt = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-                entry.update({"ok": bool(txt), "status": 200, "sample": txt[:40]})
-            except urllib.error.HTTPError as e:
-                body = ""
-                try:
-                    body = e.read().decode("utf-8")[:300]
-                except Exception:
-                    pass
-                entry.update({"ok": False, "status": e.code, "error": body})
-            except Exception as e:
-                entry.update({"ok": False, "error": str(e)[:300]})
-            results["openrouter"].append(entry)
-
-    return results
-
 class SeyunRequest(BaseModel):
     day_gan: str
     year_branch: str
