@@ -422,6 +422,50 @@ async def learn_restore(code: str):
     return data
 
 
+def _saju_summary_for_grading(saju_data: Dict[str, Any]) -> str:
+    """채점용 명식 요약 텍스트 — 계산 결과를 정답 기준으로 AI에 전달한다."""
+    pillars = saju_data.get("pillars", {})
+    lines = []
+    p_names = {"year": "연주", "month": "월주", "day": "일주", "hour": "시주"}
+    for k in ["year", "month", "day", "hour"]:
+        p = pillars.get(k, {})
+        if p.get("pillar"):
+            lines.append(f"{p_names[k]}: {p['pillar']}")
+    if saju_data.get("five_elements"):
+        lines.append("오행 분포: " + ", ".join(f"{k} {v}개" for k, v in saju_data["five_elements"].items()))
+    if saju_data.get("ten_gods"):
+        lines.append("천간 십성: " + ", ".join(f"{p_names.get(k, k)} {v}" for k, v in saju_data["ten_gods"].items()))
+    if saju_data.get("jiji_ten_gods"):
+        lines.append("지지 십성(정기): " + ", ".join(f"{p_names.get(k, k)} {v}" for k, v in saju_data["jiji_ten_gods"].items()))
+    if saju_data.get("twelve_growth"):
+        lines.append("12운성: " + ", ".join(f"{p_names.get(k, k)} {v}" for k, v in saju_data["twelve_growth"].items()))
+    if saju_data.get("relations"):
+        lines.append("합충 관계: " + ", ".join(saju_data["relations"]))
+    if saju_data.get("gongmang"):
+        lines.append("공망: " + str(saju_data["gongmang"]))
+    return "\n".join(lines)
+
+
+class GradeRequest(BaseModel):
+    saju_data: Dict[str, Any]  # /calculate 응답
+    user_answer: str  # 학생의 해석 서술
+
+
+@app.post("/learn/grade")
+async def learn_grade(req: GradeRequest, request: Request):
+    """통변 훈련 — 학생의 명식 해석을 AI가 채점한다 (튜터와 동일한 레이트리밋 공유)."""
+    answer = (req.user_answer or "").strip()
+    if len(answer) < 50:
+        raise HTTPException(status_code=422, detail="해석을 50자 이상 작성해 주세요.")
+    if not req.saju_data.get("pillars"):
+        raise HTTPException(status_code=422, detail="saju_data.pillars가 필요합니다.")
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0].strip()
+    if not _tutor_rate_ok(client_ip):
+        raise HTTPException(status_code=429, detail="제출이 너무 잦아요. 1분 후 다시 시도해 주세요.")
+    summary = _saju_summary_for_grading(req.saju_data)
+    return {"result": ai_report.grade_interpretation(summary, answer)}
+
+
 class TutorRequest(BaseModel):
     question: str
     chapter_id: Optional[str] = None

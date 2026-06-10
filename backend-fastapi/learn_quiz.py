@@ -380,6 +380,99 @@ def _pool_practice(rng: random.Random) -> list[dict]:
     return items
 
 
+def _pool_sinkang(rng: random.Random) -> list[dict]:
+    """[고급] 신강신약·용신 — 득령 판정은 오행 관계로 동적 출제."""
+    items = []
+    # 득령 판정 (월지 오행 vs 일간 오행)
+    deukryeong_choices = ['득령 — 월지가 비겁', '득령 — 월지가 인성', '실령', '판단 불가']
+    for dg in rng.sample(HEAVENLY_STEMS, 5):
+        for mb in rng.sample(EARTHLY_BRANCHES, 3):
+            d_el, m_el = ELEMENTS_MAP[dg], ELEMENTS_MAP[mb]
+            if m_el == d_el:
+                ans, why = '득령 — 월지가 비겁', f"월지 {m_el}이 일간과 같은 오행(비겁)"
+            elif GENERATES[m_el] == d_el:
+                ans, why = '득령 — 월지가 인성', f"월지 {m_el}이 일간 {d_el}을 생함(인성)"
+            else:
+                ans, why = '실령', f"월지 {m_el}은 일간 {d_el}을 돕지 않음"
+            items.append(_make_item(
+                rng, f"dr:{dg}{mb}", f"일간 {_label_stem(dg)}({d_el})가 {_label_branch(mb)}월에 태어났다. 월지 판정은?",
+                ans, deukryeong_choices,
+                f"{why} → {ans}입니다. 득령은 신강신약 판정의 절반을 차지합니다."))
+    # 개념 문제
+    group_pool = ['인성·비겁', '식상·재성·관성', '비겁·식상', '재성·인성']
+    concept_q = [
+        ("신약(身弱)한 사주에 약(藥)이 되는 십성 그룹은?", "인성·비겁", group_pool,
+         "신약은 나를 생하는 인성과 나를 돕는 비겁이 약입니다."),
+        ("신강(身强)한 사주의 균형을 잡아주는 십성 그룹은?", "식상·재성·관성", group_pool,
+         "신강은 기운을 빼는 식상, 써버리는 재성, 눌러주는 관성이 약입니다."),
+        ("재다신약(財多身弱) 사주의 대표 용신 후보는?", "비겁", ['비겁', '재성', '식상', '관성'],
+         "재성이 산처럼 많아 신약해진 사주는 재를 나눠 짊어질 비겁(우군)이 약입니다."),
+        ("신강신약 판정에서 가장 비중이 큰 글자는?", "월지", ['월지', '연간', '시지', '일간'],
+         "득령(월지)이 판정의 절반 — 태어난 계절이 사주의 사령부입니다."),
+        ("강한 것을 누르고 약한 것을 돕는 용신법은?", "억부용신", ['억부용신', '조후용신', '통관용신', '전왕용신'],
+         "억부(抑扶)는 용신 찾기의 기본 공식입니다."),
+        ("사주의 추위·더위를 먼저 해결하는 용신법은?", "조후용신", ['조후용신', '억부용신', '병약용신', '전왕용신'],
+         "조후(調候)는 계절이 만든 온도·습도부터 맞춥니다."),
+        ("대립하는 두 오행 세력을 소통시키는 용신법은?", "통관용신", ['통관용신', '억부용신', '조후용신', '병약용신'],
+         "통관(通關)은 둘 사이에 다리를 놓는 중간 오행을 씁니다."),
+        ("한 오행이 사주를 압도할 때 대세를 따르는 용신법은?", "전왕용신", ['전왕용신', '억부용신', '조후용신', '통관용신'],
+         "전왕(專旺)은 종격·화격 같은 특수격에 적용합니다."),
+        ("한겨울(子월)생이 金·水로 치우쳤을 때 우선 용신은?", "화", ELEMENTS,
+         "얼어붙은 사주는 난로(火)부터 — 조후용신입니다."),
+        ("한여름(午월)생이 木·火로 치우쳤을 때 우선 용신은?", "수", ELEMENTS,
+         "타들어 가는 사주는 물(水)부터 — 조후용신입니다."),
+    ]
+    for i, (q, a, pool, ex) in enumerate(concept_q):
+        items.append(_make_item(rng, f"sk:{i}", q, a, pool, ex))
+    return items
+
+
+def _pool_gyeokguk(rng: random.Random) -> list[dict]:
+    """[고급] 격국 — 월지 정기 십성으로 격 판정 (비겁 월지는 건록·양인 특수격)."""
+    items = []
+    gyeok_names = ['식신격', '상관격', '편재격', '정재격', '편관격', '정관격', '편인격', '정인격']
+    # 팔정격 판정 (월지 정기가 비견·겁재인 조합은 제외)
+    combos = [(dg, mb) for dg in HEAVENLY_STEMS for mb in EARTHLY_BRANCHES
+              if GAN_TEN_GODS[dg][BRANCH_HIDDEN_GANS[mb]] not in ('비견', '겁재')]
+    for dg, mb in rng.sample(combos, 12):
+        hidden = BRANCH_HIDDEN_GANS[mb]
+        ss = GAN_TEN_GODS[dg][hidden]
+        items.append(_make_item(
+            rng, f"gk:{dg}{mb}", f"일간 {_label_stem(dg)}가 {_label_branch(mb)}월에 태어났다(투출 없음). 격은?",
+            f"{ss}격", gyeok_names,
+            f"{_label_branch(mb)}의 정기 {_label_stem(hidden)}은 일간 {_label_stem(dg)} 기준 {ss} → {ss}격입니다."))
+    # 건록격·양인격 (특수격)
+    special_pool = ['건록격', '양인격', '정관격', '식신격']
+    rokkw = [(dg, mb) for dg in HEAVENLY_STEMS for mb in EARTHLY_BRANCHES
+             if TWELVE_GROWTH.get(dg, {}).get(mb) == '건록']
+    for dg, mb in rng.sample(rokkw, 3):
+        items.append(_make_item(
+            rng, f"rok:{dg}{mb}", f"일간 {_label_stem(dg)}가 건록지인 {_label_branch(mb)}월에 태어났다. 격은?",
+            '건록격', special_pool,
+            f"월지가 일간의 건록(비견) 자리면 건록격 — 자수성가의 격입니다."))
+    yangin = [(dg, mb) for dg in YANG_STEMS for mb in EARTHLY_BRANCHES
+              if TWELVE_GROWTH.get(dg, {}).get(mb) == '제왕']
+    for dg, mb in rng.sample(yangin, 3):
+        items.append(_make_item(
+            rng, f"yin:{dg}{mb}", f"양간 {_label_stem(dg)}가 제왕지인 {_label_branch(mb)}월에 태어났다. 격은?",
+            '양인격', special_pool,
+            f"양간이 월지에 제왕(가장 힘센 겁재)을 두면 양인격 — 칼을 쥐고 태어난 격입니다."))
+    # 개념 문제
+    concept_q = [
+        ("격국을 정하는 기준이 되는 자리는?", "월지", ['월지', '일간', '연주', '시지'],
+         "월지(태어난 계절)가 사주의 사령부 — 격의 출발점입니다."),
+        ("월지 지장간 중 천간에 드러난 글자로 격을 정하는 원칙은?", "투출 우선", ['투출 우선', '여기 우선', '시지 우선', '합화 우선'],
+         "투출(透出)한 지장간이 있으면 그 글자의 십성으로 격을 정합니다."),
+        ("양인격이 성립할 수 있는 일간은?", "양간만", ['양간만', '음간만', "모든 일간", "토 일간만"],
+         "양인격은 양간이 월지에 제왕을 둘 때만 성립합니다 — 음간에게는 없습니다."),
+        ("월지가 일간의 비견(건록 자리)일 때의 격은?", "건록격", special_pool,
+         "월지 비견은 팔정격이 아니라 건록격 — 독립·자수성가의 구조입니다."),
+    ]
+    for i, (q, a, pool, ex) in enumerate(concept_q):
+        items.append(_make_item(rng, f"gkc:{i}", q, a, pool, ex))
+    return items
+
+
 CHAPTER_GENERATORS: dict[str, Callable[[random.Random], list[dict]]] = {
     "elements": _pool_elements,
     "stems": _pool_stems,
@@ -391,6 +484,8 @@ CHAPTER_GENERATORS: dict[str, Callable[[random.Random], list[dict]]] = {
     "hapchung": _pool_hapchung,
     "sinsal": _pool_sinsal,
     "practice": _pool_practice,
+    "sinkang": _pool_sinkang,
+    "gyeokguk": _pool_gyeokguk,
 }
 
 

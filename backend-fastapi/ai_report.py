@@ -607,3 +607,40 @@ def stream_tutor(question: str, chapter_title: str = "", context_hint: str = "")
             return
         yield _sse({"delta": "죄송합니다. 지금은 선생님이 자리를 비웠어요. 잠시 후 다시 질문해 주세요."})
         yield _sse({"done": True, "error": error_msg or "no_model"})
+
+
+# ---------------------------------------------------------------------------
+# 학습 모드: 통변 훈련 채점 (학생의 명식 해석 서술을 AI가 평가)
+# ---------------------------------------------------------------------------
+GRADER_SYSTEM_INSTRUCTION = (
+    "당신은 명리학 통변(명식 해석) 수업의 채점 선생님입니다. 학생이 제출한 명식 해석 답안을 평가하세요.\n"
+    "채점 기준 (100점 만점):\n"
+    "1. 일간·오행 분포 파악의 정확성 (30점)\n"
+    "2. 십성·12운성·합충 등 근거 사용의 정확성 (30점) — 명리적으로 틀린 주장(예: 잘못된 십성)은 반드시 짚어 감점\n"
+    "3. 해석의 논리성과 균형 (25점) — 근거 없는 단정·점술식 표현은 감점\n"
+    "4. 표현력 (15점)\n"
+    "출력 형식 (매우 중요): 반드시 아래 네 개의 마크다운 헤딩만 사용하세요.\n"
+    "'## 채점 결과' — 첫 줄에 '총점: NN점 / 100점'을 쓰고 기준별 점수를 한 줄씩.\n"
+    "'## 잘 짚은 부분' — 학생이 정확히 본 포인트 2~3가지.\n"
+    "'## 놓친 부분' — 틀렸거나 빠뜨린 포인트와 그 이유. 명식의 실제 데이터를 근거로 교정.\n"
+    "'## 한 걸음 더' — 다음 연습 방향 한두 문장.\n"
+    "격려하되 정확하게. 출처·파일명 언급 금지. 핵심 용어 1~3곳만 **굵게**."
+)
+
+
+def grade_interpretation(saju_summary: str, user_answer: str) -> str:
+    """통변 답안 채점 (동기). Gemini → OpenRouter 폴백."""
+    knowledge = build_knowledge_context("original")[:TUTOR_KNOWLEDGE_LIMIT]
+    prompt = "\n".join([
+        "[채점 근거 지식]", knowledge, "",
+        "[학생에게 주어진 명식 (정답 데이터)]", saju_summary[:2000], "",
+        "[학생의 해석 답안]", user_answer.replace("#", "").replace("`", "")[:4000], "",
+        "위 명식 데이터를 정답 기준으로 삼아 학생 답안을 채점하세요.",
+    ])
+    text = _gemini_generate(prompt, GRADER_SYSTEM_INSTRUCTION)
+    if text:
+        return text
+    text = _openrouter_generate(prompt, GRADER_SYSTEM_INSTRUCTION)
+    if text:
+        return text
+    return "죄송합니다. 지금은 채점 선생님이 자리를 비웠어요. 잠시 후 다시 제출해 주세요."

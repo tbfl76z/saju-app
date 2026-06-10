@@ -103,11 +103,25 @@ export async function fetchPersonalQuiz(sajuData: any, count = 10): Promise<Quiz
     return res.json();
 }
 
-// 레벨 테스트 — 10챕터 × 1문항 (chapter 태그 포함)
+// 레벨 테스트 — 챕터별 1문항 (chapter 태그 포함)
 export async function fetchPlacement(): Promise<QuizItem[]> {
     const res = await fetch(`${API_BASE}/learn/placement`);
     if (!res.ok) throw new Error(`placement ${res.status}`);
     return res.json();
+}
+
+// 통변 훈련 — 명식 해석 서술을 AI가 채점
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function gradeInterpretation(sajuData: any, userAnswer: string): Promise<string> {
+    const res = await fetch(`${API_BASE}/learn/grade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saju_data: sajuData, user_answer: userAnswer }),
+    });
+    if (res.status === 429) throw new Error("rate");
+    if (!res.ok) throw new Error(`grade ${res.status}`);
+    const data = await res.json();
+    return typeof data?.result === "string" ? data.result : "채점 결과를 불러오지 못했습니다.";
 }
 
 // AI 튜터 스트리밍 (analyzeStream.ts와 동일한 SSE 파싱 패턴)
@@ -236,6 +250,14 @@ export function recordQuizResult(
     saveProgress(p);
     addWrongToSrs(chapterId, wrongItems);
     return p;
+}
+
+// 통변 훈련 등 퀴즈 외 학습 활동의 XP 적립 (+스트릭 갱신)
+export function awardXp(amount: number): void {
+    const p = getProgress();
+    p.xp += amount;
+    touchStreak(p);
+    saveProgress(p);
 }
 
 // 약점 분석: 챕터별 누적 정답률 + 복습덱 분포

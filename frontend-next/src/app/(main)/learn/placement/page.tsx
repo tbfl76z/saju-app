@@ -42,7 +42,7 @@ export default function PlacementPage() {
             <div className="text-center space-y-2">
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🧭 레벨 테스트</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm">
-                    챕터별 1문항, 총 10문항 — 쉬운 것부터 어려운 순서로 나옵니다
+                    챕터별 1문항{items.length > 0 ? ` · 총 ${items.length}문항` : ""} — 쉬운 것부터 어려운 순서로 나옵니다
                 </p>
             </div>
 

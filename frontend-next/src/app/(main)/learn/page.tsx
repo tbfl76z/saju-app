@@ -107,7 +107,7 @@ export default function LearnPage() {
                     <p className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-50">
                         <Compass className="h-5 w-5 text-[#bf953f]" /> 처음이신가요? 레벨 테스트로 시작하기
                     </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">10문항으로 내 수준을 진단하고 시작할 챕터를 추천받아요 →</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">챕터별 1문항 진단으로 내 수준에 맞는 시작 챕터를 추천받아요 →</p>
                 </Link>
             ) : (
                 <div className="text-right mb-2">
@@ -148,9 +148,18 @@ export default function LearnPage() {
                     </Link>
                 ) : (
                     chapters.length > 0 && (
-                        <p className="text-sm text-emerald-600 font-bold text-center py-1">🎓 전 챕터 완료! 복습과 실전 명식 풀이로 실력을 다져보세요.</p>
+                        <p className="text-sm text-emerald-600 font-bold text-center py-1">🎓 전 챕터 완료! 복습과 통변 훈련으로 실력을 다져보세요.</p>
                     )
                 )}
+                <Link
+                    href="/learn/tongbyeon"
+                    className="flex items-center justify-between rounded-xl border border-slate-200/60 dark:border-slate-700 px-4 py-3 hover:bg-[#d4af37]/10 hover:border-[#d4af37]/40 transition-colors"
+                >
+                    <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                        🖋️ 도전 · 통변 훈련
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">내 해석을 AI가 채점 (+30 XP) →</span>
+                </Link>
             </div>
 
             {error && <p className="text-center text-red-500 mb-6">{error}</p>}
