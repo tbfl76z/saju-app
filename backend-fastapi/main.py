@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -378,11 +378,33 @@ class TutorRequest(BaseModel):
     context_hint: Optional[str] = None  # 틀린 문제 등 학습 상황 전달용
 
 
+# 튜터 레이트리밋: IP당 분당 호출 수 제한 (무료 LLM 한도 소모 공격 방어, 인메모리 경량 구현)
+_tutor_calls: Dict[str, List[float]] = {}
+TUTOR_RATE_LIMIT = int(os.getenv("TUTOR_RATE_LIMIT", "6"))  # 회/분
+
+
+def _tutor_rate_ok(ip: str) -> bool:
+    import time
+    now = time.time()
+    calls = [t for t in _tutor_calls.get(ip, []) if now - t < 60]
+    if len(calls) >= TUTOR_RATE_LIMIT:
+        _tutor_calls[ip] = calls
+        return False
+    calls.append(now)
+    _tutor_calls[ip] = calls
+    if len(_tutor_calls) > 10000:  # 메모리 보호
+        _tutor_calls.clear()
+    return True
+
+
 @app.post("/learn/tutor")
-async def learn_tutor(req: TutorRequest):
+async def learn_tutor(req: TutorRequest, request: Request):
     """AI 튜터 질의응답 (SSE 스트리밍). 챕터 정보가 있으면 수업 맥락으로 전달한다."""
     if not req.question or not req.question.strip():
         raise HTTPException(status_code=422, detail="질문을 입력해 주세요.")
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0].strip()
+    if not _tutor_rate_ok(client_ip):
+        raise HTTPException(status_code=429, detail="질문이 너무 잦아요. 1분 후 다시 시도해 주세요.")
     chapter_title = ""
     if req.chapter_id:
         chapter = learn_curriculum.get_chapter(req.chapter_id)

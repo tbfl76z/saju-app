@@ -362,16 +362,21 @@ def _pool_practice(rng: random.Random) -> list[dict]:
             items.append(_make_item(
                 rng, f"pr_jss:{day_gz}{ob}", f"{case} — 월지 {_label_branch(ob)}의 십성(지장간 정기 기준)은?", tg, ten_gods,
                 f"{_label_branch(ob)}의 정기는 {_label_stem(hidden)}. 일간 {_label_stem(dg)} 기준 {tg}입니다."))
-        else:  # relation: 일지-월지 관계
-            rel = "없음"
+        else:  # relation: 일지-월지 관계 (형 포함, 관계가 둘 이상 겹치는 쌍은 모호하므로 출제 제외)
+            rels = []
             for rel_name in ['합', '충', '파', '해']:
                 if BRANCH_RELATIONS[rel_name].get(db) == ob:
-                    rel = rel_name
-                    break
+                    rels.append(rel_name)
+            h_val = BRANCH_RELATIONS['형'].get(db)
+            if (isinstance(h_val, list) and ob in h_val) or (isinstance(h_val, str) and h_val == ob):
+                rels.append('형')
+            if len(rels) > 1:  # 寅亥(합+파)·巳申(합+형+파) 등 복수 관계 → 단일 정답 불가
+                continue
+            rel = rels[0] if rels else "없음"
             items.append(_make_item(
                 rng, f"pr_rel:{day_gz}{ob}", f"{case} — 일지 {_label_branch(db)}와 월지 {_label_branch(ob)}의 관계는?",
-                rel, ['합', '충', '파', '해', '없음'],
-                f"{_label_branch(db)}-{_label_branch(ob)}: " + (f"{rel} 관계입니다." if rel != '없음' else "합·충·파·해 어디에도 해당하지 않습니다.")))
+                rel, ['합', '충', '형', '파', '해', '없음'],
+                f"{_label_branch(db)}-{_label_branch(ob)}: " + (f"{rel} 관계입니다." if rel != '없음' else "합·충·형·파·해 어디에도 해당하지 않습니다.")))
     return items
 
 

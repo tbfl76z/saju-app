@@ -48,6 +48,10 @@ export default function ChapterPage() {
         setError("");
         try {
             const items = await fetchQuiz(chapterId, 10);
+            if (items.length === 0) {
+                setError("퀴즈를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                return;
+            }
             setQuiz(items);
             setStage("quiz");
         } catch {

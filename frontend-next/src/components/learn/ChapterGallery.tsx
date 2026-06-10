@@ -48,7 +48,7 @@ export function ChapterGallery({ images }: { images: string[] }) {
                     className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4"
                     onClick={() => setZoom(null)}
                 >
-                    <button className="absolute top-4 right-4 text-white" aria-label="닫기">
+                    <button onClick={() => setZoom(null)} className="absolute top-4 right-4 text-white" aria-label="닫기">
                         <X className="h-8 w-8" />
                     </button>
                     {/* eslint-disable-next-line @next/next/no-img-element */}

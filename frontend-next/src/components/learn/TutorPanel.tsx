@@ -54,7 +54,10 @@ export function TutorPanel({ chapterId, contextHint, placeholder }: TutorPanelPr
                         <input
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && ask()}
+                            onKeyDown={(e) => {
+                                // 한글 IME 조합 확정 Enter로 전송되는 것 방지
+                                if (e.key === "Enter" && !e.nativeEvent.isComposing) ask();
+                            }}
                             placeholder={placeholder || "예: 식신과 상관의 차이가 뭐예요?"}
                             className="flex-1 rounded-xl border border-[#d4af37]/30 bg-white/60 dark:bg-slate-900/40 px-4 py-2.5 text-sm outline-none focus:border-[#d4af37]"
                         />

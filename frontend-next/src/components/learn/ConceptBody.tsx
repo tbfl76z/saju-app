@@ -3,7 +3,7 @@
 import { Fragment, type ReactNode } from "react";
 
 // 개념 카드 본문 렌더러 (마크다운 경량 파서)
-// 지원: **굵게**, '- ' 목록, '|' 표, 빈 줄 단락 구분
+// 지원: **굵게**, '- ' 목록, '1. ' 숫자 목록, '|' 표, 빈 줄 단락 구분, 단락 내 줄바꿈 보존
 
 function renderInline(text: string): ReactNode[] {
     const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -23,6 +23,7 @@ function renderInline(text: string): ReactNode[] {
 type Block =
     | { type: "p"; lines: string[] }
     | { type: "list"; items: string[] }
+    | { type: "olist"; items: string[] }
     | { type: "table"; rows: string[][] };
 
 function parseBlocks(body: string): Block[] {
@@ -55,6 +56,13 @@ function parseBlocks(body: string): Block[] {
                 flush();
                 cur = { type: "list", items: [item] };
             }
+        } else if (/^\d+\.\s+/.test(line.trim())) {
+            const item = line.trim().replace(/^\d+\.\s+/, "");
+            if (cur?.type === "olist") cur.items.push(item);
+            else {
+                flush();
+                cur = { type: "olist", items: [item] };
+            }
         } else {
             if (cur?.type === "p") cur.lines.push(line);
             else {
@@ -82,6 +90,18 @@ export function ConceptBody({ body }: { body: string }) {
                                 </li>
                             ))}
                         </ul>
+                    );
+                }
+                if (b.type === "olist") {
+                    return (
+                        <ol key={i} className="space-y-1.5 pl-1">
+                            {b.items.map((item, j) => (
+                                <li key={j} className="flex gap-2">
+                                    <span className="text-[#bf953f] font-bold shrink-0">{j + 1}.</span>
+                                    <span>{renderInline(item)}</span>
+                                </li>
+                            ))}
+                        </ol>
                     );
                 }
                 if (b.type === "table") {
@@ -113,7 +133,7 @@ export function ConceptBody({ body }: { body: string }) {
                         </div>
                     );
                 }
-                return <p key={i}>{renderInline(b.lines.join("\n"))}</p>;
+                return <p key={i} className="whitespace-pre-line">{renderInline(b.lines.join("\n"))}</p>;
             })}
         </div>
     );
