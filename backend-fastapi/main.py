@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import datetime
@@ -27,6 +28,11 @@ load_dotenv()
 
 app = FastAPI(title="Saju API")
 calc = SajuCalculator()  # Initialize calculator once
+
+# 학습 모드 도표 이미지 등 정적 파일 서빙 (폴더가 있을 때만 마운트)
+_static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 # Enable CORS for Next.js
 app.add_middleware(

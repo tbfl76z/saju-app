@@ -23,6 +23,7 @@ export interface ConceptCard {
 export interface ChapterDetail extends ChapterSummary {
     cards: ConceptCard[];
     total: number;
+    images: string[]; // 원전 PDF에서 추출한 도표 이미지 경로 (/static/learn/...)
 }
 
 export interface QuizItem {

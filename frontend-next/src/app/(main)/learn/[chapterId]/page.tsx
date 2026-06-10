@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Trophy, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConceptBody } from "@/components/learn/ConceptBody";
+import { ChapterGallery } from "@/components/learn/ChapterGallery";
 import { QuizRunner } from "@/components/learn/QuizRunner";
 import { TutorPanel } from "@/components/learn/TutorPanel";
 import {
@@ -196,6 +197,9 @@ export default function ChapterPage() {
                     </div>
                 </div>
             )}
+
+            {/* 원전 자료 도표 (퀴즈 중에는 숨김 — 컨닝 방지보다는 집중 유도) */}
+            {stage !== "quiz" && <ChapterGallery images={chapter.images} />}
 
             {/* AI 튜터 — 모든 단계에서 사용 가능 */}
             <TutorPanel chapterId={chapterId} contextHint={wrongHint} />

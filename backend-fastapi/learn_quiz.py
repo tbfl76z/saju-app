@@ -35,6 +35,14 @@ ELEMENTS = ['목', '화', '토', '금', '수']
 # 상생: A가 B를 낳는다 / 상극: A가 B를 누른다
 GENERATES = {'목': '화', '화': '토', '토': '금', '금': '수', '수': '목'}
 CONTROLS = {'목': '토', '토': '수', '수': '화', '화': '금', '금': '목'}
+# 오행별 속성 (계절·방위·색·운동성) — 1장 개념 카드와 1:1 대응
+ELEMENT_META = {
+    '목': {'season': '봄', 'direction': '동쪽', 'color': '청색(파랑)', 'nature': '위로 뻗는 성장'},
+    '화': {'season': '여름', 'direction': '남쪽', 'color': '적색(빨강)', 'nature': '사방으로 퍼지는 확산'},
+    '토': {'season': '환절기(사계의 사이)', 'direction': '중앙', 'color': '황색(노랑)', 'nature': '중심을 잡는 중재'},
+    '금': {'season': '가을', 'direction': '서쪽', 'color': '백색(하양)', 'nature': '단단히 여무는 수렴'},
+    '수': {'season': '겨울', 'direction': '북쪽', 'color': '흑색(검정)', 'nature': '아래로 모이는 응축'},
+}
 TRIADS = {'寅午戌': '화국(火局)', '申子辰': '수국(水局)', '巳酉丑': '금국(金局)', '亥卯未': '목국(木局)'}
 SINSAL_ORDER = ['지살', '년살', '월살', '망신살', '장성살', '반안살', '역마살', '육해살', '화개살', '겁살', '재살', '천살']
 
@@ -71,14 +79,29 @@ def _make_item(rng: random.Random, key: str, question: str, answer: str,
 # 챕터별 문제 풀 생성기
 # ---------------------------------------------------------------------------
 def _pool_elements(rng: random.Random) -> list[dict]:
+    # 주의: 천간·지지 글자의 오행 판별 문제는 2~3장(천간·지지)에서 출제한다.
+    # 1장 퀴즈는 1장 개념 카드에서 배운 범위(오행 성질·계절·방위·색·상생·상극)만 다룬다.
     items = []
-    # 글자 → 오행 판별
-    for ch in HEAVENLY_STEMS + EARTHLY_BRANCHES:
-        label = _label_stem(ch) if ch in STEM_KOR else _label_branch(ch)
-        el = ELEMENTS_MAP[ch]
+    # 오행 속성 (계절·방위·색·운동성)
+    for el, meta in ELEMENT_META.items():
         items.append(_make_item(
-            rng, f"el:{ch}", f"{label}의 오행은?", el, ELEMENTS,
-            f"{label}은(는) {el}({'木火土金水'[ELEMENTS.index(el)]})의 글자입니다."))
+            rng, f"elseason:{el}", f"오행 {el}의 계절은?", meta['season'],
+            [m['season'] for m in ELEMENT_META.values()],
+            f"{el}은(는) {meta['season']}의 기운입니다. ({meta['nature']})"))
+        items.append(_make_item(
+            rng, f"elseason_r:{el}", f"'{meta['season']}'에 해당하는 오행은?", el, ELEMENTS,
+            f"{meta['season']}의 오행은 {el}입니다."))
+        items.append(_make_item(
+            rng, f"eldir:{el}", f"오행 {el}의 방위는?", meta['direction'],
+            [m['direction'] for m in ELEMENT_META.values()],
+            f"{el}의 방위는 {meta['direction']}, 색은 {meta['color']}입니다."))
+        items.append(_make_item(
+            rng, f"elcolor:{el}", f"오행 {el}을 상징하는 색은?", meta['color'],
+            [m['color'] for m in ELEMENT_META.values()],
+            f"{el}의 상징색은 {meta['color']}입니다."))
+        items.append(_make_item(
+            rng, f"elnature:{el}", f"'{meta['nature']}'의 기운을 가진 오행은?", el, ELEMENTS,
+            f"{el}의 운동성이 '{meta['nature']}'입니다."))
     # 상생
     for a, b in GENERATES.items():
         items.append(_make_item(
