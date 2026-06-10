@@ -91,3 +91,18 @@
 
 ### 미반영(기록만)
 - SM-2 오답 시 EF 감점은 Anki식 변형으로 유지 (표준 SM-2와 다르나 실용상 무해)
+
+---
+
+## 2026-06-10 (5차) — Phase 2 보완 기능 5종
+
+### 추가 기능 (보완 아이디어 1~5 구현)
+1. **내 명식으로 풀기** (실전 챕터): 저장 명식 선택 → 맞춤 10문항 (일간·천간 십성·지지 12운성·정기 십성·지지 관계·공망·오행 분포). `POST /learn/quiz/personal` + `generate_personal_quiz()`
+2. **진도 백업/복원**: 진도+복습덱을 공유 코드로 내보내기/불러오기 (share_store sqlite 재활용, 500KB 상한, srs 300장 컷). /learn 홈 하단 UI. 주의: Render 무료티어 재배포 시 백업 DB 초기화될 수 있음(공유 기능과 동일한 한계)
+3. **오늘의 학습 루틴**: /learn 홈 상단 "1단계 복습(due N장) → 2단계 이어서 학습(첫 미통과 챕터)" 카드
+4. **약점 분석**: 챕터별 누적 정답률 막대(70% 미만 빨강) + 복습덱 분포. recordQuizResult에 totalQ/totalCorrect 누적 추가
+5. **레벨 테스트**: `GET /learn/placement` 10챕터×1문항(chapter 태그) → /learn/placement 페이지에서 진단 + 챕터별 ✓/✗ + 시작 챕터 추천. 학습 기록 없으면 홈에 크게 배너 노출
+
+### 검증
+- 개인 퀴즈 50시드·placement 50시드 무결성 PASS (일간·공망 정답 스팟체크 포함)
+- API 스모크: placement 10문항·personal 10문항·backup→restore 왕복·404 정상 / `npm run build` 통과
