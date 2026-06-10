@@ -10,9 +10,13 @@ import { ChapterGallery } from "@/components/learn/ChapterGallery";
 import { QuizRunner } from "@/components/learn/QuizRunner";
 import { TutorPanel } from "@/components/learn/TutorPanel";
 import {
-    fetchChapter, fetchQuiz, recordQuizResult, PASS_SCORE,
+    fetchChapter, fetchQuiz, fetchPersonalQuiz, recordQuizResult, PASS_SCORE,
     type ChapterDetail, type QuizItem,
 } from "@/lib/learn";
+import { listProfiles, type SavedProfile } from "@/lib/storage";
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 type Stage = "concept" | "quiz" | "result";
 
@@ -29,12 +33,20 @@ export default function ChapterPage() {
     const [showDetail, setShowDetail] = useState(false); // 현재 카드의 '자세히 보기' 펼침 여부
     const [result, setResult] = useState<{ score: number; correct: number; wrong: QuizItem[] } | null>(null);
     const [error, setError] = useState("");
+    // 실전 챕터: '내 명식으로 풀기' 용 저장 명식
+    const [profiles, setProfiles] = useState<SavedProfile[]>([]);
+    const [profileId, setProfileId] = useState("");
 
     useEffect(() => {
         if (!chapterId) return;
         fetchChapter(chapterId)
             .then(setChapter)
             .catch(() => setError("챕터를 불러오지 못했습니다."));
+        if (chapterId === "practice") {
+            const list = listProfiles();
+            setProfiles(list);
+            if (list.length > 0) setProfileId(list[0].id);
+        }
     }, [chapterId]);
 
     // 카드 이동 시 '자세히 보기'는 접는다
@@ -61,9 +73,30 @@ export default function ChapterPage() {
         }
     };
 
+    // 내 명식으로 풀기 (실전 챕터 전용) — 저장 명식 기반 맞춤 퀴즈
+    const startPersonalQuiz = async () => {
+        const profile = profiles.find((p) => p.id === profileId);
+        if (!profile) return;
+        setQuizLoading(true);
+        setError("");
+        try {
+            const items = await fetchPersonalQuiz(profile.sajuData, 10);
+            if (items.length === 0) {
+                setError("이 명식으로는 퀴즈를 만들지 못했습니다.");
+                return;
+            }
+            setQuiz(items);
+            setStage("quiz");
+        } catch {
+            setError("내 명식 퀴즈를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        } finally {
+            setQuizLoading(false);
+        }
+    };
+
     const finishQuiz = (correct: number, wrongItems: QuizItem[]) => {
         const score = Math.round((correct / quiz.length) * 100);
-        recordQuizResult(chapterId, score, wrongItems);
+        recordQuizResult(chapterId, score, wrongItems, quiz.length);
         setResult({ score, correct, wrong: wrongItems });
         setStage("result");
     };
@@ -176,6 +209,38 @@ export default function ChapterPage() {
                             </Button>
                         )}
                     </div>
+                    {/* 실전 챕터: 내 명식으로 풀기 */}
+                    {chapterId === "practice" && (
+                        <div className="glass-card p-5 space-y-3">
+                            <p className="font-bold text-slate-800 dark:text-slate-100">🔮 내 명식으로 풀기</p>
+                            {profiles.length === 0 ? (
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    저장된 명식이 없습니다. <Link href="/" className="text-[#bf953f] font-bold">홈에서 내 명식을 계산·저장</Link>하면 내 사주로 실전 퀴즈를 풀 수 있어요.
+                                </p>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Select value={profileId} onValueChange={setProfileId}>
+                                        <SelectTrigger className="flex-1 rounded-xl glass-card border-white/40">
+                                            <SelectValue placeholder="명식 선택" />
+                                        </SelectTrigger>
+                                        <SelectContent className="glass-card border-none shadow-xl">
+                                            {profiles.map((p) => (
+                                                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        onClick={startPersonalQuiz}
+                                        disabled={quizLoading || !profileId}
+                                        className="rounded-xl bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white font-bold shrink-0"
+                                    >
+                                        {quizLoading ? "준비 중…" : "풀어보기"}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {error && <p className="text-center text-sm text-red-500">{error}</p>}
                 </div>
             )}

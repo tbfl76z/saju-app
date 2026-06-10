@@ -33,6 +33,7 @@ export interface QuizItem {
     choices: string[];
     answer: number;
     explanation: string;
+    chapter?: string; // 레벨 테스트 문항의 출제 챕터 태그
 }
 
 // ---------- API 호출 ----------
@@ -90,6 +91,25 @@ export async function fetchQuiz(chapterId: string, count = 10): Promise<QuizItem
     return res.json();
 }
 
+// '내 사주로 배우기' — 저장 명식 기반 맞춤 퀴즈
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchPersonalQuiz(sajuData: any, count = 10): Promise<QuizItem[]> {
+    const res = await fetch(`${API_BASE}/learn/quiz/personal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saju_data: sajuData, count }),
+    });
+    if (!res.ok) throw new Error(`personal quiz ${res.status}`);
+    return res.json();
+}
+
+// 레벨 테스트 — 10챕터 × 1문항 (chapter 태그 포함)
+export async function fetchPlacement(): Promise<QuizItem[]> {
+    const res = await fetch(`${API_BASE}/learn/placement`);
+    if (!res.ok) throw new Error(`placement ${res.status}`);
+    return res.json();
+}
+
 // AI 튜터 스트리밍 (analyzeStream.ts와 동일한 SSE 파싱 패턴)
 export async function streamTutor(
     question: string,
@@ -139,6 +159,8 @@ export interface ChapterProgress {
     passed: boolean; // 80점 이상 통과
     attempts: number;
     completedAt?: number;
+    totalQ?: number; // 누적 푼 문항 수 (약점 분석용)
+    totalCorrect?: number; // 누적 정답 수
 }
 
 export interface LearnProgress {
@@ -190,11 +212,12 @@ function touchStreak(p: LearnProgress): void {
     p.lastStudyDay = today;
 }
 
-// 퀴즈 완료 기록: 점수 갱신 + XP 적립 + 스트릭 + 오답 SRS 등록. 갱신된 진도를 반환.
+// 퀴즈 완료 기록: 점수 갱신 + XP 적립 + 스트릭 + 오답 SRS 등록 + 누적 통계. 갱신된 진도를 반환.
 export function recordQuizResult(
     chapterId: string,
     scorePct: number,
-    wrongItems: QuizItem[]
+    wrongItems: QuizItem[],
+    totalCount = 10
 ): LearnProgress {
     const p = getProgress();
     const prev = p.chapters[chapterId] || { bestScore: 0, passed: false, attempts: 0 };
@@ -204,6 +227,8 @@ export function recordQuizResult(
         passed,
         attempts: prev.attempts + 1,
         completedAt: passed ? prev.completedAt ?? Date.now() : prev.completedAt,
+        totalQ: (prev.totalQ ?? 0) + totalCount,
+        totalCorrect: (prev.totalCorrect ?? 0) + Math.max(0, totalCount - wrongItems.length),
     };
     // XP: 정답당 10, 통과 보너스 50
     p.xp += Math.round(scorePct / 10) * 10 + (scorePct >= PASS_SCORE ? 50 : 0);
@@ -211,6 +236,52 @@ export function recordQuizResult(
     saveProgress(p);
     addWrongToSrs(chapterId, wrongItems);
     return p;
+}
+
+// 약점 분석: 챕터별 누적 정답률 + 복습덱 분포
+export interface ChapterStat {
+    chapterId: string;
+    accuracy: number; // 0~100, 누적 기준
+    totalQ: number;
+    srsCount: number; // 복습덱에 남아 있는 이 챕터 카드 수
+}
+
+export function getChapterStats(): ChapterStat[] {
+    const p = getProgress();
+    const srsBy: Record<string, number> = {};
+    for (const c of readSrs()) srsBy[c.chapterId] = (srsBy[c.chapterId] ?? 0) + 1;
+    const ids = new Set([...Object.keys(p.chapters), ...Object.keys(srsBy)]);
+    return [...ids].map((id) => {
+        const ch = p.chapters[id];
+        const totalQ = ch?.totalQ ?? 0;
+        return {
+            chapterId: id,
+            totalQ,
+            accuracy: totalQ > 0 ? Math.round(((ch?.totalCorrect ?? 0) / totalQ) * 100) : 0,
+            srsCount: srsBy[id] ?? 0,
+        };
+    });
+}
+
+// ---------- 진도 백업/복원 (기기 이동용 공유 코드) ----------
+export async function exportLearnBackup(): Promise<string> {
+    const res = await fetch(`${API_BASE}/learn/backup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ progress: getProgress(), srs: readSrs() }),
+    });
+    if (!res.ok) throw new Error(`backup ${res.status}`);
+    const data = await res.json();
+    return data.code as string;
+}
+
+export async function importLearnBackup(code: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/learn/backup/${encodeURIComponent(code.trim())}`);
+    if (!res.ok) throw new Error(`restore ${res.status}`);
+    const data = await res.json();
+    if (typeof window === "undefined") return;
+    if (data.progress) window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(data.progress));
+    if (Array.isArray(data.srs)) window.localStorage.setItem(SRS_KEY, JSON.stringify(data.srs));
 }
 
 // 챕터 잠금: 사용자 요청으로 전면 해제 — 모든 챕터를 처음부터 자유롭게 학습 가능.

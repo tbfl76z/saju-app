@@ -372,6 +372,56 @@ async def learn_get_quiz(chapter_id: str, count: int = 10, seed: Optional[int] =
     return learn_quiz.generate_quiz(chapter_id, count=count, seed=seed)
 
 
+class PersonalQuizRequest(BaseModel):
+    saju_data: Dict[str, Any]  # /calculate 응답 (pillars 포함)
+    count: int = 10
+    seed: Optional[int] = None
+
+
+@app.post("/learn/quiz/personal")
+async def learn_personal_quiz(req: PersonalQuizRequest):
+    """'내 사주로 배우기' — 저장된 명식으로 맞춤 퀴즈를 생성한다."""
+    pillars = req.saju_data.get("pillars")
+    if not pillars:
+        raise HTTPException(status_code=422, detail="saju_data.pillars가 필요합니다.")
+    name = str(req.saju_data.get("name") or "나")[:20]
+    items = learn_quiz.generate_personal_quiz(pillars, name=name, count=max(1, min(req.count, 20)), seed=req.seed)
+    if not items:
+        raise HTTPException(status_code=422, detail="명식 데이터가 올바르지 않습니다.")
+    return items
+
+
+@app.get("/learn/placement")
+async def learn_placement(seed: Optional[int] = None):
+    """레벨 테스트 — 10챕터 × 1문항으로 학습 시작점을 진단한다."""
+    return learn_quiz.generate_placement_quiz(seed=seed)
+
+
+class LearnBackupRequest(BaseModel):
+    progress: Dict[str, Any]
+    srs: List[Dict[str, Any]] = []
+
+
+@app.post("/learn/backup")
+async def learn_backup(req: LearnBackupRequest):
+    """학습 진도+복습덱을 저장하고 복원 코드를 반환한다 (기기 이동용)."""
+    payload = {"type": "learn_backup", "progress": req.progress, "srs": req.srs[:300]}
+    import json as _json
+    if len(_json.dumps(payload, ensure_ascii=False)) > 500_000:  # 과대 페이로드 방지
+        raise HTTPException(status_code=413, detail="백업 데이터가 너무 큽니다.")
+    return {"code": share_store.save_share(payload)}
+
+
+@app.get("/learn/backup/{code}")
+async def learn_restore(code: str):
+    """복원 코드로 학습 진도+복습덱을 조회한다."""
+    res = share_store.get_share(code)
+    data = (res or {}).get("payload")
+    if not isinstance(data, dict) or data.get("type") != "learn_backup":
+        raise HTTPException(status_code=404, detail="복원 코드를 찾을 수 없습니다.")
+    return data
+
+
 class TutorRequest(BaseModel):
     question: str
     chapter_id: Optional[str] = None

@@ -394,6 +394,116 @@ CHAPTER_GENERATORS: dict[str, Callable[[random.Random], list[dict]]] = {
 }
 
 
+def generate_personal_quiz(pillars: dict, name: str = "나", count: int = 10, seed: int | None = None) -> list[dict[str, Any]]:
+    """저장된 명식(pillars)으로 '내 사주로 배우기' 퀴즈를 생성한다."""
+    rng = random.Random(seed)
+    try:
+        dg = pillars["day"]["stem"]
+        db = pillars["day"]["branch"]
+    except (KeyError, TypeError):
+        return []
+    ten_gods = ['비견', '겁재', '식신', '상관', '편재', '정재', '편관', '정관', '편인', '정인']
+    stages = ['장생', '목욕', '관대', '건록', '제왕', '쇠', '병', '사', '묘', '절', '태', '양']
+    p_names = {"year": "연주", "month": "월주", "day": "일주", "hour": "시주"}
+    who = f"{name}님"
+    items: list[dict] = []
+
+    # 일간·일주 기본
+    items.append(_make_item(
+        rng, "my_ilgan", f"{who} 명식의 일간(나 자신)은?", _label_stem(dg),
+        [_label_stem(s) for s in HEAVENLY_STEMS],
+        f"일주 {_label_ganzhi(pillars['day'].get('pillar', dg + db))}의 천간이 일간입니다."))
+    el = ELEMENTS_MAP[dg]
+    items.append(_make_item(
+        rng, "my_el", f"{who}의 일간 {_label_stem(dg)}의 오행은?", el, ELEMENTS,
+        f"{_label_stem(dg)}은(는) {'양' if dg in YANG_STEMS else '음'}{el}입니다."))
+    items.append(_make_item(
+        rng, "my_yy", f"{who}의 일간 {_label_stem(dg)}의 음양은?", '양' if dg in YANG_STEMS else '음',
+        ['양', '음', '중성', '없음'],
+        f"갑병무경임이 양간, 을정기신계가 음간입니다."))
+
+    # 천간 십성 (연·월·시)
+    for key in ["year", "month", "hour"]:
+        st = pillars.get(key, {}).get("stem")
+        if not st:
+            continue
+        tg = GAN_TEN_GODS[dg][st]
+        items.append(_make_item(
+            rng, f"my_ss:{key}", f"{who} 명식에서 {p_names[key]} 천간 {_label_stem(st)}의 십성은?", tg, ten_gods,
+            f"일간 {_label_stem(dg)}({ELEMENTS_MAP[dg]}) 기준 {_label_stem(st)}({ELEMENTS_MAP[st]})은 {tg}입니다."))
+
+    # 지지 12운성·정기 십성 (4기둥)
+    for key in ["year", "month", "day", "hour"]:
+        br = pillars.get(key, {}).get("branch")
+        if not br:
+            continue
+        us = TWELVE_GROWTH[dg][br]
+        items.append(_make_item(
+            rng, f"my_us:{key}", f"{who}의 일간이 {p_names[key]} 지지 {_label_branch(br)}에서 갖는 12운성은?", us, stages,
+            f"{_label_stem(dg)} 일간은 {_label_branch(br)}에서 {us}입니다."))
+        hidden = BRANCH_HIDDEN_GANS[br]
+        tg = GAN_TEN_GODS[dg][hidden]
+        items.append(_make_item(
+            rng, f"my_jss:{key}", f"{who} 명식에서 {p_names[key]} 지지 {_label_branch(br)}의 십성(정기 기준)은?", tg, ten_gods,
+            f"{_label_branch(br)}의 정기는 {_label_stem(hidden)} → 일간 {_label_stem(dg)} 기준 {tg}입니다."))
+
+    # 지지 관계 (단일 관계 쌍만 출제)
+    keys = [k for k in ["year", "month", "day", "hour"] if pillars.get(k, {}).get("branch")]
+    for i in range(len(keys)):
+        for j in range(i + 1, len(keys)):
+            b1, b2 = pillars[keys[i]]["branch"], pillars[keys[j]]["branch"]
+            rels = [r for r in ['합', '충', '파', '해'] if BRANCH_RELATIONS[r].get(b1) == b2]
+            h = BRANCH_RELATIONS['형'].get(b1)
+            if (isinstance(h, list) and b2 in h) or (isinstance(h, str) and h == b2):
+                rels.append('형')
+            if len(rels) != 1:
+                continue
+            items.append(_make_item(
+                rng, f"my_rel:{keys[i]}{keys[j]}",
+                f"{who} 명식에서 {p_names[keys[i]]} {_label_branch(b1)}와 {p_names[keys[j]]} {_label_branch(b2)}의 관계는?",
+                rels[0], ['합', '충', '형', '파', '해', '없음'],
+                f"{_label_branch(b1)}-{_label_branch(b2)}는 {rels[0]} 관계입니다."))
+
+    # 공망
+    day_pillar = pillars["day"].get("pillar")
+    if day_pillar:
+        gm = get_gongmang(day_pillar)
+        if gm != "-":
+            items.append(_make_item(
+                rng, "my_gm", f"{who}의 일주 {_label_ganzhi(day_pillar)} 기준 공망은?", gm,
+                ['戌亥', '申酉', '午未', '辰巳', '寅卯', '子丑'],
+                f"{_label_ganzhi(day_pillar)}가 속한 순(旬)의 빈 지지가 공망입니다 → {gm}."))
+
+    # 오행 분포 (최다 오행이 유일할 때만)
+    counts: dict[str, int] = {e: 0 for e in ELEMENTS}
+    for key in ["year", "month", "day", "hour"]:
+        for ch in [pillars.get(key, {}).get("stem"), pillars.get(key, {}).get("branch")]:
+            e = ELEMENTS_MAP.get(ch)
+            if e:
+                counts[e] += 1
+    top = max(counts.values())
+    tops = [e for e, c in counts.items() if c == top]
+    if len(tops) == 1:
+        items.append(_make_item(
+            rng, "my_top_el", f"{who} 명식 여덟 글자 중 가장 많은 오행은?", tops[0], ELEMENTS,
+            f"오행 분포: " + " · ".join(f"{e} {c}개" for e, c in counts.items() if c) + f" → {tops[0]}이(가) 가장 많습니다."))
+
+    rng.shuffle(items)
+    return items[:max(1, min(count, len(items)))]
+
+
+def generate_placement_quiz(seed: int | None = None) -> list[dict[str, Any]]:
+    """레벨 테스트: 10챕터에서 1문항씩 골라 학습 시작점을 진단한다. 각 문항에 chapter 태그 포함."""
+    rng = random.Random(seed)
+    items = []
+    for chapter_id, gen in CHAPTER_GENERATORS.items():
+        pool = gen(rng)
+        item = pool[rng.randrange(len(pool))]
+        item["chapter"] = chapter_id
+        items.append(item)
+    return items  # 챕터 순서 유지 (쉬운 것 → 어려운 것)
+
+
 def generate_quiz(chapter_id: str, count: int = 10, seed: int | None = None) -> list[dict[str, Any]]:
     """챕터 퀴즈 N문항 생성. seed 지정 시 재현 가능."""
     gen = CHAPTER_GENERATORS.get(chapter_id)
