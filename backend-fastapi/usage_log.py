@@ -122,8 +122,9 @@ def render_dashboard_html(stats: dict[str, Any]) -> str:
     max_req = max([d["requests"] for d in daily], default=1) or 1
 
     daily_rows = "".join(
-        f"<tr><td>{d['day']}</td>"
-        f"<td><div class='bar' style='width:{max(4, int(d['requests'] / max_req * 100))}%'></div> {d['requests']}</td>"
+        f"<tr><td class='day'>{d['day']}</td>"
+        f"<td class='req'><span class='barwrap'><span class='bar' style='width:{max(4, int(d['requests'] / max_req * 100))}%'></span></span>"
+        f"<span class='num reqnum'>{d['requests']}</span></td>"
         f"<td class='num'>{d['unique_ips']}</td>"
         f"<td class='num {'warn' if d['ai_calls'] >= 15 else ''}'>{d['ai_calls']}</td>"
         f"<td class='num'>{d['learn_calls']}</td><td class='num'>{d['calc_calls']}</td></tr>"
@@ -159,12 +160,22 @@ def render_dashboard_html(stats: dict[str, Any]) -> str:
   .card b {{ display: block; font-size: 26px; color: #bf953f; }}
   .card span {{ font-size: 12px; color: #64748b; }}
   table {{ width: 100%; border-collapse: collapse; background: #fff; border-radius: 14px; overflow: hidden;
-           border: 1px solid #e8e0c9; font-size: 13px; }}
-  th {{ background: #f3edd9; padding: 8px; text-align: left; font-size: 12px; }}
+           border: 1px solid #e8e0c9; font-size: 13px; table-layout: fixed; }}
+  th {{ background: #f3edd9; padding: 8px; text-align: center; font-size: 12px; }}
+  th:first-child {{ text-align: left; }}
   td {{ padding: 8px; border-top: 1px solid #f1ece0; vertical-align: middle; }}
   .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
-  .bar {{ display: inline-block; height: 10px; background: linear-gradient(90deg, #d4af37, #bf953f);
-          border-radius: 5px; vertical-align: middle; margin-right: 6px; }}
+  /* 일별 추이: 날짜·요청(막대) 열은 넓게, 숫자 열은 균등 고정 */
+  .t-daily th:nth-child(1) {{ width: 21%; }}
+  .t-daily th:nth-child(2) {{ width: 31%; }}
+  .t-daily th:nth-child(n+3) {{ width: 12%; }}
+  .t-daily td.num {{ text-align: center; }}
+  .day {{ white-space: nowrap; font-variant-numeric: tabular-nums; }}
+  .req {{ white-space: nowrap; }}
+  .barwrap {{ display: inline-block; width: calc(100% - 38px); height: 10px; vertical-align: middle;
+              background: #f1ece0; border-radius: 5px; overflow: hidden; }}
+  .bar {{ display: block; height: 100%; background: linear-gradient(90deg, #d4af37, #bf953f); border-radius: 5px; }}
+  .reqnum {{ display: inline-block; width: 32px; vertical-align: middle; }}
   .warn {{ color: #dc2626; font-weight: 700; }}
   .path {{ font-family: monospace; font-size: 12px; }}
   .dim {{ color: #94a3b8; font-size: 11px; }}
@@ -181,7 +192,7 @@ def render_dashboard_html(stats: dict[str, Any]) -> str:
 </div>
 
 <h2>일별 추이</h2>
-<table><tr><th>날짜</th><th>요청</th><th>방문자</th><th>AI</th><th>학습</th><th>계산</th></tr>{daily_rows}</table>
+<table class="t-daily"><tr><th>날짜</th><th>요청</th><th>방문자</th><th>AI</th><th>학습</th><th>계산</th></tr>{daily_rows}</table>
 
 <h2>많이 쓰인 기능</h2>
 <table><tr><th>경로</th><th>횟수</th></tr>{path_rows}</table>
