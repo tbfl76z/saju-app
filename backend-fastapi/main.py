@@ -43,7 +43,7 @@ async def access_log_middleware(request: Request, call_next):
     response = await call_next(request)
     try:
         path = request.url.path
-        if not path.startswith("/static") and path != "/admin/stats" and request.method != "OPTIONS":
+        if not path.startswith(("/static", "/admin")) and request.method != "OPTIONS":
             ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0].strip()
             usage_log.log_request(
                 ip, request.method, path, response.status_code,
@@ -54,16 +54,27 @@ async def access_log_middleware(request: Request, call_next):
     return response
 
 
-@app.get("/admin/stats")
-async def admin_stats(key: str = "", days: int = 7):
-    """사용량 통계 조회 (ADMIN_STATS_KEY 환경변수로 보호).
-    예: GET /admin/stats?key=비밀키&days=7"""
+def _check_admin_key(key: str) -> None:
     expected = os.getenv("ADMIN_STATS_KEY")
     if not expected:
         raise HTTPException(status_code=403, detail="ADMIN_STATS_KEY가 설정되지 않았습니다.")
     if key != expected:
         raise HTTPException(status_code=403, detail="키가 올바르지 않습니다.")
+
+
+@app.get("/admin/stats")
+async def admin_stats(key: str = "", days: int = 7):
+    """사용량 통계 JSON 조회 (ADMIN_STATS_KEY 보호). 예: /admin/stats?key=비밀키&days=7"""
+    _check_admin_key(key)
     return usage_log.get_stats(days)
+
+
+@app.get("/admin/dashboard")
+async def admin_dashboard(key: str = "", days: int = 7):
+    """사용량 대시보드 (HTML) — 브라우저에서 바로 보기 좋은 표·그래프 버전."""
+    from fastapi.responses import HTMLResponse
+    _check_admin_key(key)
+    return HTMLResponse(usage_log.render_dashboard_html(usage_log.get_stats(days)))
 
 
 # Enable CORS for Next.js
