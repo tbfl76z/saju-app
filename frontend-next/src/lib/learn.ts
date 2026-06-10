@@ -176,11 +176,10 @@ export function recordQuizResult(
     return p;
 }
 
-// 챕터 잠금 해제 여부: 첫 챕터이거나 직전 챕터를 통과했으면 열림
-export function isUnlocked(order: number, chapters: ChapterSummary[], progress: LearnProgress): boolean {
-    if (order === 0) return true;
-    const prevChapter = chapters.find((c) => c.order === order - 1);
-    return !!(prevChapter && progress.chapters[prevChapter.id]?.passed);
+// 챕터 잠금: 사용자 요청으로 전면 해제 — 모든 챕터를 처음부터 자유롭게 학습 가능.
+// (순차 잠금이 다시 필요해지면 이 함수에서 직전 챕터 통과 여부를 검사하면 된다)
+export function isUnlocked(): boolean {
+    return true;
 }
 
 // ---------- SM-2 간격 반복 (복습 덱) ----------

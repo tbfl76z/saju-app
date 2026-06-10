@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Flame, Star, Lock, CheckCircle2, RotateCcw } from "lucide-react";
+import { Flame, Star, CheckCircle2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-    fetchCurriculum, getProgress, isUnlocked, countSrs,
+    fetchCurriculum, getProgress, countSrs,
     type ChapterSummary, type LearnProgress,
 } from "@/lib/learn";
 
@@ -79,37 +79,26 @@ export default function LearnPage() {
             <div className="space-y-3">
                 {chapters.map((ch) => {
                     const st = progress.chapters[ch.id];
-                    const unlocked = isUnlocked(ch.order, chapters, progress);
-                    const inner = (
-                        <div
-                            className={cn(
-                                "glass-card flex items-center gap-4 p-5 transition-all",
-                                unlocked ? "hover:border-[#d4af37]/60 hover:-translate-y-0.5" : "opacity-50"
-                            )}
-                        >
-                            <span className="text-3xl shrink-0">{ch.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
-                                    {ch.order + 1}. {ch.title}
-                                    {st?.passed && <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />}
-                                </p>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{ch.subtitle}</p>
+                    return (
+                        <Link key={ch.id} href={`/learn/${ch.id}`}>
+                            <div className="glass-card flex items-center gap-4 p-5 transition-all hover:border-[#d4af37]/60 hover:-translate-y-0.5">
+                                <span className="text-3xl shrink-0">{ch.emoji}</span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
+                                        {ch.order + 1}. {ch.title}
+                                        {st?.passed && <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />}
+                                    </p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{ch.subtitle}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    {st ? (
+                                        <p className="text-sm font-bold text-[#bf953f]">{st.bestScore}점</p>
+                                    ) : (
+                                        <p className="text-xs font-semibold text-slate-400">시작 →</p>
+                                    )}
+                                </div>
                             </div>
-                            <div className="text-right shrink-0">
-                                {!unlocked ? (
-                                    <Lock className="h-5 w-5 text-slate-400" />
-                                ) : st ? (
-                                    <p className="text-sm font-bold text-[#bf953f]">{st.bestScore}점</p>
-                                ) : (
-                                    <p className="text-xs font-semibold text-slate-400">시작 →</p>
-                                )}
-                            </div>
-                        </div>
-                    );
-                    return unlocked ? (
-                        <Link key={ch.id} href={`/learn/${ch.id}`}>{inner}</Link>
-                    ) : (
-                        <div key={ch.id} title="이전 챕터를 통과하면 열립니다">{inner}</div>
+                        </Link>
                     );
                 })}
             </div>

@@ -157,7 +157,7 @@ export default function ChapterPage() {
                             {quiz.length}문항 중 <strong>{result.correct}개</strong> 정답
                         </p>
                         {passed ? (
-                            <p className="font-bold text-emerald-600">🎉 통과! 다음 챕터가 열렸습니다.</p>
+                            <p className="font-bold text-emerald-600">🎉 통과! 이 챕터를 완료했습니다.</p>
                         ) : (
                             <p className="font-semibold text-slate-500">
                                 {PASS_SCORE}점 이상이면 통과예요. 개념을 다시 보고 도전해 보세요!
