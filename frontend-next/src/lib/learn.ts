@@ -18,6 +18,7 @@ export interface ChapterSummary {
 export interface ConceptCard {
     title: string;
     body: string;
+    detail?: string; // '자세히 보기' 심화 정리 (서버 내장 콘텐츠)
 }
 
 export interface ChapterDetail extends ChapterSummary {

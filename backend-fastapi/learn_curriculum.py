@@ -315,8 +315,10 @@ def _chapter_images(chapter_id: str) -> list[str]:
 
 
 def get_chapter(chapter_id: str) -> dict[str, Any] | None:
-    """챕터 상세 (개념 카드 + 원전 도표 이미지 포함)."""
+    """챕터 상세 (개념 카드 + '자세히 보기' 심화 + 원전 도표 이미지 포함)."""
+    from learn_details import get_detail  # 순환 참조 방지를 위해 지연 임포트
     for i, ch in enumerate(CURRICULUM):
         if ch["id"] == chapter_id:
-            return {**ch, "order": i, "total": len(CURRICULUM), "images": _chapter_images(chapter_id)}
+            cards = [{**c, "detail": get_detail(chapter_id, c["title"])} for c in ch["cards"]]
+            return {**ch, "cards": cards, "order": i, "total": len(CURRICULUM), "images": _chapter_images(chapter_id)}
     return None

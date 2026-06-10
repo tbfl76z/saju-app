@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Trophy, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Trophy, RotateCcw, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConceptBody } from "@/components/learn/ConceptBody";
 import { ChapterGallery } from "@/components/learn/ChapterGallery";
@@ -26,6 +26,7 @@ export default function ChapterPage() {
     const [cardIdx, setCardIdx] = useState(0);
     const [quiz, setQuiz] = useState<QuizItem[]>([]);
     const [quizLoading, setQuizLoading] = useState(false);
+    const [showDetail, setShowDetail] = useState(false); // 현재 카드의 '자세히 보기' 펼침 여부
     const [result, setResult] = useState<{ score: number; correct: number; wrong: QuizItem[] } | null>(null);
     const [error, setError] = useState("");
 
@@ -35,6 +36,12 @@ export default function ChapterPage() {
             .then(setChapter)
             .catch(() => setError("챕터를 불러오지 못했습니다."));
     }, [chapterId]);
+
+    // 카드 이동 시 '자세히 보기'는 접는다
+    const goCard = (i: number) => {
+        setCardIdx(i);
+        setShowDetail(false);
+    };
 
     const startQuiz = async () => {
         setQuizLoading(true);
@@ -100,7 +107,7 @@ export default function ChapterPage() {
                         {chapter.cards.map((_, i) => (
                             <button
                                 key={i}
-                                onClick={() => setCardIdx(i)}
+                                onClick={() => goCard(i)}
                                 className={`h-2 rounded-full transition-all ${i === cardIdx ? "w-6 bg-[#d4af37]" : "w-2 bg-slate-300 dark:bg-slate-700"}`}
                                 aria-label={`카드 ${i + 1}`}
                             />
@@ -112,13 +119,31 @@ export default function ChapterPage() {
                             {cardIdx + 1}. {card.title}
                         </h3>
                         <ConceptBody body={card.body} />
+
+                        {/* 자세히 보기 — 카드 주제의 심화 정리 (서버 내장, 토큰 미사용) */}
+                        {card.detail && (
+                            <div className="pt-2">
+                                <button
+                                    onClick={() => setShowDetail(!showDetail)}
+                                    className="flex items-center gap-1.5 text-sm font-bold text-[#bf953f] hover:text-[#d4af37] transition-colors"
+                                >
+                                    <BookOpen className="h-4 w-4" />
+                                    {showDetail ? "자세히 보기 접기 ▲" : "📖 자세히 보기 — 심화 정리 ▼"}
+                                </button>
+                                {showDetail && (
+                                    <div className="mt-3 rounded-2xl border border-[#d4af37]/25 bg-[#d4af37]/5 dark:bg-slate-900/50 p-5">
+                                        <ConceptBody body={card.detail} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex gap-3">
                         <Button
                             variant="outline"
                             disabled={cardIdx === 0}
-                            onClick={() => setCardIdx(cardIdx - 1)}
+                            onClick={() => goCard(cardIdx - 1)}
                             className="rounded-xl flex-1"
                         >
                             <ArrowLeft className="h-4 w-4 mr-1" /> 이전
@@ -133,7 +158,7 @@ export default function ChapterPage() {
                             </Button>
                         ) : (
                             <Button
-                                onClick={() => setCardIdx(cardIdx + 1)}
+                                onClick={() => goCard(cardIdx + 1)}
                                 className="rounded-xl flex-[2] bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white font-bold"
                             >
                                 다음 <ArrowRight className="h-4 w-4 ml-1" />
@@ -173,7 +198,7 @@ export default function ChapterPage() {
                     <div className="flex gap-3">
                         <Button
                             variant="outline"
-                            onClick={() => { setStage("concept"); setCardIdx(0); setResult(null); }}
+                            onClick={() => { setStage("concept"); goCard(0); setResult(null); }}
                             className="rounded-xl flex-1"
                         >
                             <RotateCcw className="h-4 w-4 mr-1" /> 개념 다시 보기
