@@ -72,7 +72,14 @@ export default function ChapterPage() {
             </div>
         );
     }
-    if (!chapter) return <p className="text-center text-slate-400 py-16">불러오는 중…</p>;
+    if (!chapter) {
+        return (
+            <div className="text-center text-slate-400 py-16 space-y-2">
+                <p className="animate-pulse">챕터를 불러오는 중…</p>
+                <p className="text-xs">서버를 깨우는 중이면 최대 1분쯤 걸릴 수 있어요.</p>
+            </div>
+        );
+    }
 
     const card = chapter.cards[cardIdx];
     const isLastCard = cardIdx === chapter.cards.length - 1;

@@ -104,7 +104,10 @@ export default function LearnPage() {
             </div>
 
             {chapters.length === 0 && !error && (
-                <p className="text-center text-slate-400 py-10">커리큘럼을 불러오는 중…</p>
+                <div className="text-center text-slate-400 py-10 space-y-2">
+                    <p className="animate-pulse">커리큘럼을 불러오는 중…</p>
+                    <p className="text-xs">잠들어 있던 서버를 깨우는 중이면 최대 1분쯤 걸릴 수 있어요.<br />한 번 불러온 뒤에는 바로 열립니다.</p>
+                </div>
             )}
         </div>
     );

@@ -36,16 +36,52 @@ export interface QuizItem {
 }
 
 // ---------- API 호출 ----------
+// 커리큘럼·챕터는 정적 콘텐츠 → localStorage 캐시로 재방문 시 즉시 표시 (stale-while-revalidate).
+// 무료 서버(Render) 콜드스타트(최대 1분) 동안에도 한 번 본 내용은 바로 뜬다.
+const CACHE_PREFIX = "saju-learn-cache:";
+
+function readCache<T>(key: string): T | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = window.localStorage.getItem(CACHE_PREFIX + key);
+        return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeCache(key: string, data: unknown): void {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
+    } catch {
+        // 용량 초과 등 무시
+    }
+}
+
+async function fetchJsonCached<T>(key: string, url: string): Promise<T> {
+    const cached = readCache<T>(key);
+    if (cached) {
+        // 캐시를 즉시 반환하고, 뒤에서 조용히 갱신해 다음 방문에 반영
+        fetch(url)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => d && writeCache(key, d))
+            .catch(() => {});
+        return cached;
+    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${key} ${res.status}`);
+    const data = (await res.json()) as T;
+    writeCache(key, data);
+    return data;
+}
+
 export async function fetchCurriculum(): Promise<ChapterSummary[]> {
-    const res = await fetch(`${API_BASE}/learn/curriculum`);
-    if (!res.ok) throw new Error(`curriculum ${res.status}`);
-    return res.json();
+    return fetchJsonCached<ChapterSummary[]>("curriculum", `${API_BASE}/learn/curriculum`);
 }
 
 export async function fetchChapter(chapterId: string): Promise<ChapterDetail> {
-    const res = await fetch(`${API_BASE}/learn/chapter/${chapterId}`);
-    if (!res.ok) throw new Error(`chapter ${res.status}`);
-    return res.json();
+    return fetchJsonCached<ChapterDetail>(`chapter:${chapterId}`, `${API_BASE}/learn/chapter/${chapterId}`);
 }
 
 export async function fetchQuiz(chapterId: string, count = 10): Promise<QuizItem[]> {
