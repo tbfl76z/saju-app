@@ -128,3 +128,19 @@
 ### 검증
 - 12챕터 360문항 무결성 PASS (격국·득령 정답 스팟체크), 심화 59종 매칭·고아 0
 - 빌드 통과(/learn/tongbyeon 라우트), 채점 422 가드·실호출 정상
+
+---
+
+## 2026-06-10 (7차) — 접속 로그·사용량 모니터링
+
+### 배경
+- 외부 사용자 테스트 시작 → 접속·사용량 가시화 필요
+
+### 구현
+- **usage_log.py 신규**: 요청별 sqlite(usage.db) 기록 — KST 일자, IP, 경로, 상태코드, 처리시간(ms), UA
+- **미들웨어**: /static·OPTIONS·/admin/stats 제외 전 요청 로깅, 로그 실패는 본 요청에 무영향
+- **GET /admin/stats?key=비밀키&days=N**: 일별 요청 수·고유 IP·AI 호출(analyze/tutor/grade)·학습 호출·계산 호출, 경로 TOP15, 방문자별 요청 수·최초/최종 접속. `ADMIN_STATS_KEY` 환경변수로 보호 (로컬 .env에 생성 완료, **Render 환경변수에도 추가 필요**)
+- **프론트**: @vercel/analytics 패키지 + layout 삽입 (Vercel 대시보드 → 프로젝트 → Analytics 탭에서 Enable 필요)
+
+### 한계 메모
+- Render 무료 티어는 재배포 시 usage.db 초기화 — Starter 영속 디스크 전환 시 보존. Vercel Analytics는 영구 보존(무료 플랜 데이터 30일)
