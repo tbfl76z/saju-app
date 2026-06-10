@@ -58,3 +58,6 @@
 
 ### 검증
 - API 스모크: chapter images 22건·/static 200 OK·1장 퀴즈 범위 정상 / `npm run build` 통과
+
+### 추가 (사용자 요청)
+- **챕터 순차 잠금 전면 해제**: 모든 챕터를 처음부터 자유롭게 학습 가능 (`isUnlocked` 항상 true, 잠금 UI 제거). 재잠금 필요 시 lib/learn.ts의 isUnlocked만 복원하면 됨
