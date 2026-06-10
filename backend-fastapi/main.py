@@ -20,6 +20,8 @@ from saju_data import SAJU_TERMS
 import ai_report
 import image_prompt as image_prompt_mod
 import share_store
+import learn_curriculum
+import learn_quiz
 
 load_dotenv()
 
@@ -336,6 +338,56 @@ async def analyze_stream(req: AnalysisRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+# ---------------------------------------------------------------------------
+# 학습 모드 (사주 공부하기)
+# ---------------------------------------------------------------------------
+@app.get("/learn/curriculum")
+async def learn_get_curriculum():
+    """학습 커리큘럼 챕터 목록 (권장 순서 포함)."""
+    return learn_curriculum.get_curriculum_summary()
+
+
+@app.get("/learn/chapter/{chapter_id}")
+async def learn_get_chapter(chapter_id: str):
+    """챕터 상세 — 개념 카드 목록."""
+    chapter = learn_curriculum.get_chapter(chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=404, detail="챕터를 찾을 수 없습니다.")
+    return chapter
+
+
+@app.get("/learn/quiz/{chapter_id}")
+async def learn_get_quiz(chapter_id: str, count: int = 10, seed: Optional[int] = None):
+    """챕터 퀴즈 동적 생성 (계산 엔진 매핑 테이블 기반, seed로 재현 가능)."""
+    if not learn_curriculum.get_chapter(chapter_id):
+        raise HTTPException(status_code=404, detail="챕터를 찾을 수 없습니다.")
+    count = max(1, min(count, 20))  # 과도한 요청 방지
+    return learn_quiz.generate_quiz(chapter_id, count=count, seed=seed)
+
+
+class TutorRequest(BaseModel):
+    question: str
+    chapter_id: Optional[str] = None
+    context_hint: Optional[str] = None  # 틀린 문제 등 학습 상황 전달용
+
+
+@app.post("/learn/tutor")
+async def learn_tutor(req: TutorRequest):
+    """AI 튜터 질의응답 (SSE 스트리밍). 챕터 정보가 있으면 수업 맥락으로 전달한다."""
+    if not req.question or not req.question.strip():
+        raise HTTPException(status_code=422, detail="질문을 입력해 주세요.")
+    chapter_title = ""
+    if req.chapter_id:
+        chapter = learn_curriculum.get_chapter(req.chapter_id)
+        if chapter:
+            chapter_title = chapter["title"]
+    return StreamingResponse(
+        ai_report.stream_tutor(req.question, chapter_title, req.context_hint or ""),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 if __name__ == "__main__":
     import uvicorn

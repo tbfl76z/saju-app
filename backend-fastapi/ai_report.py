@@ -541,3 +541,69 @@ def stream_report(req: Any) -> Iterator[str]:
             "delta": "죄송합니다. 현재 AI 모델 사용량이 한도에 도달했습니다. 잠시 후 다시 시도해 주세요."
         })
         yield _sse({"done": True, "error": error_msg or "no_model"})
+
+
+# ---------------------------------------------------------------------------
+# 학습 모드: AI 튜터 (질의응답형 — 리포트 4섹션 형식을 강제하지 않는다)
+# ---------------------------------------------------------------------------
+TUTOR_SYSTEM_INSTRUCTION = (
+    "당신은 명리학을 처음 배우는 학생을 가르치는 친절한 과외 선생님입니다.\n"
+    "수업 원칙:\n"
+    "1. 학생의 질문에 핵심부터 간결하게 답하고, 필요한 만큼만 배경을 보충하세요. 전체 답변은 짧은 문단 2~4개를 넘기지 마세요.\n"
+    "2. 전문 용어가 나오면 반드시 한 줄로 뜻을 풀어 주세요. 예시(글자·간단한 명식)를 들어 설명하면 더 좋습니다.\n"
+    "3. 제공된 전문 지식을 근거로 답하되, 파일명·출처·'SOURCE' 같은 표현은 절대 언급하지 마세요.\n"
+    "4. 운세 풀이나 단정적 예언을 하지 말고, '개념을 이해시키는 것'에 집중하세요.\n"
+    "5. 마크다운 헤딩(#) 없이 평문으로 답하고, 핵심 용어 1~3곳만 **굵게** 표시하세요.\n"
+    "6. 답 끝에 학생이 이어서 생각해 볼 만한 질문이나 연습거리를 한 줄 제안하세요."
+)
+
+# 튜터는 짧은 문답이므로 풀이 리포트보다 컨텍스트를 작게 잡아 속도·한도를 아낀다
+TUTOR_KNOWLEDGE_LIMIT = int(os.getenv("TUTOR_KNOWLEDGE_LIMIT", "30000"))
+
+
+def build_tutor_prompt(question: str, chapter_title: str = "", context_hint: str = "") -> str:
+    """학습 질문 + 챕터 맥락 + 지식베이스로 튜터 프롬프트를 구성한다."""
+    knowledge = build_knowledge_context("original")[:TUTOR_KNOWLEDGE_LIMIT]
+    parts = ["[전문 지식 (수업 근거 자료)]", knowledge, ""]
+    if chapter_title:
+        parts.append(f"[현재 학습 중인 단원] {sanitize(chapter_title)}")
+    if context_hint:
+        # 틀린 문제 정보 등 — 오답 해설 요청에 활용
+        parts.append(f"[학생의 학습 상황] {sanitize(context_hint)}")
+    parts.append(f"[학생의 질문] {sanitize(question)}")
+    return "\n".join(parts)
+
+
+def stream_tutor(question: str, chapter_title: str = "", context_hint: str = "") -> Iterator[str]:
+    """AI 튜터 스트리밍 답변. Gemini 체인 → OpenRouter 폴백 (stream_report와 동일한 전략)."""
+    prompt = build_tutor_prompt(question, chapter_title, context_hint)
+    produced = False
+    error_msg = ""
+
+    for model_name in _get_models_to_try():
+        try:
+            model = genai.GenerativeModel(model_name, system_instruction=TUTOR_SYSTEM_INSTRUCTION)
+            stream = model.generate_content(prompt, stream=True)
+            for chunk in stream:
+                text = getattr(chunk, "text", "") or ""
+                if text:
+                    produced = True
+                    yield _sse({"delta": _clean(text)})
+            if produced:
+                yield _sse({"done": True})
+                return
+        except Exception as e:
+            error_msg = str(e)
+            if not produced:
+                continue
+            yield _sse({"done": True, "error": str(e)})
+            return
+
+    if not produced:
+        fb = _openrouter_generate(prompt, TUTOR_SYSTEM_INSTRUCTION)
+        if fb:
+            yield _sse({"delta": fb})
+            yield _sse({"done": True})
+            return
+        yield _sse({"delta": "죄송합니다. 지금은 선생님이 자리를 비웠어요. 잠시 후 다시 질문해 주세요."})
+        yield _sse({"done": True, "error": error_msg or "no_model"})

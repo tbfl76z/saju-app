@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sun, HeartHandshake, Bookmark } from "lucide-react";
+import { Home, Sun, HeartHandshake, Bookmark, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // 네비게이션 항목 정의 (단일 출처)
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { href: "/", label: "명식", icon: Home },
     { href: "/today", label: "오늘의 운세", icon: Sun },
     { href: "/compatibility", label: "궁합", icon: HeartHandshake },
+    { href: "/learn", label: "공부", icon: GraduationCap },
     { href: "/saved", label: "저장됨", icon: Bookmark },
 ] as const;
 

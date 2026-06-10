@@ -1,0 +1,387 @@
+"""
+사주 학습 모드 — 퀴즈 동적 생성 모듈
+- saju_utils의 매핑 테이블(오행·십성·12운성·지장간·형충회합 등)을 출제 근거로 사용
+- 챕터별 출제 함수가 문제 풀을 만들고, seed 기반 셔플로 N문항을 샘플링한다
+- 문항 형식: {key, question, choices[4], answer(정답 인덱스), explanation}
+"""
+import random
+from typing import Any, Callable
+
+from saju_utils import (
+    HEAVENLY_STEMS, EARTHLY_BRANCHES, GANZHI_LIST, ELEMENTS_MAP,
+    GAN_TEN_GODS, BRANCH_HIDDEN_GANS, BRANCH_HIDDEN_FULL, TWELVE_GROWTH,
+    STEM_RELATIONS, BRANCH_RELATIONS, get_sinsal_list, get_gongmang,
+)
+
+# ---------------------------------------------------------------------------
+# 학습용 메타데이터 (한글 독음·음양·물상·띠·계절·시각)
+# ---------------------------------------------------------------------------
+STEM_KOR = {'甲': '갑', '乙': '을', '丙': '병', '丁': '정', '戊': '무',
+            '己': '기', '庚': '경', '辛': '신', '壬': '임', '癸': '계'}
+BRANCH_KOR = {'子': '자', '丑': '축', '寅': '인', '卯': '묘', '辰': '진', '巳': '사',
+              '午': '오', '未': '미', '申': '신', '酉': '유', '戌': '술', '亥': '해'}
+YANG_STEMS = ['甲', '丙', '戊', '庚', '壬']
+YANG_BRANCHES = ['子', '寅', '辰', '午', '申', '戌']
+STEM_IMAGERY = {'甲': '큰 나무', '乙': '화초·덩굴', '丙': '태양', '丁': '촛불·달빛', '戊': '큰 산·대지',
+                '己': '밭·정원', '庚': '바위·무쇠', '辛': '보석·칼날', '壬': '바다·큰 강', '癸': '비·이슬'}
+BRANCH_ANIMAL = {'子': '쥐', '丑': '소', '寅': '호랑이', '卯': '토끼', '辰': '용', '巳': '뱀',
+                 '午': '말', '未': '양', '申': '원숭이', '酉': '닭', '戌': '개', '亥': '돼지'}
+BRANCH_TIME = {'子': '23~01시', '丑': '01~03시', '寅': '03~05시', '卯': '05~07시',
+               '辰': '07~09시', '巳': '09~11시', '午': '11~13시', '未': '13~15시',
+               '申': '15~17시', '酉': '17~19시', '戌': '19~21시', '亥': '21~23시'}
+BRANCH_SEASON = {'寅': '봄', '卯': '봄', '辰': '봄(환절기)', '巳': '여름', '午': '여름', '未': '여름(환절기)',
+                 '申': '가을', '酉': '가을', '戌': '가을(환절기)', '亥': '겨울', '子': '겨울', '丑': '겨울(환절기)'}
+ELEMENTS = ['목', '화', '토', '금', '수']
+# 상생: A가 B를 낳는다 / 상극: A가 B를 누른다
+GENERATES = {'목': '화', '화': '토', '토': '금', '금': '수', '수': '목'}
+CONTROLS = {'목': '토', '토': '수', '수': '화', '화': '금', '금': '목'}
+TRIADS = {'寅午戌': '화국(火局)', '申子辰': '수국(水局)', '巳酉丑': '금국(金局)', '亥卯未': '목국(木局)'}
+SINSAL_ORDER = ['지살', '년살', '월살', '망신살', '장성살', '반안살', '역마살', '육해살', '화개살', '겁살', '재살', '천살']
+
+
+def _label_stem(s: str) -> str:
+    return f"{s}({STEM_KOR[s]})"
+
+
+def _label_branch(b: str) -> str:
+    return f"{b}({BRANCH_KOR[b]})"
+
+
+def _label_ganzhi(gz: str) -> str:
+    return f"{gz}({STEM_KOR[gz[0]]}{BRANCH_KOR[gz[1]]})"
+
+
+def _make_item(rng: random.Random, key: str, question: str, answer: str,
+               wrong_pool: list[str], explanation: str) -> dict[str, Any]:
+    """정답 + 오답 3개(같은 카테고리 풀)로 4지선다 문항을 조립한다."""
+    wrongs = [w for w in dict.fromkeys(wrong_pool) if w != answer]
+    rng.shuffle(wrongs)
+    choices = wrongs[:3] + [answer]
+    rng.shuffle(choices)
+    return {
+        "key": key,
+        "question": question,
+        "choices": choices,
+        "answer": choices.index(answer),
+        "explanation": explanation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 챕터별 문제 풀 생성기
+# ---------------------------------------------------------------------------
+def _pool_elements(rng: random.Random) -> list[dict]:
+    items = []
+    # 글자 → 오행 판별
+    for ch in HEAVENLY_STEMS + EARTHLY_BRANCHES:
+        label = _label_stem(ch) if ch in STEM_KOR else _label_branch(ch)
+        el = ELEMENTS_MAP[ch]
+        items.append(_make_item(
+            rng, f"el:{ch}", f"{label}의 오행은?", el, ELEMENTS,
+            f"{label}은(는) {el}({'木火土金水'[ELEMENTS.index(el)]})의 글자입니다."))
+    # 상생
+    for a, b in GENERATES.items():
+        items.append(_make_item(
+            rng, f"gen:{a}", f"오행 {a}이(가) 생(生)하는 오행은?", b, ELEMENTS,
+            f"상생 순환은 목→화→토→금→수→목입니다. {a}은(는) {b}을(를) 낳습니다."))
+        items.append(_make_item(
+            rng, f"genby:{b}", f"{b}을(를) 생(生)해 주는 오행은?", a, ELEMENTS,
+            f"상생 순환(목→화→토→금→수)에서 {b}을(를) 낳는 것은 {a}입니다."))
+    # 상극
+    for a, b in CONTROLS.items():
+        items.append(_make_item(
+            rng, f"ctl:{a}", f"{a}이 극(剋)하는 오행은?", b, ELEMENTS,
+            f"상극 순환은 목→토→수→화→금→목입니다. {a}은(는) {b}을(를) 누릅니다."))
+    return items
+
+
+def _pool_stems(rng: random.Random) -> list[dict]:
+    items = []
+    stem_labels = [_label_stem(s) for s in HEAVENLY_STEMS]
+    for s in HEAVENLY_STEMS:
+        kor, el = STEM_KOR[s], ELEMENTS_MAP[s]
+        yy = '양' if s in YANG_STEMS else '음'
+        # 독음
+        items.append(_make_item(
+            rng, f"stemkor:{s}", f"천간 {s}의 한글 독음은?", kor, list(STEM_KOR.values()),
+            f"{s}은(는) '{kor}'으로 읽습니다. ({yy}{el})"))
+        # 음양+오행
+        items.append(_make_item(
+            rng, f"stemyy:{s}", f"{_label_stem(s)}의 음양과 오행은?", f"{yy}{el}",
+            [f"{a}{b}" for a in ['양', '음'] for b in ELEMENTS],
+            f"{_label_stem(s)}은(는) {yy}의 {el} 기운입니다. 물상은 {STEM_IMAGERY[s]}."))
+        # 물상
+        items.append(_make_item(
+            rng, f"stemimg:{s}", f"'{STEM_IMAGERY[s]}'에 비유되는 천간은?", _label_stem(s), stem_labels,
+            f"{_label_stem(s)}의 대표 물상이 {STEM_IMAGERY[s]}입니다."))
+    return items
+
+
+def _pool_branches(rng: random.Random) -> list[dict]:
+    items = []
+    branch_labels = [_label_branch(b) for b in EARTHLY_BRANCHES]
+    for b in EARTHLY_BRANCHES:
+        el = ELEMENTS_MAP[b]
+        yy = '양' if b in YANG_BRANCHES else '음'
+        items.append(_make_item(
+            rng, f"brani:{b}", f"{_label_branch(b)}에 해당하는 띠 동물은?", BRANCH_ANIMAL[b],
+            list(BRANCH_ANIMAL.values()),
+            f"{_label_branch(b)}은(는) {BRANCH_ANIMAL[b]}띠입니다."))
+        items.append(_make_item(
+            rng, f"brel:{b}", f"{_label_branch(b)}의 오행은?", el, ELEMENTS,
+            f"{_label_branch(b)}은(는) {BRANCH_SEASON[b]}의 글자로 오행은 {el}입니다."))
+        items.append(_make_item(
+            rng, f"brtime:{b}", f"{_label_branch(b)}시(時)는 몇 시인가?", BRANCH_TIME[b],
+            list(BRANCH_TIME.values()),
+            f"{_label_branch(b)}시는 {BRANCH_TIME[b]}입니다."))
+        items.append(_make_item(
+            rng, f"brseason:{b}", f"{_label_branch(b)}의 계절은?", BRANCH_SEASON[b],
+            list(dict.fromkeys(BRANCH_SEASON.values())),
+            f"인묘진=봄, 사오미=여름, 신유술=가을, 해자축=겨울. {_label_branch(b)}은(는) {BRANCH_SEASON[b]}입니다."))
+        items.append(_make_item(
+            rng, f"bryy:{b}", f"{_label_branch(b)}의 음양은?", yy, ['양', '음', '중성', '없음'],
+            f"양지는 자인진오신술, 음지는 축묘사미유해입니다. {_label_branch(b)}은(는) {yy}입니다."))
+    return items
+
+
+def _pool_ganzhi(rng: random.Random) -> list[dict]:
+    items = []
+    sample_idx = rng.sample(range(60), 20)
+    for i in sample_idx:
+        gz, nxt = GANZHI_LIST[i], GANZHI_LIST[(i + 1) % 60]
+        near = [_label_ganzhi(GANZHI_LIST[(i + d) % 60]) for d in (2, 11, 13, -1, 10)]
+        items.append(_make_item(
+            rng, f"gznext:{gz}", f"60갑자에서 {_label_ganzhi(gz)} 다음 간지는?", _label_ganzhi(nxt), near,
+            f"60갑자는 천간·지지가 한 칸씩 함께 전진합니다. {_label_ganzhi(gz)} 다음은 {_label_ganzhi(nxt)}입니다."))
+        # 간지의 오행 조합
+        s_el, b_el = ELEMENTS_MAP[gz[0]], ELEMENTS_MAP[gz[1]]
+        combo = f"{s_el}+{b_el}"
+        items.append(_make_item(
+            rng, f"gzel:{gz}", f"{_label_ganzhi(gz)}의 오행 조합(천간+지지)은?", combo,
+            [f"{a}+{b}" for a in ELEMENTS for b in ELEMENTS],
+            f"{_label_stem(gz[0])}은 {s_el}, {_label_branch(gz[1])}은 {b_el}이므로 {combo}입니다."))
+    # 근묘화실
+    pillar_q = [
+        ("사주에서 '나 자신'을 나타내는 기둥은?", "일주(日柱)", "일주의 천간(일간)이 사주의 주인공입니다."),
+        ("부모·사회성·성장기를 나타내는 기둥은?", "월주(月柱)", "근묘화실에서 월주는 싹(苗) — 부모 자리이자 사회 무대입니다."),
+        ("조상·어린 시절을 나타내는 기둥은?", "연주(年柱)", "연주는 뿌리(根) — 조상과 유년기를 봅니다."),
+        ("자녀·말년을 나타내는 기둥은?", "시주(時柱)", "시주는 열매(實) — 자녀와 말년을 봅니다."),
+    ]
+    pillar_pool = ["연주(年柱)", "월주(月柱)", "일주(日柱)", "시주(時柱)"]
+    for i, (q, a, ex) in enumerate(pillar_q):
+        items.append(_make_item(rng, f"pillar:{i}", q, a, pillar_pool, ex))
+    return items
+
+
+def _pool_jijanggan(rng: random.Random) -> list[dict]:
+    items = []
+    stem_labels = [_label_stem(s) for s in HEAVENLY_STEMS]
+    for b in EARTHLY_BRANCHES:
+        main = BRANCH_HIDDEN_GANS[b]
+        full = "·".join(g for g, _ in BRANCH_HIDDEN_FULL[b])
+        items.append(_make_item(
+            rng, f"jjg:{b}", f"{_label_branch(b)}의 지장간 정기(본기)는?", _label_stem(main), stem_labels,
+            f"{_label_branch(b)}의 지장간은 {full}이며, 대표(정기)는 {_label_stem(main)}입니다."))
+        all_combos = ["·".join(g for g, _ in BRANCH_HIDDEN_FULL[x]) for x in EARTHLY_BRANCHES]
+        items.append(_make_item(
+            rng, f"jjgfull:{b}", f"{_label_branch(b)} 속에 숨은 지장간 전체 구성은?", full, all_combos,
+            f"{_label_branch(b)}의 지장간은 {full}(맨 뒤가 정기)입니다."))
+    return items
+
+
+def _pool_sipseong(rng: random.Random) -> list[dict]:
+    items = []
+    ten_gods = ['비견', '겁재', '식신', '상관', '편재', '정재', '편관', '정관', '편인', '정인']
+    day_gans = rng.sample(HEAVENLY_STEMS, 6)
+    for dg in day_gans:
+        targets = rng.sample(HEAVENLY_STEMS, 5)
+        for t in targets:
+            tg = GAN_TEN_GODS[dg][t]
+            items.append(_make_item(
+                rng, f"ss:{dg}{t}", f"일간이 {_label_stem(dg)}일 때, {_label_stem(t)}의 십성은?",
+                tg, ten_gods,
+                f"일간 {_label_stem(dg)}({ELEMENTS_MAP[dg]}) 기준으로 {_label_stem(t)}({ELEMENTS_MAP[t]})은(는) {tg}입니다."))
+    # 개념 문제
+    concept_q = [
+        ("나와 오행이 같고 음양도 같은 십성은?", "비견", "같은 오행: 음양 같으면 비견, 다르면 겁재."),
+        ("내가 생(生)하는 오행 중 음양이 다른 십성은?", "상관", "내가 생함: 음양 같으면 식신, 다르면 상관."),
+        ("내가 극(剋)하는 오행 중 음양이 다른 십성은?", "정재", "내가 극함(재성): 음양 같으면 편재, 다르면 정재."),
+        ("나를 극(剋)하는 오행 중 음양이 같은 십성은?", "편관", "나를 극함(관성): 음양 같으면 편관(칠살), 다르면 정관."),
+        ("나를 생(生)해 주는 오행 중 음양이 다른 십성은?", "정인", "나를 생함(인성): 음양 같으면 편인, 다르면 정인."),
+    ]
+    for i, (q, a, ex) in enumerate(concept_q):
+        items.append(_make_item(rng, f"ssc:{i}", q, a, ten_gods, ex))
+    return items
+
+
+def _pool_unseong(rng: random.Random) -> list[dict]:
+    items = []
+    stages = ['장생', '목욕', '관대', '건록', '제왕', '쇠', '병', '사', '묘', '절', '태', '양']
+    day_gans = rng.sample(list(TWELVE_GROWTH.keys()), 6)
+    for dg in day_gans:
+        branches = rng.sample(EARTHLY_BRANCHES, 4)
+        for b in branches:
+            st = TWELVE_GROWTH[dg][b]
+            direction = '순행' if dg in YANG_STEMS else '역행'
+            items.append(_make_item(
+                rng, f"us:{dg}{b}", f"{_label_stem(dg)} 일간이 {_label_branch(b)}를 만나면 12운성은?",
+                st, stages,
+                f"{_label_stem(dg)}은(는) {'양간' if dg in YANG_STEMS else '음간'}이라 {direction}합니다. {_label_branch(b)}에서 {st}입니다."))
+    # 순서 문제
+    for i in rng.sample(range(12), 4):
+        cur, nxt = stages[i], stages[(i + 1) % 12]
+        items.append(_make_item(
+            rng, f"usord:{cur}", f"12운성에서 '{cur}' 다음 단계는?", nxt, stages,
+            f"12운성 순서: 장생→목욕→관대→건록→제왕→쇠→병→사→묘→절→태→양. {cur} 다음은 {nxt}입니다."))
+    return items
+
+
+def _pool_hapchung(rng: random.Random) -> list[dict]:
+    items = []
+    stem_labels = [_label_stem(s) for s in HEAVENLY_STEMS]
+    branch_labels = [_label_branch(b) for b in EARTHLY_BRANCHES]
+    # 천간합/충
+    for s in HEAVENLY_STEMS:
+        partner = STEM_RELATIONS['합'][s]
+        items.append(_make_item(
+            rng, f"sh:{s}", f"{_label_stem(s)}과(와) 천간합(合)을 이루는 글자는?", _label_stem(partner), stem_labels,
+            f"천간합 다섯 쌍: 갑기·을경·병신·정임·무계. {_label_stem(s)}의 짝은 {_label_stem(partner)}입니다."))
+    for s, partner in STEM_RELATIONS['충'].items():
+        items.append(_make_item(
+            rng, f"sc:{s}", f"{_label_stem(s)}과(와) 천간충(沖)이 되는 글자는?", _label_stem(partner), stem_labels,
+            f"천간충: 갑경·을신·병임·정계 (무·기 토는 충이 없음). {_label_stem(s)}의 충은 {_label_stem(partner)}입니다."))
+    # 지지 육합/육충
+    for b in EARTHLY_BRANCHES:
+        hap, chung = BRANCH_RELATIONS['합'][b], BRANCH_RELATIONS['충'][b]
+        items.append(_make_item(
+            rng, f"bh:{b}", f"{_label_branch(b)}과(와) 육합(六合)을 이루는 지지는?", _label_branch(hap), branch_labels,
+            f"육합: 자축·인해·묘술·진유·사신·오미. {_label_branch(b)}의 합은 {_label_branch(hap)}입니다."))
+        items.append(_make_item(
+            rng, f"bc:{b}", f"{_label_branch(b)}과(와) 육충(六沖)이 되는 지지는?", _label_branch(chung), branch_labels,
+            f"육충은 지지 시계판의 정반대 자리입니다. {_label_branch(b)}의 충은 {_label_branch(chung)}입니다."))
+    # 삼합
+    for group, name in TRIADS.items():
+        g_label = "·".join(_label_branch(x) for x in group)
+        items.append(_make_item(
+            rng, f"triad:{group}", f"삼합 {g_label}이 이루는 국(局)은?", name, list(TRIADS.values()),
+            f"{g_label} 세 글자가 모이면 {name}을 이룹니다."))
+    return items
+
+
+def _pool_sinsal(rng: random.Random) -> list[dict]:
+    items = []
+    # 12신살: 연지 기준 산출
+    refs = rng.sample(EARTHLY_BRANCHES, 5)
+    for ref in refs:
+        targets = rng.sample(EARTHLY_BRANCHES, 3)
+        for t in targets:
+            ss = get_sinsal_list(ref, t)
+            items.append(_make_item(
+                rng, f"sin:{ref}{t}", f"연지가 {_label_branch(ref)}인 사람에게 {_label_branch(t)}는 무슨 신살인가?",
+                ss, SINSAL_ORDER,
+                f"연지 {_label_branch(ref)}의 삼합 그룹 첫 글자에서 지살부터 순서대로 돕니다. {_label_branch(t)}는 {ss}입니다."))
+    # 신살 개념
+    concept_q = [
+        ("이동·여행·해외 인연을 뜻하는 신살은?", "역마살", "역마(驛馬)는 옛 파발마 — 이동과 변화의 기운입니다.", ["도화살", "화개살", "장성살", "겁살"]),
+        ("시선을 끄는 매력·인기를 뜻하는 신살은?", "도화살", "도화(桃花)는 복숭아꽃 — 매력과 인기입니다. 12신살의 '년살'에 해당합니다.", ["역마살", "화개살", "반안살", "천살"]),
+        ("예술·종교·철학적 재능과 내면 침잠을 뜻하는 신살은?", "화개살", "화개(華蓋)는 화려함을 덮는 일산 — 예술·철학의 별입니다.", ["역마살", "도화살", "망신살", "월살"]),
+        ("권위와 지위, 중심 세력이 되는 당당한 신살은?", "장성살", "장성(將星)은 장군의 별 — 권위와 리더십입니다.", ["육해살", "재살", "지살", "겁살"]),
+    ]
+    for i, (q, a, ex, wrongs) in enumerate(concept_q):
+        items.append(_make_item(rng, f"sinc:{i}", q, a, wrongs + [a], ex))
+    # 공망
+    gz_samples = rng.sample(GANZHI_LIST, 5)
+    gm_pool = ['戌亥', '申酉', '午未', '辰巳', '寅卯', '子丑']
+    for gz in gz_samples:
+        gm = get_gongmang(gz)
+        items.append(_make_item(
+            rng, f"gm:{gz}", f"{_label_ganzhi(gz)} 일주의 공망은?", gm, gm_pool,
+            f"60갑자를 10개씩 묶은 순(旬)마다 짝 없는 지지 두 글자가 공망이 됩니다. {_label_ganzhi(gz)}의 공망은 {gm}입니다."))
+    return items
+
+
+def _pool_practice(rng: random.Random) -> list[dict]:
+    """실전: 랜덤 명식(일주+월주 등)을 만들어 종합 독해 문제를 낸다."""
+    items = []
+    ten_gods = ['비견', '겁재', '식신', '상관', '편재', '정재', '편관', '정관', '편인', '정인']
+    stages = ['장생', '목욕', '관대', '건록', '제왕', '쇠', '병', '사', '묘', '절', '태', '양']
+    for _ in range(14):
+        day_gz = rng.choice(GANZHI_LIST)
+        other_gz = rng.choice([g for g in GANZHI_LIST if g != day_gz])
+        dg, db = day_gz[0], day_gz[1]
+        og, ob = other_gz[0], other_gz[1]
+        case = f"일주가 {_label_ganzhi(day_gz)}, 월주가 {_label_ganzhi(other_gz)}인 명식"
+
+        qtype = rng.choice(['ilgan', 'ilgan_el', 'wolgan_ss', 'ilji_us', 'wolji_ss', 'relation'])
+        if qtype == 'ilgan':
+            items.append(_make_item(
+                rng, f"pr_ilgan:{day_gz}", f"{case} — 이 사람의 일간은?",
+                _label_stem(dg), [_label_stem(s) for s in HEAVENLY_STEMS],
+                f"일주 {_label_ganzhi(day_gz)}의 천간이 일간입니다. 일간은 {_label_stem(dg)}."))
+        elif qtype == 'ilgan_el':
+            el = ELEMENTS_MAP[dg]
+            items.append(_make_item(
+                rng, f"pr_el:{day_gz}", f"{case} — 일간의 오행은?", el, ELEMENTS,
+                f"일간 {_label_stem(dg)}의 오행은 {el}입니다."))
+        elif qtype == 'wolgan_ss':
+            tg = GAN_TEN_GODS[dg][og]
+            items.append(_make_item(
+                rng, f"pr_ss:{day_gz}{og}", f"{case} — 월간 {_label_stem(og)}의 십성은?", tg, ten_gods,
+                f"일간 {_label_stem(dg)}({ELEMENTS_MAP[dg]}) 기준 {_label_stem(og)}({ELEMENTS_MAP[og]})은 {tg}입니다."))
+        elif qtype == 'ilji_us':
+            st = TWELVE_GROWTH[dg][db]
+            items.append(_make_item(
+                rng, f"pr_us:{day_gz}", f"{case} — 일간이 일지 {_label_branch(db)}에서 갖는 12운성은?", st, stages,
+                f"{_label_stem(dg)} 일간은 {_label_branch(db)}에서 {st}입니다."))
+        elif qtype == 'wolji_ss':
+            hidden = BRANCH_HIDDEN_GANS[ob]
+            tg = GAN_TEN_GODS[dg][hidden]
+            items.append(_make_item(
+                rng, f"pr_jss:{day_gz}{ob}", f"{case} — 월지 {_label_branch(ob)}의 십성(지장간 정기 기준)은?", tg, ten_gods,
+                f"{_label_branch(ob)}의 정기는 {_label_stem(hidden)}. 일간 {_label_stem(dg)} 기준 {tg}입니다."))
+        else:  # relation: 일지-월지 관계
+            rel = "없음"
+            for rel_name in ['합', '충', '파', '해']:
+                if BRANCH_RELATIONS[rel_name].get(db) == ob:
+                    rel = rel_name
+                    break
+            items.append(_make_item(
+                rng, f"pr_rel:{day_gz}{ob}", f"{case} — 일지 {_label_branch(db)}와 월지 {_label_branch(ob)}의 관계는?",
+                rel, ['합', '충', '파', '해', '없음'],
+                f"{_label_branch(db)}-{_label_branch(ob)}: " + (f"{rel} 관계입니다." if rel != '없음' else "합·충·파·해 어디에도 해당하지 않습니다.")))
+    return items
+
+
+CHAPTER_GENERATORS: dict[str, Callable[[random.Random], list[dict]]] = {
+    "elements": _pool_elements,
+    "stems": _pool_stems,
+    "branches": _pool_branches,
+    "ganzhi": _pool_ganzhi,
+    "jijanggan": _pool_jijanggan,
+    "sipseong": _pool_sipseong,
+    "unseong": _pool_unseong,
+    "hapchung": _pool_hapchung,
+    "sinsal": _pool_sinsal,
+    "practice": _pool_practice,
+}
+
+
+def generate_quiz(chapter_id: str, count: int = 10, seed: int | None = None) -> list[dict[str, Any]]:
+    """챕터 퀴즈 N문항 생성. seed 지정 시 재현 가능."""
+    gen = CHAPTER_GENERATORS.get(chapter_id)
+    if not gen:
+        return []
+    rng = random.Random(seed)
+    pool = gen(rng)
+    rng.shuffle(pool)
+    # 같은 key(같은 지식 포인트) 중복 출제 방지
+    seen: set[str] = set()
+    result = []
+    for item in pool:
+        if item["key"] in seen:
+            continue
+        seen.add(item["key"])
+        result.append(item)
+        if len(result) >= count:
+            break
+    return result
