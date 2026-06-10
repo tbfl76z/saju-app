@@ -23,6 +23,7 @@ import image_prompt as image_prompt_mod
 import share_store
 import learn_curriculum
 import learn_quiz
+import usage_log
 
 load_dotenv()
 
@@ -33,6 +34,37 @@ calc = SajuCalculator()  # Initialize calculator once
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.isdir(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+# 접속 로그 미들웨어 — 정적 파일·통계 조회 자체는 제외하고 모든 API 요청을 기록
+@app.middleware("http")
+async def access_log_middleware(request: Request, call_next):
+    import time as _time
+    start = _time.time()
+    response = await call_next(request)
+    try:
+        path = request.url.path
+        if not path.startswith("/static") and path != "/admin/stats" and request.method != "OPTIONS":
+            ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0].strip()
+            usage_log.log_request(
+                ip, request.method, path, response.status_code,
+                int((_time.time() - start) * 1000), request.headers.get("user-agent", ""),
+            )
+    except Exception:
+        pass  # 로그 실패가 본 요청을 막지 않도록
+    return response
+
+
+@app.get("/admin/stats")
+async def admin_stats(key: str = "", days: int = 7):
+    """사용량 통계 조회 (ADMIN_STATS_KEY 환경변수로 보호).
+    예: GET /admin/stats?key=비밀키&days=7"""
+    expected = os.getenv("ADMIN_STATS_KEY")
+    if not expected:
+        raise HTTPException(status_code=403, detail="ADMIN_STATS_KEY가 설정되지 않았습니다.")
+    if key != expected:
+        raise HTTPException(status_code=403, detail="키가 올바르지 않습니다.")
+    return usage_log.get_stats(days)
+
 
 # Enable CORS for Next.js
 app.add_middleware(
