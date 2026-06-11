@@ -67,7 +67,7 @@ export default function TongbyeonPage() {
             </div>
 
             <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🖋️ 통변 훈련</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🖋️ 통변 훈련</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm">
                     명식을 보고 직접 해석을 써보세요 — AI 선생님이 100점 만점으로 채점해 드립니다
                 </p>

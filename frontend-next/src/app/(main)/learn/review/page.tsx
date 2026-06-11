@@ -49,7 +49,7 @@ export default function ReviewPage() {
             </div>
 
             <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🔁 복습하기</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🔁 복습하기</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm">
                     틀렸던 문제를 잊을 때쯤 다시 — 간격 반복으로 오래 기억해요
                 </p>

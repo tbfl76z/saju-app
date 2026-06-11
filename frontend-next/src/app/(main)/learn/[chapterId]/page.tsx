@@ -138,7 +138,7 @@ export default function ChapterPage() {
             </div>
 
             <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">
                     {chapter.emoji} {chapter.title}
                 </h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm">{chapter.subtitle}</p>

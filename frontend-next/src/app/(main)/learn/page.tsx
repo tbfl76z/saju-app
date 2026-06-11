@@ -75,7 +75,7 @@ export default function LearnPage() {
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
             <div className="text-center space-y-3 py-5 md:py-10">
-                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">📚 사주 공부하기</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">📚 사주 공부하기</h2>
                 <p className="text-slate-600 dark:text-slate-400">
                     음양오행부터 실전 명식 읽기까지 — 내 사주로 배우는 명리학
                 </p>
@@ -84,19 +84,19 @@ export default function LearnPage() {
             {/* 학습 현황 헤더 */}
             <div className="glass-card p-5 mb-4 grid grid-cols-3 gap-3 text-center">
                 <div>
-                    <p className="flex items-center justify-center gap-1 text-2xl font-bold text-[#bf953f]">
+                    <p className="flex items-center justify-center gap-1 text-xl md:text-2xl font-bold text-[#bf953f]">
                         <Star className="h-5 w-5" /> {progress.xp}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">경험치 XP</p>
                 </div>
                 <div>
-                    <p className="flex items-center justify-center gap-1 text-2xl font-bold text-orange-500">
+                    <p className="flex items-center justify-center gap-1 text-xl md:text-2xl font-bold text-orange-500">
                         <Flame className="h-5 w-5" /> {progress.streak}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">연속 학습일</p>
                 </div>
                 <div>
-                    <p className="text-2xl font-bold text-emerald-600">{passedCount}<span className="text-sm text-slate-400">/{chapters.length || 10}</span></p>
+                    <p className="text-xl md:text-2xl font-bold text-emerald-600">{passedCount}<span className="text-sm text-slate-400">/{chapters.length || 10}</span></p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">완료 챕터</p>
                 </div>
             </div>
@@ -171,7 +171,7 @@ export default function LearnPage() {
                     return (
                         <Link key={ch.id} href={`/learn/${ch.id}`} className="block">
                             <div className="glass-card flex items-center gap-4 p-5 transition-all hover:border-[#d4af37]/60 hover:-translate-y-0.5">
-                                <span className="text-3xl shrink-0">{ch.emoji}</span>
+                                <span className="text-2xl md:text-3xl shrink-0">{ch.emoji}</span>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
                                         {ch.order + 1}. {ch.title}

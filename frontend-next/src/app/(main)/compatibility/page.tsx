@@ -19,7 +19,7 @@ export default function CompatibilityPage() {
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
             <div className="text-center space-y-3 py-5 md:py-10">
-                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">💞 인연의 궁합</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">💞 인연의 궁합</h2>
                 <p className="text-slate-600 dark:text-slate-400">두 사람의 명식을 입력하면 기운의 조화를 살펴드립니다.</p>
             </div>
             <CompatibilitySection apiBase={API_BASE} terms={terms} />
