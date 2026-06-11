@@ -40,8 +40,8 @@ export default function SavedPage() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto px-6">
-            <div className="text-center space-y-3 py-10">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+            <div className="text-center space-y-3 py-5 md:py-10">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🔖 저장된 명식</h2>
                 <p className="text-slate-600 dark:text-slate-400">저장해 둔 명식을 불러오거나 정리할 수 있습니다.</p>
             </div>

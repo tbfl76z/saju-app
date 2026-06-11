@@ -73,8 +73,8 @@ export default function LearnPage() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto px-6 pb-24">
-            <div className="text-center space-y-3 py-10">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
+            <div className="text-center space-y-3 py-5 md:py-10">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">📚 사주 공부하기</h2>
                 <p className="text-slate-600 dark:text-slate-400">
                     음양오행부터 실전 명식 읽기까지 — 내 사주로 배우는 명리학
@@ -169,7 +169,7 @@ export default function LearnPage() {
                 {chapters.map((ch) => {
                     const st = progress.chapters[ch.id];
                     return (
-                        <Link key={ch.id} href={`/learn/${ch.id}`}>
+                        <Link key={ch.id} href={`/learn/${ch.id}`} className="block">
                             <div className="glass-card flex items-center gap-4 p-5 transition-all hover:border-[#d4af37]/60 hover:-translate-y-0.5">
                                 <span className="text-3xl shrink-0">{ch.emoji}</span>
                                 <div className="flex-1 min-w-0">

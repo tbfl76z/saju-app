@@ -33,8 +33,8 @@ export default function TodayPage() {
     const selected = profiles.find((p) => p.id === selectedId);
 
     return (
-        <div className="max-w-4xl mx-auto px-6">
-            <div className="text-center space-y-3 py-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+            <div className="text-center space-y-3 py-5 md:py-10">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🌅 오늘의 운세</h2>
                 <p className="text-slate-600 dark:text-slate-400">저장된 명식을 선택하면 오늘 하루의 흐름을 살펴드립니다.</p>
             </div>

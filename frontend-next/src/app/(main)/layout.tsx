@@ -10,7 +10,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 {children}
             </main>
             <NavBarMobile />
-            <footer className="mt-32 border-t border-slate-200/50 dark:border-slate-800/50 py-16 text-center text-xs text-slate-500 dark:text-slate-500 font-sans tracking-wide">
+            {/* 모바일은 하단 고정 탭바(약 70px)에 가리지 않도록 pb를 크게 잡는다 */}
+            <footer className="mt-12 md:mt-32 border-t border-slate-200/50 dark:border-slate-800/50 pt-8 md:pt-16 pb-28 md:pb-16 text-center text-xs text-slate-500 dark:text-slate-500 font-sans tracking-wide">
                 <div className="max-w-xl mx-auto space-y-4 px-6">
                     <div className="flex justify-center gap-6 mb-8 mt-4 text-slate-300 dark:text-slate-700">
                         <span>✦</span> <span>✦</span> <span>✦</span>

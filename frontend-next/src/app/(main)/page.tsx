@@ -82,10 +82,10 @@ export default function Home() {
   if (!isMounted) return null;
 
   return (
-      <div className="max-w-4xl mx-auto px-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
         {!sajuData ? (
           <div className="space-y-6">
-            <div className="text-center space-y-4 py-16 animate-in fade-in duration-1000">
+            <div className="text-center space-y-4 py-8 md:py-16 animate-in fade-in duration-1000">
               <h2 className="text-4xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif leading-tight">당신의 운명을 코드로 풀어보세요</h2>
               <p className="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto">정통 명리학의 심오한 지혜와 최신 인공지능 기술이 만나,<br />당신의 삶에 따뜻한 위로와 지혜의 지도를 그려드립니다.</p>
             </div>

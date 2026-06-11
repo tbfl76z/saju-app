@@ -103,7 +103,7 @@ export default function ChapterPage() {
 
     if (error && !chapter) {
         return (
-            <div className="max-w-3xl mx-auto px-6 py-16 text-center space-y-4">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center space-y-4">
                 <p className="text-red-500">{error}</p>
                 <Link href="/learn" className="text-[#bf953f] font-bold">← 커리큘럼으로</Link>
             </div>
@@ -127,8 +127,8 @@ export default function ChapterPage() {
         : undefined;
 
     return (
-        <div className="max-w-3xl mx-auto px-6 pb-24 space-y-6">
-            <div className="flex items-center justify-between pt-8">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24 space-y-6">
+            <div className="flex items-center justify-between pt-4 md:pt-8">
                 <Link href="/learn" className="flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-[#bf953f]">
                     <ArrowLeft className="h-4 w-4" /> 커리큘럼
                 </Link>
