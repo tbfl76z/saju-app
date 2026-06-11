@@ -70,11 +70,16 @@ async def admin_stats(key: str = "", days: int = 7):
 
 
 @app.get("/admin/dashboard")
-async def admin_dashboard(key: str = "", days: int = 7):
-    """사용량 대시보드 (HTML) — 브라우저에서 바로 보기 좋은 표·그래프 버전."""
+async def admin_dashboard(key: str = "", days: int = 7, day: Optional[str] = None):
+    """사용량 대시보드 (HTML). day=YYYY-MM-DD 지정 시 그날의 시간대별 상세를 보여준다."""
     from fastapi.responses import HTMLResponse
+    import re as _re
     _check_admin_key(key)
-    return HTMLResponse(usage_log.render_dashboard_html(usage_log.get_stats(days)))
+    if day:
+        if not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            raise HTTPException(status_code=422, detail="day는 YYYY-MM-DD 형식이어야 합니다.")
+        return HTMLResponse(usage_log.render_day_html(usage_log.get_day_stats(day), key=key, days=days))
+    return HTMLResponse(usage_log.render_dashboard_html(usage_log.get_stats(days), key=key, days=days))
 
 
 # Enable CORS for Next.js
