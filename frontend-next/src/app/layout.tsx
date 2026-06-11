@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} font-noto antialiased bg-slate-50 dark:bg-slate-950`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} font-noto antialiased`}
       >
         <ThemeProvider>
           {children}

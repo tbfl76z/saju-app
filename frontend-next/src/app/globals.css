@@ -96,20 +96,30 @@
 }
 
 @layer base {
+  /* 라이트 = 시안 A '골드·한지': 따뜻한 종이결 바탕 */
   body {
-    @apply bg-slate-50 text-foreground antialiased;
+    @apply text-foreground antialiased;
     font-family: var(--font-noto-serif), serif;
+    background-color: #faf7f0;
     background-image:
-      radial-gradient(at 0% 0%, hsla(45, 60%, 92%, 1) 0, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(220, 30%, 95%, 1) 0, transparent 50%);
+      radial-gradient(circle at 85% -5%, #f3e9d2 0%, transparent 55%),
+      radial-gradient(at 0% 100%, hsla(45, 45%, 94%, 1) 0, transparent 50%);
     background-attachment: fixed;
   }
 
+  /* 다크 = 시안 E '다크 모던': 별이 뜬 밤하늘 */
   .dark body {
-    @apply bg-slate-950;
+    background-color: #070918;
     background-image:
-      radial-gradient(at 0% 0%, hsla(45, 40%, 18%, 1) 0, transparent 50%),
-      radial-gradient(at 100% 100%, hsla(220, 40%, 14%, 1) 0, transparent 50%);
+      radial-gradient(circle at 80% -5%, rgba(43, 42, 94, 0.85) 0%, transparent 50%),
+      radial-gradient(1px 1px at 12% 28%, rgba(207, 212, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 38% 64%, rgba(207, 212, 255, 0.7) 50%, transparent 51%),
+      radial-gradient(1.6px 1.6px at 71% 18%, rgba(230, 195, 92, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 52%, rgba(207, 212, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(1.2px 1.2px at 55% 86%, rgba(183, 165, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(1px 1px at 25% 80%, rgba(207, 212, 255, 0.6) 50%, transparent 51%),
+      radial-gradient(1px 1px at 5% 55%, rgba(207, 212, 255, 0.5) 50%, transparent 51%);
+    background-attachment: fixed;
   }
 
   /* 모션 최소화 선호 시 애니메이션 비활성화 */
@@ -126,12 +136,29 @@
 }
 
 @layer components {
+  /* 라이트(A): 한지 위의 흰 카드 — 옅은 종이색 테두리 + 절제된 그림자 */
   .glass-card {
-    @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-xl rounded-3xl overflow-hidden;
+    @apply backdrop-blur-md rounded-3xl overflow-hidden;
+    background: rgba(255, 253, 248, 0.88);
+    border: 1px solid #e9e1cf;
+    box-shadow: 0 2px 14px rgba(43, 39, 34, 0.06);
   }
 
+  /* 다크(E): 밤하늘 위의 네이비 카드 — 두툼한 테두리 + 바닥 그림자(게임 버튼감) */
   .dark .glass-card {
-    @apply bg-slate-900/60 border-white/10;
+    background: rgba(26, 31, 68, 0.88);
+    border: 2px solid #323a6e;
+    box-shadow: 0 4px 0 #0a0d22;
+  }
+
+  /* 다크(E): 골드 그라데이션 버튼에 바닥 그림자 — 눌리는 듯한 입체감 */
+  .dark [class*="from-[#d4af37]"] {
+    box-shadow: 0 4px 0 #8a6f2a;
+  }
+
+  .dark [class*="from-[#d4af37]"]:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #8a6f2a;
   }
 
   .premium-report {
