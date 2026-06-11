@@ -107,6 +107,20 @@
     background-attachment: fixed;
   }
 
+  /* 나이트 = 시안 D '한지 + 밤하늘': 밝은 종이 바탕, 상단에만 별이 뜬 황혼 띠 */
+  .night body {
+    background-color: #faf7f0;
+    background-image:
+      radial-gradient(ellipse 160% 230px at 50% -70px, #1c2150 0%, rgba(28, 33, 80, 0.55) 55%, transparent 100%),
+      radial-gradient(1.4px 1.4px at 18% 38px, rgba(230, 195, 92, 0.95) 50%, transparent 51%),
+      radial-gradient(1px 1px at 36% 72px, rgba(255, 255, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 62% 30px, rgba(255, 255, 255, 0.85) 50%, transparent 51%),
+      radial-gradient(1.2px 1.2px at 81% 64px, rgba(183, 165, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 92% 24px, rgba(255, 255, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(circle at 85% 10%, #f3e9d2 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+
   /* 다크 = 시안 E '다크 모던': 별이 뜬 밤하늘 */
   .dark body {
     background-color: #070918;
@@ -142,6 +156,11 @@
     background: rgba(255, 253, 248, 0.88);
     border: 1px solid #e9e1cf;
     box-shadow: 0 2px 14px rgba(43, 39, 34, 0.06);
+  }
+
+  /* 나이트(D): 카드 테두리에 라벤더 기운 */
+  .night .glass-card {
+    border-color: #ded6ee;
   }
 
   /* 다크(E): 밤하늘 위의 네이비 카드 — 두툼한 테두리 + 바닥 그림자(게임 버튼감) */
