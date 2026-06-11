@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 E — 다크 모던 (B+C 조합, 웹+모바일)</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --gold:#e6c35c; --gold-deep:#f0d27e; --ink:#e8e6f2; --paper:#0e1126; --line:#2a2f55; --sub:#9aa0c5; }
+  * { margin:0; box-sizing:border-box; }
+  body { font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#070918; color:var(--ink); padding:30px 16px 60px; }
+  .serif { font-family:'Noto Serif KR',serif; }
+  .stage { max-width:1480px; margin:0 auto; }
+  .stage > h1 { font-size:18px; margin-bottom:4px; } .stage > p { font-size:12px; color:#8a8170; margin-bottom:22px; }
+  .boards { display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap; }
+  .board-label { font-size:11px; font-weight:700; letter-spacing:.18em; color:#9a9080; margin:0 0 8px 4px; }
+
+  /* ───── 공통 디자인 언어 ───── */
+  .paper { background:var(--paper);
+           background-image:radial-gradient(circle at 80% -5%, #2b2a5e 0%, transparent 50%),
+                            radial-gradient(1px 1px at 12% 28%, #cfd4ff 50%, transparent 51%),
+                            radial-gradient(1px 1px at 38% 64%, #cfd4ff 50%, transparent 51%),
+                            radial-gradient(1.5px 1.5px at 71% 18%, #e6c35c 50%, transparent 51%),
+                            radial-gradient(1px 1px at 88% 52%, #cfd4ff 50%, transparent 51%),
+                            radial-gradient(1px 1px at 55% 86%, #b7a5ff 50%, transparent 51%); }
+  .cta { display:inline-block; background:linear-gradient(135deg,#e6c35c,#c89a3a); color:#1a1503; border-radius:18px; font-weight:800;
+         box-shadow:0 5px 0 #8a6f2a, 0 0 24px rgba(230,195,92,.35); }
+  .pillar { background:#1a1f44; border:2px solid #323a6e; border-radius:18px; text-align:center; box-shadow:0 4px 0 #0a0d22; position:relative; }
+  .pillar.day { border-color:var(--gold); box-shadow:0 4px 0 #8a6f2a, 0 0 18px rgba(230,195,92,.25); background:#262344; }
+  .pillar.day::before { content:"日主"; position:absolute; top:-8px; left:50%; transform:translateX(-50%);
+                        background:var(--gold); color:#1a1503; font-size:9px; padding:2px 8px; border-radius:99px; letter-spacing:.1em; }
+  .lab { font-size:10px; color:#777da8; font-weight:600; }
+  .han { font-family:'Noto Serif KR'; font-weight:700; line-height:1.25; margin:4px 0; }
+  .han .b { color:#b7a5ff; }
+  .ss { font-size:10px; color:var(--sub); }
+  .period { background:#1a1f44; border:2px solid #323a6e; border-radius:14px; text-align:center; box-shadow:0 3px 0 #0a0d22; }
+  .period.on { border-color:var(--gold); background:#262344; box-shadow:0 3px 0 #8a6f2a; }
+  .period .k { font-size:10px; color:#777da8; font-weight:700; }
+  .period .g { font-family:'Noto Serif KR'; font-weight:700; margin-top:2px; }
+  .period.on .g { color:var(--gold); }
+  .detail { background:#1a1f44; border:2px solid #323a6e; border-left:4px solid var(--gold); border-radius:14px; color:#b9bedd; box-shadow:0 3px 0 #0a0d22; }
+  .detail b { color:var(--gold); font-family:'Noto Serif KR'; margin-right:6px; }
+  .btn-easy { background:#1a1f44; border:2px solid #323a6e; color:#b9bedd; border-radius:16px; font-weight:800; box-shadow:0 4px 0 #0a0d22; }
+  .btn-adv { background:linear-gradient(135deg,#e6c35c,#c89a3a); color:#1a1503; border:0; border-radius:16px; font-weight:800; box-shadow:0 4px 0 #8a6f2a; }
+  .sect { font-weight:800; display:flex; align-items:center; gap:8px; }
+  .sect::after { content:""; flex:1; height:1px; background:var(--line); }
+  .eyebrow { letter-spacing:.35em; color:var(--gold); font-weight:700; }
+  .logo { display:flex; gap:9px; align-items:center; font-weight:700; }
+  .logo .mark { border-radius:10px; background:linear-gradient(135deg,#e6c35c,#9d7a2a); display:grid; place-items:center; color:#1a1503; }
+
+  /* ───── 데스크톱 아트보드 ───── */
+  .desktop { width:960px; border-radius:18px; overflow:hidden; box-shadow:0 18px 50px rgba(43,39,34,.18); }
+  .d-head { display:flex; justify-content:space-between; align-items:center; padding:16px 36px; border-bottom:1px solid var(--line); }
+  .d-head .logo { font-size:18px; } .d-head .logo .mark { width:36px; height:36px; font-size:17px; }
+  .d-nav { display:flex; gap:22px; font-size:13.5px; font-weight:600; color:var(--sub); align-items:center; }
+  .d-nav .on { color:var(--gold); border-bottom:2px solid var(--gold); padding-bottom:2px; }
+  .d-hero { display:flex; align-items:center; gap:40px; padding:48px 56px 40px; }
+  .d-hero .left { flex:1.2; }
+  .d-hero .eyebrow { font-size:11px; margin-bottom:14px; }
+  .d-hero h2 { font-weight:800; font-size:38px; line-height:1.35; letter-spacing:-0.02em; }
+  .d-hero p { margin-top:14px; font-size:15px; color:var(--sub); line-height:1.8; }
+  .d-hero .cta { margin-top:24px; padding:15px 40px; font-size:15px; }
+  .d-hero .right { flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .d-hero .pillar { padding:16px 4px 12px; } .d-hero .han { font-size:34px; }
+  .d-body { padding:8px 56px 54px; }
+  .d-body .sect { font-size:17px; margin:26px 0 14px; }
+  .d-periods { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; max-width:620px; }
+  .d-periods .period { padding:10px 4px; } .d-periods .g { font-size:18px; }
+  .d-detail { margin-top:12px; max-width:620px; padding:14px 18px; font-size:13.5px; line-height:1.8; }
+  .d-detail b { font-size:17px; }
+  .d-ai { margin-top:20px; display:flex; gap:10px; max-width:620px; }
+  .d-ai button { flex:1; padding:15px; font-size:14.5px; font-family:inherit; }
+
+  /* ───── 모바일 아트보드 (폰 프레임) ───── */
+  .phone { width:400px; border-radius:44px; padding:12px; background:#000; box-shadow:0 18px 50px rgba(43,39,34,.3); }
+  .screen { border-radius:34px; overflow:hidden; position:relative; }
+  .notch { height:26px; display:flex; justify-content:center; align-items:flex-start; }
+  .notch span { width:120px; height:22px; background:#000; border-radius:0 0 14px 14px; }
+  .m-head { display:flex; justify-content:space-between; align-items:center; padding:8px 18px 12px; border-bottom:1px solid var(--line); }
+  .m-head .logo { font-size:15px; } .m-head .logo .mark { width:28px; height:28px; font-size:14px; }
+  .m-hero { text-align:center; padding:26px 20px 22px; }
+  .m-hero .eyebrow { font-size:10px; margin-bottom:10px; }
+  .m-hero h2 { font-weight:800; font-size:22px; line-height:1.4; letter-spacing:-0.02em; }
+  .m-hero p { margin-top:8px; font-size:12.5px; color:var(--sub); line-height:1.7; }
+  .m-hero .cta { margin-top:16px; padding:12px 32px; font-size:13.5px; }
+  .m-body { padding:0 16px 18px; }
+  .m-body .sect { font-size:14px; margin:18px 0 10px; }
+  .m-pillars { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+  .m-pillars .pillar { padding:11px 2px 9px; } .m-pillars .han { font-size:26px; }
+  .m-periods { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; }
+  .m-periods .period { padding:7px 2px; } .m-periods .g { font-size:14px; }
+  .m-detail { margin-top:9px; padding:11px 13px; font-size:11.5px; line-height:1.75; }
+  .m-detail b { font-size:14px; }
+  .m-ai { margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .m-ai button { padding:12px; font-size:12.5px; font-family:inherit; }
+  .m-tab { display:flex; justify-content:space-around; border-top:1px solid var(--line); padding:10px 6px 16px; background:#0b0e22; }
+  .m-tab div { font-size:10px; font-weight:700; color:#777da8; text-align:center; }
+  .m-tab div span { display:block; font-size:17px; margin-bottom:2px; }
+  .m-tab .on { color:var(--gold); }
+</style></head><body>
+<div class="stage">
+  <h1>시안 E — 다크 모던 (B의 밤하늘 + C의 두툼한 게임형 컴포넌트)</h1>
+  <p>밤하늘 배경은 유지하되 카드·버튼은 두툼한 라운드 + 바닥 그림자(눌리는 느낌) · 듀오링고 다크모드 감성</p>
+  <div class="boards">
+
+    <!-- 데스크톱 -->
+    <div>
+      <p class="board-label">DESKTOP · 960</p>
+      <div class="desktop paper">
+        <div class="d-head">
+          <div class="logo"><div class="mark">卜</div>Destiny Code</div>
+          <div class="d-nav"><span class="on">명식</span><span>오늘의 운세</span><span>궁합</span><span>공부</span><span>저장됨</span><span>☾</span></div>
+        </div>
+        <div class="d-hero">
+          <div class="left">
+            <div class="eyebrow">ANCIENT WISDOM · MODERN AI</div>
+            <h2>당신의 운명을<br>코드로 풀어보세요</h2>
+            <p>정통 명리학의 깊은 지혜와 인공지능이 만나<br>당신의 삶에 따뜻한 지혜의 지도를 그려드립니다.</p>
+            <a class="cta">내 명식 살펴보기</a>
+          </div>
+          <div class="right">
+            <div class="pillar"><div class="lab">時</div><div class="han">丙<br><span class="b">寅</span></div><div class="ss">식신·편관</div></div>
+            <div class="pillar day"><div class="lab">日</div><div class="han">甲<br><span class="b">子</span></div><div class="ss">본인·정인</div></div>
+            <div class="pillar"><div class="lab">月</div><div class="han">辛<br><span class="b">巳</span></div><div class="ss">정관·식신</div></div>
+            <div class="pillar"><div class="lab">年</div><div class="han">庚<br><span class="b">午</span></div><div class="ss">편관·상관</div></div>
+          </div>
+        </div>
+        <div class="d-body">
+          <div class="sect">🔮 나의 운세</div>
+          <div class="d-periods">
+            <div class="period"><div class="k">전체</div><div class="g">甲子</div></div>
+            <div class="period"><div class="k">대운</div><div class="g">乙酉</div></div>
+            <div class="period on"><div class="k">올해</div><div class="g">丙午</div></div>
+            <div class="period"><div class="k">이달</div><div class="g">甲午</div></div>
+            <div class="period"><div class="k">오늘</div><div class="g">壬申</div></div>
+          </div>
+          <div class="detail d-detail"><b>丙午</b>올해의 운세 — 십성 식신·상관 · 12운성 사(死) · 신살 도화 · 관계 자오충</div>
+          <div class="d-ai"><button class="btn-easy">🌱 쉬운 설명</button><button class="btn-adv">📜 고급 풀이</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모바일 -->
+    <div>
+      <p class="board-label">MOBILE · 390</p>
+      <div class="phone"><div class="screen paper">
+        <div class="notch"><span></span></div>
+        <div class="m-head">
+          <div class="logo"><div class="mark">卜</div>Destiny Code</div><div>☾</div>
+        </div>
+        <div class="m-hero">
+          <div class="eyebrow">ANCIENT WISDOM · MODERN AI</div>
+          <h2>당신의 운명을<br>코드로 풀어보세요</h2>
+          <p>정통 명리학의 지혜와 AI가 만나<br>삶의 지도를 그려드립니다</p>
+          <a class="cta">내 명식 살펴보기</a>
+        </div>
+        <div class="m-body">
+          <div class="sect">🀄 사주 명식</div>
+          <div class="m-pillars">
+            <div class="pillar"><div class="lab">時</div><div class="han">丙<br><span class="b">寅</span></div><div class="ss">식신</div></div>
+            <div class="pillar day"><div class="lab">日</div><div class="han">甲<br><span class="b">子</span></div><div class="ss">본인</div></div>
+            <div class="pillar"><div class="lab">月</div><div class="han">辛<br><span class="b">巳</span></div><div class="ss">정관</div></div>
+            <div class="pillar"><div class="lab">年</div><div class="han">庚<br><span class="b">午</span></div><div class="ss">편관</div></div>
+          </div>
+          <div class="sect">🔮 나의 운세</div>
+          <div class="m-periods">
+            <div class="period"><div class="k">전체</div><div class="g">甲子</div></div>
+            <div class="period"><div class="k">대운</div><div class="g">乙酉</div></div>
+            <div class="period on"><div class="k">올해</div><div class="g">丙午</div></div>
+            <div class="period"><div class="k">이달</div><div class="g">甲午</div></div>
+            <div class="period"><div class="k">오늘</div><div class="g">壬申</div></div>
+          </div>
+          <div class="detail m-detail"><b>丙午</b>십성 식신·상관 · 12운성 사 · 도화 · 자오충</div>
+          <div class="m-ai"><button class="btn-easy">🌱 쉬운 설명</button><button class="btn-adv">📜 고급 풀이</button></div>
+        </div>
+        <div class="m-tab">
+          <div class="on"><span>🀄</span>명식</div><div><span>🌅</span>운세</div><div><span>💞</span>궁합</div><div><span>🎓</span>공부</div><div><span>🔖</span>저장</div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>
