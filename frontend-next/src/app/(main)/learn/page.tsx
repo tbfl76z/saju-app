@@ -75,7 +75,10 @@ export default function LearnPage() {
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24">
             <div className="text-center space-y-3 py-5 md:py-10">
-                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">📚 사주 공부하기</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif flex items-center justify-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo-moon.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 사주 공부하기
+                </h2>
                 <p className="text-slate-600 dark:text-slate-400">
                     음양오행부터 실전 명식 읽기까지 — 내 사주로 배우는 명리학
                 </p>
