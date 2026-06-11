@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LuckCard } from "@/components/LuckCard";
 import { AnalyzeButtons } from "@/components/AnalyzeButtons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -154,27 +153,27 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         : null;
 
     // 기간별 메타 (위계순: 전체 → 대운 → 올해 → 이달 → 오늘)
-    const periods: { key: PeriodKey; label: string; data: FortuneCard | null; title: string;
+    const periods: { key: PeriodKey; label: string; chip: string; data: FortuneCard | null; title: string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: any }[] = [
         {
-            key: "total", label: "전체", data: totalCard, title: "나의 전체 운세",
+            key: "total", label: "전체", chip: "전체", data: totalCard, title: "나의 전체 운세",
             body: { saju_data: sajuData, analysis_type: "total", query: "타고난 사주 전체를 깊이 있게 풀이" },
         },
         {
-            key: "daeun", label: daeun ? `${daeun.age}세 대운` : "대운", data: daeunCard, title: "대운 흐름",
+            key: "daeun", label: daeun ? `${daeun.age}세 대운` : "대운", chip: "대운", data: daeunCard, title: "대운 흐름",
             body: { saju_data: sajuData, analysis_type: "daeun", query: `${daeun?.age ?? ""}세 대운 분석`, period_ganzhi: daeun?.ganzhi, period_label: daeun ? `${daeun.age}세 대운` : undefined },
         },
         {
-            key: "year", label: `${curYear}년`, data: year, title: "올해의 운세",
+            key: "year", label: `${curYear}년`, chip: "올해", data: year, title: "올해의 운세",
             body: { saju_data: sajuData, analysis_type: "newyear", target_year: curYear, query: `${curYear}년 신년운세` },
         },
         {
-            key: "month", label: `${curMonth}월`, data: month, title: "이달의 운세",
+            key: "month", label: `${curMonth}월`, chip: "이달", data: month, title: "이달의 운세",
             body: { saju_data: sajuData, analysis_type: "wolun", query: `${curYear}년 ${curMonth}월 월운 분석`, period_ganzhi: month?.ganzhi, period_label: `${curYear}년 ${curMonth}월(절기 기준 ${month?.ganzhi ?? ""})` },
         },
         {
-            key: "today", label: "오늘", data: today, title: "오늘의 운세",
+            key: "today", label: "오늘", chip: "오늘", data: today, title: "오늘의 운세",
             body: { saju_data: sajuData, analysis_type: "today", query: `${getTodayISO()} 일진 분석` },
         },
     ];
@@ -196,35 +195,54 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
             </h3>
 
             {isLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 max-w-4xl">
-                    {[0, 1, 2, 3, 4].map((i) => (
-                        <Skeleton key={i} className="h-40 rounded-2xl bg-slate-200/70 dark:bg-slate-700/50" />
-                    ))}
+                <div className="max-w-2xl space-y-3">
+                    <Skeleton className="h-14 rounded-2xl bg-slate-200/70 dark:bg-slate-700/50" />
+                    <Skeleton className="h-20 rounded-2xl bg-slate-200/70 dark:bg-slate-700/50" />
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 max-w-4xl">
-                    {periods.map((p) => (
-                        <div key={p.key}>
-                            <div className="text-center text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">{p.label}</div>
-                            {p.data ? (
-                                <LuckCard
-                                    header={p.label}
-                                    ganzhi={p.data.ganzhi}
-                                    stemTenGod={p.data.stem_ten_god}
-                                    branchTenGod={p.data.branch_ten_god}
-                                    growth={p.data.twelve_growth}
-                                    sinsal={p.data.sinsal || "-"}
-                                    relations={relStr(p.data.relations)}
-                                    isSelected={selected === p.key}
-                                    onClick={() => setSelected(p.key)}
-                                />
-                            ) : (
-                                <div className="rounded-2xl border border-[#d4af37]/20 bg-white/60 dark:bg-slate-800/40 p-4 text-center text-xs text-muted-foreground h-full flex items-center justify-center">
-                                    정보 없음
-                                </div>
-                            )}
+                <div className="max-w-2xl space-y-3">
+                    {/* 한 줄 기간 선택 바 (모바일 포함 항상 5칸 한 줄) */}
+                    <div className="grid grid-cols-5 gap-1.5">
+                        {periods.map((p) => (
+                            <button
+                                key={p.key}
+                                type="button"
+                                onClick={() => p.data && setSelected(p.key)}
+                                disabled={!p.data}
+                                className={cn(
+                                    "rounded-xl border px-1 py-2 flex flex-col items-center gap-0.5 transition-all",
+                                    selected === p.key
+                                        ? "border-[#d4af37] bg-[#d4af37]/15 ring-1 ring-[#d4af37]"
+                                        : "border-[#d4af37]/25 bg-white/60 dark:bg-slate-800/40 hover:bg-[#d4af37]/10",
+                                    !p.data && "opacity-40"
+                                )}
+                            >
+                                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{p.chip}</span>
+                                <span className={cn(
+                                    "text-base font-bold font-noto-serif leading-none",
+                                    selected === p.key ? "text-[#bf953f] dark:text-[#e6c35c]" : "text-slate-800 dark:text-slate-100"
+                                )}>
+                                    {p.data?.ganzhi ?? "-"}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* 선택한 기간의 상세 (슬림 한 장) */}
+                    {active.data && (
+                        <div className="rounded-2xl border border-[#d4af37]/30 bg-white/70 dark:bg-slate-800/50 px-4 py-3 text-sm">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <span className="font-bold text-[#bf953f] dark:text-[#e6c35c]">{active.label}</span>
+                                <span className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-50">{active.data.ganzhi}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-600 dark:text-slate-300">
+                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">십성</b>{active.data.stem_ten_god} · {active.data.branch_ten_god}</span>
+                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">12운성</b>{active.data.twelve_growth}</span>
+                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">신살</b>{active.data.sinsal || "-"}</span>
+                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">관계</b>{relStr(active.data.relations)}</span>
+                            </div>
                         </div>
-                    ))}
+                    )}
                 </div>
             )}
 

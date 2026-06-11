@@ -127,25 +127,6 @@ export default function Home() {
 
               <DailyFortune sajuData={sajuData} apiBase={API_BASE} />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-amber-50/70 dark:bg-amber-950/30 border-2 border-amber-200/50 dark:border-amber-800/40 rounded-2xl p-5 text-sm flex items-center gap-4 shadow-sm">
-                  <span className="text-3xl">🕳️</span>
-                  <div>
-                    <div className="font-bold text-amber-900 dark:text-amber-300 text-base">공망 (Void)</div>
-                    <div className="text-amber-800 dark:text-amber-400/90 font-medium">연주: {sajuData?.gongmang?.year || "-"} / 일주: {sajuData?.gongmang?.day || "-"}</div>
-                  </div>
-                </div>
-                {sajuData?.relations?.length > 0 && (
-                  <div className="bg-purple-50/70 dark:bg-purple-950/30 border-2 border-purple-200/50 dark:border-purple-800/40 rounded-2xl p-5 text-sm flex items-center gap-4 shadow-sm">
-                    <span className="text-3xl">💡</span>
-                    <div>
-                      <div className="font-bold text-purple-900 dark:text-purple-300 text-base">핵심 지지 관계</div>
-                      <div className="text-purple-800 dark:text-purple-400/90 font-medium">{sajuData.relations.join(", ")}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <FiveElements elements={sajuData.five_elements} />
 
               <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
@@ -165,6 +146,26 @@ export default function Home() {
                   ['hour', 'day', 'month', 'year'].map(k => sajuData?.twelve_growth?.[k] || "-"),
                 ]}
               />
+
+              {/* 공망·핵심 지지 관계 — 명식 상세표 바로 아래 배치 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-amber-50/70 dark:bg-amber-950/30 border-2 border-amber-200/50 dark:border-amber-800/40 rounded-2xl p-5 text-sm flex items-center gap-4 shadow-sm">
+                  <span className="text-3xl">🕳️</span>
+                  <div>
+                    <div className="font-bold text-amber-900 dark:text-amber-300 text-base">공망 (Void)</div>
+                    <div className="text-amber-800 dark:text-amber-400/90 font-medium">연주: {sajuData?.gongmang?.year || "-"} / 일주: {sajuData?.gongmang?.day || "-"}</div>
+                  </div>
+                </div>
+                {sajuData?.relations?.length > 0 && (
+                  <div className="bg-purple-50/70 dark:bg-purple-950/30 border-2 border-purple-200/50 dark:border-purple-800/40 rounded-2xl p-5 text-sm flex items-center gap-4 shadow-sm">
+                    <span className="text-3xl">💡</span>
+                    <div>
+                      <div className="font-bold text-purple-900 dark:text-purple-300 text-base">핵심 지지 관계</div>
+                      <div className="text-purple-800 dark:text-purple-400/90 font-medium">{sajuData.relations.join(", ")}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
                 <LuckSection sajuData={sajuData} terms={terms} apiBase={API_BASE} />
