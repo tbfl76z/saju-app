@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="240" height="240">
+  <defs>
+    <radialGradient id="orb" cx="38%" cy="32%" r="75%">
+      <stop offset="0%" stop-color="#fff6d8"/><stop offset="45%" stop-color="#f0d27e"/><stop offset="100%" stop-color="#b8923a"/>
+    </radialGradient>
+  </defs>
+  <!-- 받침대 -->
+  <path d="M38 96 Q60 108 82 96 L78 104 Q60 113 42 104 Z" fill="#8a6a24"/>
+  <!-- 구슬 -->
+  <circle cx="60" cy="58" r="38" fill="url(#orb)" stroke="#8a6a24" stroke-width="3"/>
+  <!-- 하이라이트 -->
+  <ellipse cx="46" cy="42" rx="9" ry="13" fill="#ffffff" opacity="0.55" transform="rotate(-20 46 42)"/>
+  <!-- 행복한 감은 눈 ＾＾ -->
+  <path d="M44 58 Q49 52 54 58" fill="none" stroke="#5b4316" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M66 58 Q71 52 76 58" fill="none" stroke="#5b4316" stroke-width="3.4" stroke-linecap="round"/>
+  <!-- 미소 -->
+  <path d="M53 68 Q60 74 67 68" fill="none" stroke="#5b4316" stroke-width="3.4" stroke-linecap="round"/>
+  <!-- 볼터치 -->
+  <circle cx="41" cy="66" r="4" fill="#e88f6a" opacity="0.55"/><circle cx="79" cy="66" r="4" fill="#e88f6a" opacity="0.55"/>
+  <!-- 반짝이 별 -->
+  <path d="M97 22 l2.6 6 6 2.6 -6 2.6 -2.6 6 -2.6 -6 -6 -2.6 6 -2.6 Z" fill="#e6c35c"/>
+  <path d="M22 30 l1.8 4 4 1.8 -4 1.8 -1.8 4 -1.8 -4 -4 -1.8 4 -1.8 Z" fill="#b7a5ff"/>
+</svg>
