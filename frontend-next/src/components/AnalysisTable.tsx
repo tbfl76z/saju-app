@@ -60,7 +60,7 @@ export function AnalysisTable({
 
     return (
         <div className="my-8">
-            <h3 className="text-lg font-bold mb-2">🔍 {title}</h3>
+            <h3 className="section-title text-lg md:text-xl mb-2"><span>🔍 {title}</span></h3>
             <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded-r-lg text-sm text-blue-800">
                 {description}
             </div>
