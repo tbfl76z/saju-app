@@ -47,14 +47,15 @@ export function NavBarDesktop() {
 export function NavBarMobile() {
     const isActive = useIsActive();
     return (
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 glass-card !rounded-none !rounded-t-3xl border-b-0 border-x-0 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-            <div className="flex items-center justify-around">
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 glass-card !rounded-none !rounded-t-3xl border-b-0 border-x-0 px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            {/* 라벨 폭과 무관하게 항상 대칭이 되도록 5등분 그리드 */}
+            <div className="grid grid-cols-5">
                 {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
                     <Link
                         key={href}
                         href={href}
                         className={cn(
-                            "flex flex-col items-center gap-1 px-3 py-1.5 rounded-2xl text-[10px] font-bold transition-colors",
+                            "flex flex-col items-center gap-1 py-1.5 rounded-2xl text-[10px] font-bold transition-colors whitespace-nowrap",
                             isActive(href)
                                 ? "text-[#bf953f] dark:text-[#e6c35c]"
                                 : "text-slate-400 dark:text-slate-500"
