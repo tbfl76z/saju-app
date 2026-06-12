@@ -8,7 +8,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { ReportRenderer } from "@/components/ReportRenderer";
-import { listProfiles, type SavedProfile } from "@/lib/storage";
+import { listProfilesPrimaryFirst, type SavedProfile } from "@/lib/storage";
 import { gradeInterpretation, awardXp } from "@/lib/learn";
 
 const PLACEHOLDER =
@@ -26,7 +26,7 @@ export default function TongbyeonPage() {
 
     useEffect(() => {
         setMounted(true);
-        const list = listProfiles();
+        const list = listProfilesPrimaryFirst();
         setProfiles(list);
         if (list.length > 0) setProfileId(list[0].id);
     }, []);

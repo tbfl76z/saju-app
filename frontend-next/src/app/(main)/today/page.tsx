@@ -11,7 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { listProfiles, type SavedProfile } from "@/lib/storage";
+import { listProfilesPrimaryFirst, type SavedProfile } from "@/lib/storage";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
@@ -23,7 +23,7 @@ export default function TodayPage() {
 
     useEffect(() => {
         setMounted(true);
-        const list = listProfiles();
+        const list = listProfilesPrimaryFirst();
         setProfiles(list);
         if (list.length > 0) setSelectedId(list[0].id);
     }, []);

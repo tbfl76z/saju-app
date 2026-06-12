@@ -14,7 +14,7 @@ import SavedProfilesModal from "@/components/SavedProfilesModal";
 import { Button } from "@/components/ui/button";
 import { Bookmark } from "lucide-react";
 import { notify } from "@/lib/useToast";
-import { getProfile, listProfiles, LOAD_PROFILE_KEY } from "@/lib/storage";
+import { getProfile, getPrimaryProfile, LOAD_PROFILE_KEY } from "@/lib/storage";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
@@ -28,7 +28,7 @@ const SAMPLE_PILLARS = [
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function HeroPillarsPreview({ onLoad, mounted }: { onLoad: (d: any) => void; mounted: boolean }) {
-  const profile = mounted ? listProfiles()[0] : undefined;
+  const profile = mounted ? getPrimaryProfile() : undefined;
   const d = profile?.sajuData;
   const cards = d?.pillars
     ? (["hour", "day", "month", "year"] as const).map((k, i) => ({

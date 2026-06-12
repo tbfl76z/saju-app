@@ -13,7 +13,7 @@ import {
     fetchChapter, fetchQuiz, fetchPersonalQuiz, recordQuizResult, PASS_SCORE,
     type ChapterDetail, type QuizItem,
 } from "@/lib/learn";
-import { listProfiles, type SavedProfile } from "@/lib/storage";
+import { listProfilesPrimaryFirst, type SavedProfile } from "@/lib/storage";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -43,7 +43,7 @@ export default function ChapterPage() {
             .then(setChapter)
             .catch(() => setError("챕터를 불러오지 못했습니다."));
         if (chapterId === "practice") {
-            const list = listProfiles();
+            const list = listProfilesPrimaryFirst();
             setProfiles(list);
             if (list.length > 0) setProfileId(list[0].id);
         }

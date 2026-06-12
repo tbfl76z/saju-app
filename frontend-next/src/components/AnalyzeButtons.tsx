@@ -7,6 +7,7 @@ import { ReportRenderer } from "@/components/ReportRenderer";
 import { streamAnalyze, type AnalyzeBody } from "@/lib/analyzeStream";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
+import { saveReport } from "@/lib/storage";
 
 interface AnalyzeButtonsProps {
     apiBase: string;
@@ -30,7 +31,16 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
         setShownLevel(level);
         setResult("");
         try {
-            await streamAnalyze(apiBase, { ...body, level }, setResult);
+            const finalText = await streamAnalyze(apiBase, { ...body, level }, setResult);
+            // 풀이 보관함 자동 저장 — 같은 명식·종류는 하루 1건으로 갱신 (저장됨 탭에서 다시 보기)
+            const name = body?.saju_data?.name || "이름 없음";
+            const birth = body?.saju_data?.birth_date || "";
+            saveReport({
+                title,
+                profileLabel: birth ? `${name} · ${birth}` : name,
+                type: String(body?.analysis_type ?? "total"),
+                text: finalText,
+            });
         } catch {
             setResult("분석 중 오류가 발생했습니다. 다시 시도해 주세요.");
             notify.error("AI 분석에 실패했습니다", "잠시 후 다시 시도해 주세요.");
