@@ -156,12 +156,12 @@ export default function LearnPage() {
                 )}
                 <Link
                     href="/learn/tongbyeon"
-                    className="flex items-center justify-between rounded-xl border border-slate-200/60 dark:border-slate-700 px-4 py-3 hover:bg-[#d4af37]/10 hover:border-[#d4af37]/40 transition-colors"
+                    className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/60 dark:border-slate-700 px-4 py-3 hover:bg-[#d4af37]/10 hover:border-[#d4af37]/40 transition-colors"
                 >
-                    <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                    <span className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0">
                         🖋️ 도전 · 통변 훈련
                     </span>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">내 해석을 AI가 채점 (+30 XP) →</span>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-right">내 해석을 AI가 채점 (+30 XP) →</span>
                 </Link>
             </div>
 
