@@ -14,9 +14,70 @@ import SavedProfilesModal from "@/components/SavedProfilesModal";
 import { Button } from "@/components/ui/button";
 import { Bookmark } from "lucide-react";
 import { notify } from "@/lib/useToast";
-import { getProfile, LOAD_PROFILE_KEY } from "@/lib/storage";
+import { getProfile, listProfiles, LOAD_PROFILE_KEY } from "@/lib/storage";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+
+// 히어로 우측 명식 미리보기 — 마지막 저장 명식이 있으면 그걸, 없으면 예시 명식 (시안 A 구성)
+const SAMPLE_PILLARS = [
+  { lab: "時", stem: "丙", branch: "寅", ss: "식신·편관", day: false },
+  { lab: "日", stem: "甲", branch: "子", ss: "본인·정인", day: true },
+  { lab: "月", stem: "辛", branch: "巳", ss: "정관·식신", day: false },
+  { lab: "年", stem: "庚", branch: "午", ss: "편관·상관", day: false },
+];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function HeroPillarsPreview({ onLoad, mounted }: { onLoad: (d: any) => void; mounted: boolean }) {
+  const profile = mounted ? listProfiles()[0] : undefined;
+  const d = profile?.sajuData;
+  const cards = d?.pillars
+    ? (["hour", "day", "month", "year"] as const).map((k, i) => ({
+        lab: ["時", "日", "月", "年"][i],
+        stem: d.pillars[k]?.stem ?? "-",
+        branch: d.pillars[k]?.branch ?? "-",
+        ss: `${k === "day" ? "본인" : d.ten_gods?.[k] ?? "-"}·${d.jiji_ten_gods?.[k] ?? "-"}`,
+        day: k === "day",
+      }))
+    : SAMPLE_PILLARS;
+
+  return (
+    <button
+      type="button"
+      onClick={() => d && onLoad(d)}
+      className={`block w-full pt-3 ${d ? "cursor-pointer" : "cursor-default"}`}
+      aria-label={d ? "저장된 명식 열기" : "예시 명식"}
+    >
+      <div className="grid grid-cols-4 gap-2">
+        {cards.map((c) => (
+          <div
+            key={c.lab}
+            className={`relative rounded-2xl border text-center px-1 py-3 md:py-4 backdrop-blur-sm transition-transform hover:scale-[1.03] ${
+              c.day
+                ? "border-[#d4af37] bg-[#fdf8ea]/90 dark:bg-[#262344]/90 shadow-[0_0_16px_rgba(212,175,55,0.3)]"
+                : "border-[#e9e1cf] dark:border-[#323a6e] bg-white/85 dark:bg-[#1a1f44]/85 shadow-sm"
+            }`}
+          >
+            {c.day && (
+              <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white text-[8px] font-bold px-2 py-px rounded-full tracking-widest shadow">
+                日主
+              </span>
+            )}
+            <p className="text-[9px] md:text-[10px] text-slate-400 dark:text-slate-500 font-semibold">{c.lab}</p>
+            <p className="font-noto-serif text-2xl md:text-[34px] font-bold leading-tight text-slate-900 dark:text-slate-50 my-0.5">
+              {c.stem}
+              <br />
+              <span className="text-[#8a6a24] dark:text-[#b7a5ff]">{c.branch}</span>
+            </p>
+            <p className="text-[9px] md:text-[10px] text-slate-500 dark:text-slate-400 truncate px-0.5">{c.ss}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] md:text-[11px] text-slate-400 dark:text-slate-500 text-center">
+        {d ? `${profile?.label} — 탭하면 바로 열려요` : "예시 명식 — 내 사주를 계산하면 여기에 표시됩니다"}
+      </p>
+    </button>
+  );
+}
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +88,7 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null); // 히어로 CTA → 입력 폼 스크롤
 
   useEffect(() => {
     setIsMounted(true);
@@ -85,12 +147,27 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         {!sajuData ? (
           <div className="space-y-6">
-            <div className="hero-sky text-center space-y-4 py-8 md:py-16 animate-in fade-in duration-1000">
-              <p className="text-[10px] md:text-[11px] tracking-[0.35em] text-[#bf953f] dark:text-[#e6c35c] font-bold uppercase">Ancient Wisdom · Modern AI</p>
-              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif leading-tight">당신의 운명을 코드로 풀어보세요</h2>
-              <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg max-w-2xl mx-auto">정통 명리학의 심오한 지혜와 최신 인공지능 기술이 만나,<br />당신의 삶에 따뜻한 위로와 지혜의 지도를 그려드립니다.</p>
+            {/* 시안 A 히어로: 좌측 카피+CTA / 우측 명식 미리보기 2단 구성 */}
+            <div className="hero-sky grid md:grid-cols-[1.15fr_1fr] gap-8 md:gap-10 items-center py-8 md:py-14 px-2 md:px-6 animate-in fade-in duration-1000">
+              <div className="text-center md:text-left space-y-4">
+                <p className="text-[10px] md:text-[11px] tracking-[0.35em] text-[#bf953f] dark:text-[#e6c35c] font-bold uppercase">Ancient Wisdom · Modern AI</p>
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif leading-snug">당신의 운명을<br className="hidden md:block" /> 코드로 풀어보세요</h2>
+                <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base leading-relaxed">정통 명리학의 깊은 지혜와 인공지능이 만나<br />당신의 삶에 따뜻한 지혜의 지도를 그려드립니다.</p>
+                <div className="pt-1">
+                  <Button
+                    onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="rounded-full bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white font-bold px-8 py-5 shadow-lg shadow-[#d4af37]/30"
+                  >
+                    내 명식 살펴보기
+                  </Button>
+                </div>
+              </div>
+              <HeroPillarsPreview onLoad={(d) => setSajuData(d)} mounted={isMounted} />
             </div>
-            <SajuForm onCalculate={handleCalculate} isLoading={isLoading} />
+
+            <div ref={formRef} className="scroll-mt-24">
+              <SajuForm onCalculate={handleCalculate} isLoading={isLoading} />
+            </div>
             <div className="flex justify-center">
               <Button variant="ghost" onClick={() => setSavedOpen(true)} className="rounded-full text-slate-500 dark:text-slate-400 hover:text-[#bf953f]">
                 <Bookmark className="h-4 w-4 mr-1.5" /> 저장된 명식 불러오기
