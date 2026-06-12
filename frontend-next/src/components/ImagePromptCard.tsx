@@ -84,9 +84,9 @@ export function ImagePromptCard({ sajuData, apiBase }: ImagePromptCardProps) {
 
     return (
         <section className="fade-up">
-            <h3 className="text-xl font-bold mb-2 flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
+            <h3 className="section-title text-lg md:text-xl mb-2">
                 <span className="text-2xl">🎨</span>
-                <span className="border-b-2 border-[#d4af37]/30 pb-1">나의 명식 이미지</span>
+                <span>나의 명식 이미지</span>
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
                 천간지지를 바탕으로 당신의 운명을 그림으로 표현하는 프롬프트를 만들어 드립니다.

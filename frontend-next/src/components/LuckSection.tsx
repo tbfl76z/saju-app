@@ -126,9 +126,9 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
     return (
         <div className="space-y-12">
             <section className="fade-up">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif">
+                <h3 className="section-title text-lg md:text-xl mb-6">
                     <span className="text-2xl">⏳</span>
-                    <span className="border-b-2 border-[#d4af37]/30 pb-1">대운(大運) 흐름</span>
+                    <span>대운(大運) 흐름</span>
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {sajuData?.fortune?.list?.map((d: any, idx: number) => (
@@ -158,9 +158,9 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
 
             {selectedDaeun && (
                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif">
+                    <h3 className="section-title text-lg md:text-xl mb-6">
                         <span className="text-2xl">📅</span>
-                        <span className="border-b-2 border-[#d4af37]/30 pb-1">{selectedDaeun.age}세 대운 내 세운(歲運)</span>
+                        <span>{selectedDaeun.age}세 대운 내 세운(歲運)</span>
                     </h3>
                     {isLoadingSeyun ? (
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -197,9 +197,9 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
 
             {selectedSeyun && (
                 <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif">
+                    <h3 className="section-title text-lg md:text-xl mb-6">
                         <span className="text-2xl">🌙</span>
-                        <span className="border-b-2 border-[#d4af37]/30 pb-1">{selectedSeyun.year}년 월운(月運)</span>
+                        <span>{selectedSeyun.year}년 월운(月運)</span>
                     </h3>
                     {isLoadingWolun ? (
                         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">

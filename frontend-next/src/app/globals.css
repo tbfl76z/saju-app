@@ -163,6 +163,18 @@
     border-color: #ded6ee;
   }
 
+  /* 시안 공통: 섹션 타이틀 — 제목 오른쪽으로 금색 라인이 뻗는다 */
+  .section-title {
+    @apply flex items-center gap-3 font-bold font-noto-serif text-slate-900 dark:text-slate-100;
+  }
+
+  .section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.55), rgba(212, 175, 55, 0.08));
+  }
+
   /* 다크(E): 밤하늘 위의 네이비 카드 — 두툼한 테두리 + 바닥 그림자(게임 버튼감) */
   .dark .glass-card {
     background: rgba(26, 31, 68, 0.88);

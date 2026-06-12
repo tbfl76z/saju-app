@@ -25,9 +25,9 @@ export function FiveElements({ elements }: FiveElementsProps) {
 
     return (
         <div className="my-12 fade-up">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
+            <h3 className="section-title text-lg md:text-xl mb-6">
                 <span className="text-2xl">🔮</span>
-                <span className="border-b-2 border-[#d4af37]/30 pb-1">오행의 기운 분포</span>
+                <span>오행의 기운 분포</span>
             </h3>
             <div className="grid grid-cols-5 gap-3 md:gap-6">
                 {labels.map((label, idx) => {

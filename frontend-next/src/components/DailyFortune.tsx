@@ -190,8 +190,8 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
 
     return (
         <section className="fade-up">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
-                <span className="border-b-2 border-[#d4af37]/30 pb-1">🔮 나의 운세 — 전체 · 대운 · 올해 · 이달 · 오늘</span>
+            <h3 className="section-title text-lg md:text-xl mb-6">
+                <span>🔮 나의 운세 — 전체 · 대운 · 올해 · 이달 · 오늘</span>
             </h3>
 
             {isLoading ? (

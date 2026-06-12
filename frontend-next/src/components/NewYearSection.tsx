@@ -94,7 +94,7 @@ export function NewYearSection({ sajuData, apiBase }: NewYearSectionProps) {
     return (
         <section className="fade-up space-y-8">
             {/* 섹션 제목 (LuckSection 헤더 톤) */}
-            <h3 className="text-xl font-bold flex items-center gap-3 font-noto-serif text-slate-900 dark:text-slate-100">
+            <h3 className="section-title text-lg md:text-xl">
                 <span className="text-2xl">🎍</span>
                 <span className="border-b-2 border-[#d4af37]/30 dark:border-[#d4af37]/40 pb-1">
                     신년 종합 운세

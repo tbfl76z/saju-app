@@ -11,18 +11,28 @@ interface PillarProps {
     sinsal: string;
     relations: string;
     terms: Record<string, string>;
+    isDay?: boolean; // 일주(나 자신) 강조 — 골드 테두리 + 日主 배지
 }
 
-function PillarCard({ label, ganzhi, tenGod, growth, sinsal, relations, terms }: PillarProps) {
+function PillarCard({ label, ganzhi, tenGod, growth, sinsal, relations, terms, isDay = false }: PillarProps) {
     const getDesc = (item: string) => {
         const cleanItem = item.replace(/\(.*\)/, "").trim();
         return terms[cleanItem] || terms[item] || "상세 정보가 곧 업데이트될 예정입니다.";
     };
 
     return (
-        <Card className="h-full border-[#d4af37]/20 hover:border-[#d4af37]/50 transition-all hover:scale-105 shadow-md bg-white/40 dark:bg-slate-900/50 backdrop-blur-sm rounded-2xl overflow-hidden group">
+        <Card className={`h-full transition-all hover:scale-105 backdrop-blur-sm rounded-2xl overflow-hidden group ${
+            isDay
+                ? "border-[#d4af37] shadow-[0_0_18px_rgba(212,175,55,0.35)] bg-[#fdf8ea]/70 dark:bg-[#262344]/80"
+                : "border-[#d4af37]/20 hover:border-[#d4af37]/50 shadow-md bg-white/40 dark:bg-slate-900/50"
+        }`}>
             <CardContent className="p-2 md:p-6 flex flex-col items-center justify-between h-full text-center">
-                <div className="text-[10px] md:text-sm text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest mb-2 opacity-70">{label}</div>
+                <div className="text-[10px] md:text-sm text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest mb-1 opacity-70">{label}</div>
+                {isDay && (
+                    <span className="mb-1 inline-block bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white text-[9px] md:text-[10px] font-bold px-2.5 py-0.5 rounded-full tracking-[0.2em] shadow">
+                        日主·나
+                    </span>
+                )}
 
                 <div className="flex flex-col items-center justify-center my-2 md:my-5">
                     <div className="text-2xl md:text-5xl font-bold text-slate-900 dark:text-slate-100 leading-tight mb-1 font-noto-serif">{ganzhi[0]}</div>
@@ -84,6 +94,7 @@ export function SajuPillars({ data, terms }: { data: any; terms: Record<string, 
                     <PillarCard
                         key={p.key}
                         label={p.label}
+                        isDay={p.key === "day"}
                         ganzhi={data.pillars?.[p.key]?.pillar || "--"}
                         tenGod={p.key === 'day' ? '본인' : data.ten_gods?.[p.key] || "-"}
                         growth={data.twelve_growth?.[p.key] || "-"}
