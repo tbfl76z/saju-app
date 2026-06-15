@@ -398,7 +398,176 @@ def get_extended_saju_data(details, gender='여'):
         details['sinsal'] = {p: details['sinsal_details'][p]['sinsal'] for p in ['year', 'month', 'day', 'hour']}
         
         details['fortune'] = calculate_daeun(details, gender)
+        # 신강신약·용신(희기신)·격국 판정 추가 (순수 계산, 토큰 0)
+        details['strength_analysis'] = analyze_strength(details)
         return details
     except Exception as e:
         print(f"Error in get_extended_saju_data: {e}")
         return details
+
+
+# ─────────────────────────────────────────────────────────────
+# 신강신약 · 용신(희기신) · 격국 판정 엔진
+# 명리 해석의 '척추'에 해당하는 판정을 코드로 계산해 AI 프롬프트에 사실값으로 주입한다.
+# (규칙·이론은 학습 지식베이스에 있고, 여기서는 '이 명식의 실제 판정'만 약식으로 산출한다)
+# ─────────────────────────────────────────────────────────────
+
+# 오행 상생(생): key가 value를 생한다 (목생화·화생토·토생금·금생수·수생목)
+ELEMENT_GEN = {'목': '화', '화': '토', '토': '금', '금': '수', '수': '목'}
+# 오행 상극(극): key가 value를 극한다 (목극토·토극수·수극화·화극금·금극목)
+ELEMENT_KE = {'목': '토', '토': '수', '수': '화', '화': '금', '금': '목'}
+
+# 계절(월지) → 조후 보정 기준
+WINTER_BRANCHES = {'亥', '子', '丑'}  # 추운 계절: 火 필요
+SUMMER_BRANCHES = {'巳', '午', '未'}  # 더운 계절: 水 필요
+
+
+def _ten_god_group(day_el: str, target_el: str) -> str:
+    """일간 오행 기준으로 대상 오행의 십성 그룹을 반환한다.
+    비겁(같음)·인성(나를 생)·식상(내가 생)·재성(내가 극)·관성(나를 극)."""
+    if target_el == day_el:
+        return '비겁'
+    if ELEMENT_GEN.get(target_el) == day_el:
+        return '인성'
+    if ELEMENT_GEN.get(day_el) == target_el:
+        return '식상'
+    if ELEMENT_KE.get(day_el) == target_el:
+        return '재성'
+    if ELEMENT_KE.get(target_el) == day_el:
+        return '관성'
+    return '-'
+
+
+def analyze_strength(details: dict) -> dict:
+    """일간의 신강신약, 억부/조후 용신(희기신), 격국, 오행 과다·부재를 약식 판정한다.
+
+    반환 키:
+      day_element, strength, strength_score, deukryeong, strength_basis,
+      yongsin, gisin, yongsin_method, gyeokguk, element_excess, element_lack
+    """
+    try:
+        pillars = details['pillars']
+        day_gan = pillars['day']['stem']
+        day_el = ELEMENTS_MAP.get(day_gan, '')
+        if not day_el:
+            return {}
+
+        # 1) 세력 채점: 일간을 제외한 7글자(천간 3 + 지지 4)의 오행을 아군(비겁·인성) vs 타군으로 가중 합산
+        #    지지는 정기(대표 오행) 기준, 월지는 사령부이므로 가중치를 크게 둔다.
+        weights = {
+            ('year', 'stem'): 1, ('month', 'stem'): 1, ('hour', 'stem'): 1,
+            ('year', 'branch'): 2, ('month', 'branch'): 3,
+            ('day', 'branch'): 2, ('hour', 'branch'): 2,
+        }
+        ally, total = 0.0, 0.0  # 아군(생조) 세력 / 전체 세력
+        for (p, kind), w in weights.items():
+            ch = pillars[p][kind]
+            el = ELEMENTS_MAP.get(ch if kind == 'stem' else BRANCH_HIDDEN_GANS.get(ch, ch))
+            # 지지는 정기 천간의 오행으로 환산
+            if kind == 'branch':
+                el = ELEMENTS_MAP.get(BRANCH_HIDDEN_GANS.get(ch, ch))
+            if not el:
+                continue
+            total += w
+            if _ten_god_group(day_el, el) in ('비겁', '인성'):
+                ally += w
+        score = round(ally / total, 3) if total else 0.0
+
+        if score >= 0.55:
+            strength = '신강'
+        elif score <= 0.45:
+            strength = '신약'
+        else:
+            strength = '중화'
+
+        # 2) 득령 판정 (월지가 비겁·인성이면 득령, 아니면 실령) — 신강신약의 절반
+        month_branch = pillars['month']['branch']
+        month_el = ELEMENTS_MAP.get(BRANCH_HIDDEN_GANS.get(month_branch, month_branch))
+        month_group = _ten_god_group(day_el, month_el)
+        deukryeong = month_group in ('비겁', '인성')
+
+        # 3) 득지(일지 통근/아군) 보조 근거
+        day_branch = pillars['day']['branch']
+        day_branch_el = ELEMENTS_MAP.get(BRANCH_HIDDEN_GANS.get(day_branch, day_branch))
+        deukji = _ten_god_group(day_el, day_branch_el) in ('비겁', '인성')
+
+        basis_parts = [
+            f"득령({month_group} 월지)" if deukryeong else f"실령({month_group} 월지)",
+            "득지(일지 통근)" if deukji else "실지(일지 무근)",
+            f"세력 {int(score * 100)}% 아군",
+        ]
+        strength_basis = ' · '.join(basis_parts)
+
+        # 4) 용신(희기신) — 억부 기준
+        gen_of_day = [e for e, t in ELEMENT_GEN.items() if t == day_el]  # 나를 생하는 오행(인성)
+        sik = ELEMENT_GEN.get(day_el)        # 내가 생하는 오행(식상)
+        jae = ELEMENT_KE.get(day_el)         # 내가 극하는 오행(재성)
+        gwan = [e for e, t in ELEMENT_KE.items() if t == day_el]  # 나를 극하는 오행(관성)
+        bigeop = day_el                      # 비겁(같은 오행)
+
+        if strength == '신약':
+            yongsin = list(dict.fromkeys(gen_of_day + [bigeop]))      # 인성·비겁이 약
+            gisin = list(dict.fromkeys([sik, jae] + gwan))
+            method = '억부(신약 → 생조)'
+        elif strength == '신강':
+            yongsin = list(dict.fromkeys([sik, jae] + gwan))          # 식상·재성·관성이 약
+            gisin = list(dict.fromkeys(gen_of_day + [bigeop]))
+            method = '억부(신강 → 설기·극제)'
+        else:  # 중화 — 과다 오행을 설기하는 쪽을 우선
+            counts = details.get('five_elements', {})
+            top = max(counts, key=counts.get) if counts else day_el
+            yongsin = list(dict.fromkeys([ELEMENT_GEN.get(top), ELEMENT_KE.get(top)]))
+            gisin = []
+            method = '통관·조후(중화 → 과다 오행 설기)'
+
+        # 5) 조후 보정 — 한겨울 생이면 火, 한여름 생이면 水를 희신에 보강
+        counts = details.get('five_elements', {})
+        johu = None
+        if month_branch in WINTER_BRANCHES and counts.get('화', 0) == 0:
+            johu = '화'
+        elif month_branch in SUMMER_BRANCHES and counts.get('수', 0) == 0:
+            johu = '수'
+        if johu and johu not in yongsin:
+            yongsin.append(johu)
+            method += f' + 조후 보정({johu})'
+
+        yongsin = [e for e in yongsin if e]
+        # 희신 우선 — 조후·통관 보정으로 희신이 된 오행이 억부상 기신에도 들면 기신에서 제외(모순 방지)
+        gisin = [e for e in gisin if e and e not in yongsin]
+
+        # 6) 격국 — 월지 정기 십성으로 판정 (비겁 월지는 건록·양인 특수격)
+        month_jiji_god = details.get('jiji_ten_gods', {}).get('month', '-')
+        if month_jiji_god == '비견':
+            gyeokguk = '건록격'
+        elif month_jiji_god == '겁재':
+            gyeokguk = '양인격(월겁격)'
+        elif month_jiji_god and month_jiji_god != '-':
+            gyeokguk = f'{month_jiji_god}격'
+        else:
+            gyeokguk = '판정 보류'
+        # 투출로 격의 성립 강도 보강
+        tugan = details.get('tugan', [])
+        month_jijang_jeonggi = BRANCH_HIDDEN_GANS.get(month_branch)
+        if month_jijang_jeonggi in tugan and gyeokguk not in ('건록격', '양인격(월겁격)', '판정 보류'):
+            gyeokguk += '(투출, 성격)'
+
+        # 7) 오행 과다(3개 이상)·부재(0개)
+        element_excess = [e for e, c in counts.items() if c >= 3]
+        element_lack = [e for e, c in counts.items() if c == 0]
+
+        return {
+            'day_element': day_el,
+            'strength': strength,
+            'strength_score': score,
+            'deukryeong': deukryeong,
+            'strength_basis': strength_basis,
+            'yongsin': yongsin,
+            'gisin': gisin,
+            'yongsin_method': method,
+            'gyeokguk': gyeokguk,
+            'element_excess': element_excess,
+            'element_lack': element_lack,
+        }
+    except Exception as e:
+        print(f"Error in analyze_strength: {e}")
+        return {}

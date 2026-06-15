@@ -11,7 +11,7 @@ import urllib.request
 from typing import Any, Optional, Iterator
 
 import google.generativeai as genai
-from saju_utils import get_ilun_data, get_seyun_data
+from saju_utils import get_ilun_data, get_seyun_data, analyze_strength
 
 # 모델 우선순위 (최신 → 구형 폴백). list_models 검증으로 미존재 모델은 자동 제외된다.
 # 각 모델은 무료등급에서 별도 일일 한도(RPD)를 가지므로, 체인이 길수록 하루 가용 횟수가 늘어난다.
@@ -366,6 +366,31 @@ def build_prompt(req: Any) -> str:
             f"\n        - 일간 통근(일간이 뿌리내린 지지): {', '.join(tonggeun) or '없음(무근·뿌리 약함)'}"
         )
 
+    # 십성 4기둥 전체 (천간·지지) — 기존엔 년·일만 넘겨 월주(직업·사회궁)·시주가 누락됐다
+    tg = data.get('ten_gods', {})
+    jtg = data.get('jiji_ten_gods', {})
+    sipsung_line = (
+        f"        - 십성 구성(천간/지지): "
+        f"년({tg.get('year', '-')}/{jtg.get('year', '-')}), "
+        f"월({tg.get('month', '-')}/{jtg.get('month', '-')}), "
+        f"일(일간 본인/{jtg.get('day', '-')}), "
+        f"시({tg.get('hour', '-')}/{jtg.get('hour', '-')})"
+    )
+
+    # 신강신약·용신(희기신)·격국 — 해석의 척추. 저장된 구 명식엔 없을 수 있으므로 즉석 계산으로 보강
+    sa = data.get('strength_analysis') or analyze_strength(data)
+    strength_block = ""
+    if sa:
+        excess = ', '.join(sa.get('element_excess', [])) or '없음'
+        lack = ', '.join(sa.get('element_lack', [])) or '없음'
+        strength_block = (
+            f"\n        [신강신약·용신 판정 — 이 풀이의 핵심 축]"
+            f"\n        - 일간 오행: {sa.get('day_element', '-')} / 신강신약: {sa.get('strength', '-')} ({sa.get('strength_basis', '')})"
+            f"\n        - 격국: {sa.get('gyeokguk', '-')}"
+            f"\n        - 용신·희신(이 사람에게 도움 되는 오행): {', '.join(sa.get('yongsin', [])) or '판단 보류'} / 기신(부담 되는 오행): {', '.join(sa.get('gisin', [])) or '없음'} [{sa.get('yongsin_method', '')}]"
+            f"\n        - 오행 과다(3+): {excess} / 오행 부재(0): {lack}"
+        )
+
     prompt = f"""
         {report_header}
         {scope_block}
@@ -377,9 +402,9 @@ def build_prompt(req: Any) -> str:
         - 성함: {name}님
         - 명식: 년({_pillar(pillars,'year')}), 월({_pillar(pillars,'month')}), 일({_pillar(pillars,'day')}), 시({_pillar(pillars,'hour')})
         - 오행 분포: {data.get('five_elements', {})}
-        - 십성 구성: 년({data.get('ten_gods', {}).get('year', '-')}/{data.get('jiji_ten_gods', {}).get('year', '-')}), 일(본인/{data.get('jiji_ten_gods', {}).get('day', '-')})
-        - 십이운성: {data.get('twelve_growth', {})}
-        - 신살 및 상호관계: {data.get('sinsal', '없음')}, {data.get('relations', '특이사항 없음')}{jijang_block}
+{sipsung_line}
+        - 십이운성(년/월/일/시): {data.get('twelve_growth', {})}
+        - 신살 및 상호관계: {data.get('sinsal', '없음')}, {data.get('relations', '특이사항 없음')}{jijang_block}{strength_block}
         {fortune_line}{partner_block}{time_block}{category_block}
 
         [분석 요청 사항]
@@ -388,8 +413,11 @@ def build_prompt(req: Any) -> str:
         [대가의 리포트 작성 가이드]
         1. 위 '[이 풀이의 범위]'를 엄격히 지키세요. 이 리포트 고유의 주제에 집중하고, 다른 운세 풀이(전체운·대운·올해 등)와 겹치는 타고난 성격·원국 일반론의 반복을 피하세요.
         2. 개별 데이터(신살, 운성, 지장간·통근·투출 등)는 전문 지식의 상세 설명을 토대로 '근거 있는 분석'을 제시하되, 자료 출처·파일명은 언급하지 마세요. 특히 지장간·통근·투출은 천간이 지지에 뿌리내린 세력의 강약을 판단하는 핵심 근거로 활용하세요.
-        3. '## 총평 / ## 정밀 분석 / ## 개운법 / ## 대가의 한마디' 네 개의 헤딩으로만 구조화하여 품격 있는 결과물을 도출하세요.
-        4. 각 섹션은 충분한 분량(섹션당 3~6문장 이상)으로 알차게 작성하고, 너무 짧게 끝내지 마세요.
+        3. [해석의 중심축] 위 '신강신약·용신 판정'을 모든 풀이의 뼈대로 삼으세요. 신강/신약과 용신·희신(도움 오행)·기신(부담 오행)을 기준으로 강점·과제·개운법을 일관되게 전개하고, 개운법의 색·방향·시기·직업·관계 조언은 반드시 '용신·희신 오행'에 근거해 제시하세요(기신을 보강하라고 권하지 마세요).
+        4. [궁(宮)별 해석] 명식의 네 기둥을 인생 영역으로 나누어 구체적으로 풀이하세요 — 년주=조상·초년·뿌리, 월주=부모·직업·사회궁(가장 중요), 일지=배우자·가정궁, 시주=자식·말년·결실. 각 궁의 십성과 십이운성을 그 영역의 운으로 연결하세요.
+        5. [근거 명시] 모든 단정에는 그 근거가 된 글자나 판정을 괄호로 짧게 덧붙이세요(예: "추진력이 강합니다(편관 투출·신강)"). 근거 없는 막연한 덕담·일반론을 금합니다.
+        6. '## 총평 / ## 정밀 분석 / ## 개운법 / ## 대가의 한마디' 네 개의 헤딩으로만 구조화하여 품격 있는 결과물을 도출하세요.
+        7. 각 섹션은 충분한 분량(섹션당 4~7문장 이상)으로 알차게 작성하고, 너무 짧게 끝내지 마세요. 특히 '정밀 분석'은 궁별·십성별 근거를 들어 가장 깊이 있게 작성하세요.
         """
     return prompt
 
