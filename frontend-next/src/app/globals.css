@@ -55,6 +55,11 @@
   --foreground: oklch(0.2 0.02 240);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0.02 240);
+  /* 팝오버(드롭다운/셀렉트/툴팁) — 라이트 모드 불투명 흰 배경 (미정의 시 투명 겹침 버그) */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 240);
+  --muted: oklch(0.96 0.01 240);
+  --muted-foreground: oklch(0.5 0.02 240);
   --primary: oklch(0.45 0.15 45);
   /* Goldish */
   --primary-foreground: oklch(0.985 0 0);
