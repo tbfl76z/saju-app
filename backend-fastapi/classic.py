@@ -136,6 +136,11 @@ def _myungri(det: dict) -> dict:
 
 
 GUNG12 = ["명궁", "형제", "부처", "자녀", "재백", "질액", "천이", "노복", "관록", "전택", "복덕", "부모"]
+GUNG_HAN = {"명궁": "命宮", "형제": "兄弟", "부처": "夫妻", "자녀": "子女", "재백": "財帛", "질액": "疾厄",
+            "천이": "遷移", "노복": "奴僕", "관록": "官祿", "전택": "田宅", "복덕": "福德", "부모": "父母"}
+STAR_HAN = {"자미": "紫微", "천기": "天機", "태양": "太陽", "무곡": "武曲", "천동": "天同", "염정": "廉貞",
+            "천부": "天府", "태음": "太陰", "탐랑": "貪狼", "거문": "巨門", "천상": "天相", "천량": "天梁",
+            "칠살": "七殺", "파군": "破軍"}
 
 
 def _jami(det: dict) -> dict:
@@ -147,10 +152,24 @@ def _jami(det: dict) -> dict:
     mi = JIJI.index(j["명궁"])
     ju = divination.명궁_주성(j["국수"], lun["lunar_day"], mi)
     sel = content.jami_select(j["명궁"], ju)
-    # 12궁 명반: 명궁에서 역행으로 12궁(명궁→형제→부처…) 배치, 각 궁에 14주성
+    # 12궁 명반: 명궁에서 역행으로 12궁(명궁→형제→부처…) 배치, 각 궁에 14주성·궁간지·대한
     chart = divination.자미_14주성(j["국수"], lun["lunar_day"])
-    board = [{"지지": JIJI[zi], "궁": GUNG12[(mi - zi) % 12],
-              "주성": chart.get(zi, []), "is명궁": zi == mi} for zi in range(12)]
+    guk = j["국수"]
+    yang_year = ysi % 2 == 0
+    male = str(det.get("gender", "남")).startswith("남")
+    forward = (yang_year and male) or (not yang_year and not male)  # 양남·음녀 順 / 음남·양녀 逆
+    board = []
+    for zi in range(12):
+        order = (mi - zi) % 12
+        start = guk + (order if forward else (12 - order) % 12) * 10
+        gung = GUNG12[order]
+        stars = chart.get(zi, [])
+        board.append({
+            "지지": JIJI[zi], "궁간지": CHEONGAN[divination.명궁_천간(ysi, zi)] + JIJI[zi],
+            "궁": gung, "궁한자": GUNG_HAN[gung],
+            "주성": [STAR_HAN.get(s, s) for s in stars], "주성한글": stars,
+            "대한": f"{start}-{start + 9}", "is명궁": zi == mi,
+        })
     return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
             "명궁주성": ju, "명반": board, "풀이": content.jami_aspects(sel) if sel else {}}
 

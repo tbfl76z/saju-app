@@ -202,16 +202,21 @@ function JamiBoard({ jami }: { jami: any }) {
                     if (!cell) return null;
                     return (
                         <div key={zi} style={{ gridRow: r, gridColumn: c }}
-                            className={"rounded-lg border p-1.5 min-h-[68px] flex flex-col " +
+                            className={"rounded-lg border p-1.5 min-h-[84px] flex flex-col font-noto-serif " +
                                 (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
+                            {/* 주성(한자) */}
                             <div className="flex flex-wrap gap-x-1 gap-y-0.5 flex-1 content-start">
-                                {(cell["주성"] || []).map((s: string) => (
-                                    <span key={s} className="text-[11px] font-bold text-rose-500 dark:text-rose-400 leading-none">{s}</span>
-                                ))}
+                                {(cell["주성"] || []).length
+                                    ? (cell["주성"] || []).map((s: string) => (
+                                        <span key={s} className="text-[12px] font-bold text-rose-500 dark:text-rose-400 leading-none">{s}</span>))
+                                    : <span className="text-[10px] text-slate-300 dark:text-slate-600">無主星</span>}
                             </div>
-                            <div className="flex justify-between items-end mt-1">
-                                <span className={"text-[9px] " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-400")}>{cell["궁"]}</span>
-                                <span className="text-base font-noto-serif text-sky-600 dark:text-sky-400 leading-none">{zi}</span>
+                            {/* 대한 나이 */}
+                            <div className="text-[8px] text-slate-400 leading-none mt-0.5">大限 {cell["대한"]}</div>
+                            {/* 궁명 + 궁간지 */}
+                            <div className="flex justify-between items-end mt-0.5">
+                                <span className={"text-[10px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-500 dark:text-slate-300")}>{cell["궁한자"] || cell["궁"]}</span>
+                                <span className="text-[11px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
                             </div>
                         </div>
                     );
