@@ -30,6 +30,10 @@ load_dotenv()
 app = FastAPI(title="Saju API")
 calc = SajuCalculator()  # Initialize calculator once
 
+# 고전 명리 라우터(레거시 사주명리 4.0 포팅: /classic/*) — 비침투적 연결
+import classic  # noqa: E402
+app.include_router(classic.router)
+
 # 학습 모드 도표 이미지 등 정적 파일 서빙 (폴더가 있을 때만 마운트)
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.isdir(_static_dir):
