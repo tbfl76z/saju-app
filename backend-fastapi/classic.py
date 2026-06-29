@@ -187,7 +187,16 @@ async def juyeok():
     g = content.juyeok_lookup(sang, ha)
     if not g:
         raise HTTPException(500, "괘 없음")
-    return {"효": yos, "변효": byeon, "괘명": g["name"], "풀이": g["text"]}
+    out = {"효": yos, "음양": eum, "변효": byeon, "괘명": g["name"], "풀이": g["text"]}
+    # 변괘(지괘): 변효 위치의 음양을 반전해 재조합
+    if byeon:
+        yy = [(v ^ 1) if (i + 1) in byeon else v for i, v in enumerate(eum)]
+        ha2 = yy[0] | (yy[1] << 1) | (yy[2] << 2)
+        sang2 = yy[3] | (yy[4] << 1) | (yy[5] << 2)
+        g2 = content.juyeok_lookup(sang2, ha2)
+        if g2:
+            out["변괘"] = {"음양": yy, "괘명": g2["name"], "풀이": g2["text"]}
+    return out
 
 
 @router.get("/jeukseok")

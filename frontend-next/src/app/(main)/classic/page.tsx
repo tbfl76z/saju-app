@@ -245,6 +245,33 @@ function JamiView({ jami }: { jami: any }) {
     );
 }
 
+// 6효 괘상 그림 (위=6효 → 아래=1효). 효값 7·9=양, 6·8=음, 6·9=변효
+function GuaImage({ yos, label }: { yos: number[]; label?: string }) {
+    return (
+        <div className="flex flex-col items-center gap-2">
+            {label && <div className="text-2xl font-noto-serif text-[#bf953f]">{label}</div>}
+            <div className="flex flex-col gap-1.5 w-28">
+                {[...yos].map((v, i) => ({ v, hyo: yos.length - i })).reverse().map(({ v, hyo }) => {
+                    const yang = v % 2 === 1;
+                    const moving = v === 6 || v === 9;
+                    const bar = moving ? "bg-rose-500 dark:bg-rose-400" : "bg-slate-700 dark:bg-slate-200";
+                    return (
+                        <div key={hyo} className="flex items-center gap-2">
+                            <span className="text-[9px] text-slate-400 w-7 text-right">{hyo}효</span>
+                            <div className="flex gap-1.5 flex-1">
+                                {yang
+                                    ? <div className={"h-2.5 flex-1 rounded-sm " + bar} />
+                                    : <><div className={"h-2.5 flex-1 rounded-sm " + bar} /><div className={"h-2.5 flex-1 rounded-sm " + bar} /></>}
+                            </div>
+                            <span className="text-[10px] text-rose-500 w-3">{moving ? (v === 9 ? "○" : "×") : ""}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function JuyeokView() {
     const [r, setR] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -253,17 +280,29 @@ function JuyeokView() {
         try { setR(await (await fetch(`${API_BASE}/classic/juyeok`, { method: "POST" })).json()); }
         finally { setLoading(false); }
     }
+    const byeon: number[] = r?.["변효"] || [];
     return (
-        <div className="glass-card p-5 space-y-4">
-            <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-500">동전 6번을 던져 본괘를 얻습니다</p>
-                <Button onClick={cast} disabled={loading}>🪙 점치기</Button>
+        <div className="space-y-3">
+            <div className="glass-card p-5 flex items-center justify-between">
+                <p className="text-sm text-slate-500">동전 6번을 던져 괘를 얻습니다</p>
+                <Button onClick={cast} disabled={loading}>🪙 {r ? "다시 점치기" : "점치기"}</Button>
             </div>
-            {r && <div className="space-y-3">
-                <div className="text-center"><div className="text-2xl font-noto-serif text-[#bf953f]">{r["괘명"]}</div>
-                    <div className="text-xs text-slate-400">{r["변효"]?.length ? `변효: ${r["변효"].join(", ")}효` : "변효 없음"}</div></div>
-                <Pungi>{r["풀이"]}</Pungi>
-            </div>}
+            {r && <>
+                <div className="glass-card p-5 space-y-4">
+                    <div className="flex justify-center gap-8 items-start">
+                        <GuaImage yos={r["효"] || []} label={r["괘명"]} />
+                        {r["변괘"] && <>
+                            <div className="self-center text-2xl text-slate-300">→</div>
+                            <GuaImage yos={(r["변괘"]["음양"] || []).map((b: number) => (b ? 7 : 8))} label={r["변괘"]["괘명"]} />
+                        </>}
+                    </div>
+                    <div className="text-center text-xs text-slate-400">
+                        {byeon.length ? `변효 ${byeon.join("·")}효 (○노양 ×노음)` : "변효 없음 — 본괘로 판단"}
+                    </div>
+                </div>
+                <Section title={`본괘 — ${r["괘명"]}`}><Pungi>{r["풀이"]}</Pungi></Section>
+                {r["변괘"] && <Section title={`변괘(지괘) — ${r["변괘"]["괘명"]}`}><Pungi>{r["변괘"]["풀이"]}</Pungi></Section>}
+            </>}
         </div>
     );
 }
