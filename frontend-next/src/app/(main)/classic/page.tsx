@@ -193,7 +193,6 @@ function JamiView({ jami }: { jami: any }) {
 function JuyeokView() {
     const [r, setR] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const 효 = (v: number) => ({ 6: "⚋ 노음(변)", 7: "⚊ 소양", 8: "⚋ 소음", 9: "⚊ 노양(변)" } as any)[v] || v;
     async function cast() {
         setLoading(true);
         try { setR(await (await fetch(`${API_BASE}/classic/juyeok`, { method: "POST" })).json()); }
