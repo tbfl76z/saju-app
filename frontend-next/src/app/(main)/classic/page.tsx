@@ -113,7 +113,7 @@ export default function ClassicPage() {
                     {!loading && full && tab === "명리" && <MyungriView full={full} />}
                     {!loading && full && tab === "자미" && <JamiView jami={full["자미두수"]} />}
                     {tab === "주역" && <JuyeokView />}
-                    {tab === "기문" && <GimunView />}
+                    {tab === "기문" && <GimunView profile={profile} />}
                 </>
             )}
         </div>
@@ -312,22 +312,30 @@ function JuyeokView() {
     );
 }
 
-function GimunView() {
+function GimunView({ profile }: { profile?: any }) {
     const PURP = ["금전", "질병", "연애", "이사", "여가", "청탁"];
     const now = new Date();
+    // 출생국(命局): 선택 프로필 생년월일시 → 고정
+    const natal = (() => {
+        const b = profile ? toBirth(profile.sajuData) : null;
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour } : null;
+    })();
+    const [mode, setMode] = useState<"natal" | "div">(natal ? "natal" : "div");
     const [purpose, setPurpose] = useState("금전");
     const [dt, setDt] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours() });
     const [r, setR] = useState<any>(null);
     const [pick, setPick] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    async function go(d = dt, pp = purpose) {
+    // 현재 모드의 기준 시각
+    const baseDt = mode === "natal" && natal ? natal : dt;
+    async function go(d = baseDt, pp = purpose) {
         setLoading(true); setPick(null);
         try {
             const q = `${API_BASE}/classic/gimun?year=${d.y}&month=${d.m}&day=${d.d}&hour=${d.h}&purpose=${encodeURIComponent(pp)}`;
             setR(await (await fetch(q)).json());
         } finally { setLoading(false); }
     }
-    useEffect(() => { go(dt, purpose); /* eslint-disable-next-line */ }, [purpose]);
+    useEffect(() => { go(mode === "natal" && natal ? natal : dt, purpose); /* eslint-disable-next-line */ }, [purpose, mode]);
     const cls = (g: string) => g.includes("吉") ? "text-sky-600 dark:text-sky-400" : g.includes("凶") ? "text-rose-500" : "text-slate-500";
     const cellBg = (g: string) => g.includes("吉") ? "bg-sky-50/70 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800"
         : g.includes("凶") ? "bg-rose-50/70 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800"
@@ -341,16 +349,26 @@ function GimunView() {
     );
     return (
         <div className="space-y-3">
-            {/* 일시 설정 */}
+            {/* 모드 토글: 출생국(고정) / 점단(시점 가변) */}
             <div className="glass-card p-4 space-y-3">
-                <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
-                    <span className="mr-1">일시</span>
-                    {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>
-                    {num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>
-                    <Button onClick={() => go(dt, purpose)} disabled={loading} className="ml-1 h-8">조회</Button>
-                    <button onClick={() => { const n = new Date(); const nd = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), h: n.getHours() }; setDt(nd); go(nd, purpose); }}
-                        className="text-xs text-[#bf953f] underline">지금</button>
+                <div className="flex gap-1.5">
+                    {natal && <button onClick={() => setMode("natal")}
+                        className={"px-3 py-1.5 rounded-full text-sm font-semibold " + (mode === "natal" ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>출생 명국</button>}
+                    <button onClick={() => setMode("div")}
+                        className={"px-3 py-1.5 rounded-full text-sm font-semibold " + (mode === "div" ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>점단·방위</button>
                 </div>
+                {mode === "natal" && natal ? (
+                    <p className="text-sm text-slate-500">출생 {natal.y}.{natal.m}.{natal.d} {natal.h}시 기준 <b className="text-slate-700 dark:text-slate-200">평생 고정 명국</b></p>
+                ) : (
+                    <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+                        <span className="mr-1">일시</span>
+                        {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>
+                        {num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>
+                        <Button onClick={() => go(dt, purpose)} disabled={loading} className="ml-1 h-8">조회</Button>
+                        <button onClick={() => { const n = new Date(); const nd = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), h: n.getHours() }; setDt(nd); go(nd, purpose); }}
+                            className="text-xs text-[#bf953f] underline">지금</button>
+                    </div>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-slate-500">목적</span>
                     {PURP.map((p) => <button key={p} onClick={() => setPurpose(p)}
