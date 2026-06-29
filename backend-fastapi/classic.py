@@ -135,6 +135,9 @@ def _myungri(det: dict) -> dict:
     return out
 
 
+GUNG12 = ["명궁", "형제", "부처", "자녀", "재백", "질액", "천이", "노복", "관록", "전택", "복덕", "부모"]
+
+
 def _jami(det: dict) -> dict:
     P = det["pillars"]
     lun = solar_to_lunar(*det["_solar"])
@@ -144,7 +147,12 @@ def _jami(det: dict) -> dict:
     mi = JIJI.index(j["명궁"])
     ju = divination.명궁_주성(j["국수"], lun["lunar_day"], mi)
     sel = content.jami_select(j["명궁"], ju)
-    return {**j, "명궁주성": ju, "풀이": content.jami_aspects(sel) if sel else {}}
+    # 12궁 명반: 명궁에서 역행으로 12궁(명궁→형제→부처…) 배치, 각 궁에 14주성
+    chart = divination.자미_14주성(j["국수"], lun["lunar_day"])
+    board = [{"지지": JIJI[zi], "궁": GUNG12[(mi - zi) % 12],
+              "주성": chart.get(zi, []), "is명궁": zi == mi} for zi in range(12)]
+    return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
+            "명궁주성": ju, "명반": board, "풀이": content.jami_aspects(sel) if sel else {}}
 
 
 @router.post("/full")
@@ -206,11 +214,15 @@ async def gimun(year: int = 0, month: int = 1, day: int = 1, hour: int = 12, min
         pog = gimun_engine.gimun_poguk(year, month, day, hour, minute)
     except Exception as e:
         raise HTTPException(500, str(e))
+    palaces = pog.get("궁별", {})
     out = []
     for zhi, info in bw.items():
         key = (info.get("목적별키", {}) or {}).get(purpose, "")
         tbl, _, idx = key.partition(":")
         f = content.by_code(tbl, idx) if idx else {}
         out.append({"방위": DIR_KO.get(zhi, zhi), "지지": zhi, "천반": info.get("천반"), "지반": info.get("지반"),
+                    "궁": (palaces.get(zhi, {}) or {}).get("palace"),
                     "격": (f.get("SENTENCE") or "").strip(), "풀이": (f.get("DATA") or "").strip()})
-    return {"국": pog.get("국"), "purpose": purpose, "방위": out}
+    center = palaces.get("中", {}) or {}
+    return {"국": pog.get("국"), "purpose": purpose, "방위": out,
+            "중궁": {"천반": center.get("천반"), "지반": center.get("지반"), "궁": center.get("palace", 5)}}

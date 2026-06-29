@@ -25,6 +25,20 @@ type Tab = "명리" | "자미" | "주역" | "기문";
 const PILLAR_ORDER = ["hour", "day", "month", "year"] as const;
 const PILLAR_KO: Record<string, string> = { hour: "시주", day: "일주", month: "월주", year: "연주" };
 
+// 자미두수 명반: 지지 고정 배치(4×4 외곽 12궁) → [row, col]
+const JAMI_POS: Record<string, [number, number]> = {
+    "巳": [1, 1], "午": [1, 2], "未": [1, 3], "申": [1, 4],
+    "辰": [2, 1], "酉": [2, 4],
+    "卯": [3, 1], "戌": [3, 4],
+    "寅": [4, 1], "丑": [4, 2], "子": [4, 3], "亥": [4, 4],
+};
+// 기문 낙서 9궁: 궁번호 → [row, col]
+const GIMUN_POS: Record<number, [number, number]> = {
+    4: [1, 1], 9: [1, 2], 2: [1, 3],
+    3: [2, 1], 5: [2, 2], 7: [2, 3],
+    8: [3, 1], 1: [3, 2], 6: [3, 3],
+};
+
 export default function ClassicPage() {
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [sel, setSel] = useState("");
@@ -167,6 +181,46 @@ function MyungriView({ full }: { full: any }) {
     );
 }
 
+function JamiBoard({ jami }: { jami: any }) {
+    const board: any[] = jami["명반"] || [];
+    if (!board.length) return null;
+    const byZi: Record<string, any> = {};
+    board.forEach((c) => (byZi[c["지지"]] = c));
+    return (
+        <div className="glass-card p-3">
+            <div className="grid grid-cols-4 grid-rows-4 gap-1.5">
+                {/* 중앙 2×2 정보 */}
+                <div style={{ gridRow: "2 / 4", gridColumn: "2 / 4" }}
+                    className="flex flex-col items-center justify-center text-center gap-1 rounded-lg bg-[#d4af37]/8 border border-[#d4af37]/30">
+                    <div className="text-xs text-slate-400">자미두수 명반</div>
+                    <div className="text-lg font-noto-serif font-bold text-[#bf953f]">{jami["五行局"]}</div>
+                    <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · 주성 {(jami["명궁주성"] || []).join("·") || "무주성"}</div>
+                    {jami["음력"] && <div className="text-[10px] text-slate-400">음력 {jami["음력"]}</div>}
+                </div>
+                {Object.entries(JAMI_POS).map(([zi, [r, c]]) => {
+                    const cell = byZi[zi];
+                    if (!cell) return null;
+                    return (
+                        <div key={zi} style={{ gridRow: r, gridColumn: c }}
+                            className={"rounded-lg border p-1.5 min-h-[68px] flex flex-col " +
+                                (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
+                            <div className="flex flex-wrap gap-x-1 gap-y-0.5 flex-1 content-start">
+                                {(cell["주성"] || []).map((s: string) => (
+                                    <span key={s} className="text-[11px] font-bold text-rose-500 dark:text-rose-400 leading-none">{s}</span>
+                                ))}
+                            </div>
+                            <div className="flex justify-between items-end mt-1">
+                                <span className={"text-[9px] " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-400")}>{cell["궁"]}</span>
+                                <span className="text-base font-noto-serif text-sky-600 dark:text-sky-400 leading-none">{zi}</span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function JamiView({ jami }: { jami: any }) {
     if (!jami || jami.error) return <div className="glass-card p-6 text-slate-500">자미 산출 불가</div>;
     const p = jami["풀이"] || {};
@@ -174,6 +228,7 @@ function JamiView({ jami }: { jami: any }) {
     const others = Object.keys(p).filter((k) => k !== "성격");
     return (
         <div className="space-y-3">
+            <JamiBoard jami={jami} />
             <div className="glass-card p-4 flex flex-wrap gap-1.5 text-xs">
                 <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">명궁 {jami["명궁"]}궁</span>
                 <span className="px-2 py-0.5 rounded-full bg-[#d4af37]/15 text-[#bf953f]">{jami["五行局"]}</span>
@@ -217,32 +272,90 @@ function GimunView() {
     const PURP = ["금전", "질병", "연애", "이사", "여가", "청탁"];
     const now = new Date();
     const [purpose, setPurpose] = useState("금전");
+    const [dt, setDt] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours() });
     const [r, setR] = useState<any>(null);
+    const [pick, setPick] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    async function go() {
-        setLoading(true);
+    async function go(d = dt, pp = purpose) {
+        setLoading(true); setPick(null);
         try {
-            const q = `${API_BASE}/classic/gimun?year=${now.getFullYear()}&month=${now.getMonth() + 1}&day=${now.getDate()}&hour=${now.getHours()}&purpose=${encodeURIComponent(purpose)}`;
+            const q = `${API_BASE}/classic/gimun?year=${d.y}&month=${d.m}&day=${d.d}&hour=${d.h}&purpose=${encodeURIComponent(pp)}`;
             setR(await (await fetch(q)).json());
         } finally { setLoading(false); }
     }
-    useEffect(() => { go(); /* eslint-disable-next-line */ }, [purpose]);
-    const cls = (g: string) => g.includes("吉") ? "text-sky-600 dark:text-sky-400" : g.includes("凶") ? "text-rose-500" : "";
+    useEffect(() => { go(dt, purpose); /* eslint-disable-next-line */ }, [purpose]);
+    const cls = (g: string) => g.includes("吉") ? "text-sky-600 dark:text-sky-400" : g.includes("凶") ? "text-rose-500" : "text-slate-500";
+    const cellBg = (g: string) => g.includes("吉") ? "bg-sky-50/70 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800"
+        : g.includes("凶") ? "bg-rose-50/70 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800"
+            : "bg-white/40 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700";
+    const byPalace: Record<number, any> = {};
+    (r?.["방위"] || []).forEach((b: any) => { if (b["궁"]) byPalace[b["궁"]] = b; });
+    const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+        <input type="number" value={dt[k]} min={min} max={max}
+            onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
+            className="w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
+    );
     return (
         <div className="space-y-3">
-            <div className="glass-card p-4 flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-slate-500">목적</span>
-                {PURP.map((p) => <button key={p} onClick={() => setPurpose(p)}
-                    className={"px-3 py-1 rounded-full text-sm " + (purpose === p ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>{p}</button>)}
-                {r && <span className="ml-auto text-xs text-slate-400">{r["국"]}</span>}
+            {/* 일시 설정 */}
+            <div className="glass-card p-4 space-y-3">
+                <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+                    <span className="mr-1">일시</span>
+                    {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>
+                    {num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>
+                    <Button onClick={() => go(dt, purpose)} disabled={loading} className="ml-1 h-8">조회</Button>
+                    <button onClick={() => { const n = new Date(); const nd = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), h: n.getHours() }; setDt(nd); go(nd, purpose); }}
+                        className="text-xs text-[#bf953f] underline">지금</button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-slate-500">목적</span>
+                    {PURP.map((p) => <button key={p} onClick={() => setPurpose(p)}
+                        className={"px-3 py-1 rounded-full text-sm " + (purpose === p ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>{p}</button>)}
+                    {r && <span className="ml-auto text-xs text-slate-400">{r["국"]}</span>}
+                </div>
             </div>
-            {loading ? <div className="glass-card p-6 text-center text-slate-500">…</div> :
-                r && (r["방위"] || []).map((b: any, i: number) => (
-                    <div key={i} className="glass-card p-3">
-                        <div className="text-sm text-slate-500">▸{b["방위"]}({b["지지"]}) {b["천반"]}/{b["지반"]} <b className={cls(b["격"])}>{b["격"]}</b></div>
-                        <Pungi>{b["풀이"]}</Pungi>
+
+            {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : r && (
+                <>
+                    {/* 낙서 9궁 방위반 */}
+                    <div className="glass-card p-3">
+                        <div className="grid grid-cols-3 grid-rows-3 gap-1.5">
+                            {/* 중궁 */}
+                            <div style={{ gridRow: 2, gridColumn: 2 }}
+                                className="rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/8 p-1.5 min-h-[72px] flex flex-col items-center justify-center text-center">
+                                <span className="text-[10px] text-slate-400">中宮</span>
+                                {r["중궁"] && <span className="text-sm font-noto-serif text-slate-500">{r["중궁"]["천반"]}/{r["중궁"]["지반"]}</span>}
+                            </div>
+                            {Object.entries(GIMUN_POS).filter(([p]) => Number(p) !== 5).map(([p, [row, col]]) => {
+                                const b = byPalace[Number(p)];
+                                if (!b) return <div key={p} style={{ gridRow: row, gridColumn: col }} />;
+                                const on = pick && pick["지지"] === b["지지"];
+                                return (
+                                    <button key={p} style={{ gridRow: row, gridColumn: col }} onClick={() => setPick(b)}
+                                        className={"rounded-lg border p-1.5 min-h-[72px] flex flex-col text-left transition-shadow " +
+                                            cellBg(b["격"]) + (on ? " ring-2 ring-[#d4af37]" : "")}>
+                                        <div className="flex justify-between items-start">
+                                            <span className="text-[10px] text-slate-400">{b["방위"]}</span>
+                                            <span className="text-base font-noto-serif text-sky-600 dark:text-sky-400 leading-none">{b["지지"]}</span>
+                                        </div>
+                                        <div className="text-sm font-noto-serif font-bold text-slate-700 dark:text-slate-200 mt-0.5">{b["천반"]}<span className="text-slate-400 font-normal">/{b["지반"]}</span></div>
+                                        <div className={"text-[10px] font-bold leading-tight mt-auto " + cls(b["격"])}>{b["격"]}</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-[11px] text-slate-400 text-center mt-2">방위를 누르면 풀이가 표시됩니다</p>
                     </div>
-                ))}
+
+                    {/* 선택 방위 풀이 */}
+                    {pick && (
+                        <div className="glass-card p-4">
+                            <div className="text-sm text-slate-500 mb-1">▸{pick["방위"]}({pick["지지"]}) {pick["천반"]}/{pick["지반"]} <b className={cls(pick["격"])}>{pick["격"]}</b></div>
+                            <Pungi>{pick["풀이"]}</Pungi>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     );
 }
