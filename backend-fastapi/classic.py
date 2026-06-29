@@ -160,8 +160,10 @@ def _jami(det: dict) -> dict:
     forward = (yang_year and male) or (not yang_year and not male)  # 양남·음녀 順 / 음남·양녀 逆
     board = []
     for zi in range(12):
-        order = (mi - zi) % 12
-        start = guk + (order if forward else (12 - order) % 12) * 10
+        order = (mi - zi) % 12  # 궁 라벨: 명궁→형제→…→부모 (항상 지지 역행)
+        # 大限 진행: 양남·음녀는 지지 順行(명궁→부모궁 방향), 음남·양녀는 지지 逆行(명궁→형제궁 방향)
+        step = (zi - mi) % 12 if forward else (mi - zi) % 12
+        start = guk + step * 10
         gung = GUNG12[order]
         stars = chart.get(zi, [])
         board.append({

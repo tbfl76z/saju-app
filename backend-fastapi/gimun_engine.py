@@ -149,7 +149,9 @@ def gimun_poguk(year: int, month: int, day: int,
     shifu = XUNSHOU_DUNJIA[xunshou]
     e2p = {v: k for k, v in earth.items()}
     zhifu_palace = e2p[shifu]       # 직부궁 = 지반 時符頭 위치
-    sigan_palace = e2p[hour_stem]   # 時干의 지반궁(직부 이동 목표)
+    # 時干이 甲(旬首)이면 지반 육의삼기에 甲이 없다 → 旬首六儀(=직부)가 時干 대표이므로
+    # 직부 본궁에 머문다(step=0). KeyError 방지.
+    sigan_palace = zhifu_palace if hour_stem == "甲" else e2p[hour_stem]   # 時干의 지반궁
     # 천반 = 지반 plate 를 후천8궁 시계환으로 강체회전(중궁 고정).
     # 중궁(5)에 든 천간은 기궁(寄宮) 처리 — 中5 寄 坤2.
     i_sf = HOUTIAN_CLOCK.index(2 if zhifu_palace == 5 else zhifu_palace)
