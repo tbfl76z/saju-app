@@ -545,7 +545,8 @@ def stream_report(req: Any) -> Iterator[str]:
     for model_name in models_to_try:
         try:
             model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
-            stream = model.generate_content(prompt, stream=True)
+            # 첫 청크 전 무한 행 방지: 타임아웃 초과 시 예외 → 다음 모델로 폴백
+            stream = model.generate_content(prompt, stream=True, request_options={"timeout": 40})
             for chunk in stream:
                 text = getattr(chunk, "text", "") or ""
                 if text:
@@ -616,7 +617,8 @@ def stream_tutor(question: str, chapter_title: str = "", context_hint: str = "")
     for model_name in _get_models_to_try():
         try:
             model = genai.GenerativeModel(model_name, system_instruction=TUTOR_SYSTEM_INSTRUCTION)
-            stream = model.generate_content(prompt, stream=True)
+            # 첫 청크 전 무한 행 방지: 타임아웃 초과 시 예외 → 다음 모델로 폴백
+            stream = model.generate_content(prompt, stream=True, request_options={"timeout": 40})
             for chunk in stream:
                 text = getattr(chunk, "text", "") or ""
                 if text:
