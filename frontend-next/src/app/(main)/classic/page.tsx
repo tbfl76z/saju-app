@@ -122,38 +122,38 @@ function JamiCell({ cell, zi }: { cell: any; zi: string }) {
     const miowang: Record<string, string> = cell["묘왕"] || {};
     const aux = [...(cell["보좌"] || []), ...(cell["잡성"] || [])];
     return (
-        <div className={"rounded-md border p-1 min-h-[112px] flex flex-col font-noto-serif " +
+        <div className={"rounded-md border p-1.5 min-h-[150px] flex flex-col font-noto-serif " +
             (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
-            {/* 보조성·잡성 (위, 작게) */}
-            <div className="flex flex-wrap gap-x-1 text-[8px] text-slate-400 leading-tight">
+            {/* 보조성·잡성 (위) */}
+            <div className="flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
                 {aux.map((s: string, i: number) => <span key={i}>{s}</span>)}
             </div>
             {/* 주성(한자) + 묘왕 + 사화 */}
-            <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 mt-0.5 flex-1 content-start">
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 flex-1 content-start">
                 {(cell["주성"] || []).length
                     ? (cell["주성"] || []).map((s: string, i: number) => {
                         const han = (cell["주성한글"] || [])[i];
                         const hwa = hwaOf[s];
                         return (
-                            <span key={i} className="text-[13px] font-bold text-rose-600 dark:text-rose-400 leading-none">
+                            <span key={i} className="text-[19px] font-bold text-rose-600 dark:text-rose-400 leading-none">
                                 {s}
-                                {miowang[han] && <sub className="text-[7px] font-normal text-slate-400 ml-px">{miowang[han]}</sub>}
-                                {hwa && <sup className={"text-[8px] ml-px " + (HWA_COLOR[hwa] || "")}>{hwa[1]}</sup>}
+                                {miowang[han] && <sub className="text-[11px] font-normal text-slate-400 ml-px">{miowang[han]}</sub>}
+                                {hwa && <sup className={"text-[11px] ml-px " + (HWA_COLOR[hwa] || "")}>{hwa[1]}</sup>}
                             </span>
                         );
                     })
-                    : <span className="text-[9px] text-slate-300 dark:text-slate-600">無主星</span>}
+                    : <span className="text-[12px] text-slate-300 dark:text-slate-600">無主星</span>}
             </div>
             {/* 박사신 · 장생신 */}
-            <div className="flex justify-between text-[8px] text-slate-400 leading-none mt-0.5">
+            <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 leading-none mt-1">
                 <span>{cell["박사신"] || ""}</span><span>{cell["장생신"] || ""}</span>
             </div>
             {/* 대한 · 소한 */}
-            <div className="text-[7px] text-slate-400 leading-none">大 {cell["대한"]} · 小 {(cell["소한"] || []).slice(0, 5).join(",")}</div>
+            <div className="text-[10px] text-slate-400 leading-none mt-0.5">大 {cell["대한"]} · 小 {(cell["소한"] || []).slice(0, 5).join(",")}</div>
             {/* 궁명 + 간지 */}
-            <div className="flex justify-between items-end mt-0.5">
-                <span className={"text-[10px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-500 dark:text-slate-300")}>{cell["궁한자"] || cell["궁"]}</span>
-                <span className="text-[10px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
+            <div className="flex justify-between items-end mt-1">
+                <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>{cell["궁한자"] || cell["궁"]}</span>
+                <span className="text-[14px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
             </div>
         </div>
     );
@@ -166,7 +166,7 @@ function JamiBoard({ jami }: { jami: any }) {
     board.forEach((c) => (byZi[c["지지"]] = c));
     return (
         <div className="glass-card p-2 overflow-x-auto">
-            <div className="grid grid-cols-4 grid-rows-4 gap-1 min-w-[360px]">
+            <div className="grid grid-cols-4 grid-rows-4 gap-1 min-w-[600px]">
                 <div style={{ gridRow: "2 / 4", gridColumn: "2 / 4" }}
                     className="flex flex-col items-center justify-center text-center gap-1 rounded-lg bg-[#d4af37]/8 border border-[#d4af37]/30 font-noto-serif">
                     <div className="text-xs text-slate-400">紫微斗數 命盤</div>
@@ -296,7 +296,7 @@ function GimunView({ profile }: { profile?: any }) {
         const b = profile ? toBirth(profile.sajuData) : null;
         return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour } : null;
     })();
-    const [mode, setMode] = useState<"natal" | "div">(natal ? "natal" : "div");
+    const [mode, setMode] = useState<"natal" | "div">("div");  // 기문방위는 날짜 가변이 기본 — 점단·방위로 진입
     const [purpose, setPurpose] = useState("금전");
     const [dt, setDt] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours() });
     const [r, setR] = useState<any>(null);
