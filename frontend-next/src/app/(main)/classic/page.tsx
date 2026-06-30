@@ -21,9 +21,7 @@ function toBirth(s: any) {
     };
 }
 
-type Tab = "명리" | "자미" | "주역" | "기문";
-const PILLAR_ORDER = ["hour", "day", "month", "year"] as const;
-const PILLAR_KO: Record<string, string> = { hour: "시주", day: "일주", month: "월주", year: "연주" };
+type Tab = "자미" | "주역" | "기문";
 
 // 자미두수 명반: 지지 고정 배치(4×4 외곽 12궁) → [row, col]
 const JAMI_POS: Record<string, [number, number]> = {
@@ -43,9 +41,7 @@ export default function ClassicPage() {
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [sel, setSel] = useState("");
     const [mounted, setMounted] = useState(false);
-    const [tab, setTab] = useState<Tab>("명리");
-    const [full, setFull] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
+    const [tab, setTab] = useState<Tab>("자미");
 
     useEffect(() => {
         setMounted(true);
@@ -55,27 +51,13 @@ export default function ClassicPage() {
     }, []);
 
     const profile = profiles.find((p) => p.id === sel);
-
-    async function load() {
-        if (!profile) return;
-        setLoading(true);
-        try {
-            const res = await fetch(`${API_BASE}/classic/full`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(toBirth(profile.sajuData)),
-            });
-            setFull(await res.json());
-        } finally { setLoading(false); }
-    }
-    useEffect(() => { if (profile) load(); /* eslint-disable-next-line */ }, [sel]);
-
     if (!mounted) return null;
 
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-24">
             <div className="text-center space-y-2 py-5 md:py-8">
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">☯ 고전 명리</h2>
-                <p className="text-slate-600 dark:text-slate-400 text-sm">레거시 사주명리의 정형 풀이 — 명리·자미두수·주역·기문둔갑</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">자미두수 명반 · 주역점 · 기문둔갑 방위</p>
             </div>
 
             {profiles.length === 0 ? (
@@ -98,20 +80,17 @@ export default function ClassicPage() {
 
                     {/* 탭 */}
                     <div className="flex gap-1.5 mb-4 flex-wrap">
-                        {(["명리", "자미", "주역", "기문"] as Tab[]).map((t) => (
+                        {(["자미", "주역", "기문"] as Tab[]).map((t) => (
                             <button key={t} onClick={() => setTab(t)}
                                 className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
                                     (tab === t ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
                                         : "text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
-                                {t === "명리" ? "명리 풀이" : t === "자미" ? "자미두수" : t === "주역" ? "주역점" : "기문방위"}
+                                {t === "자미" ? "자미두수" : t === "주역" ? "주역점" : "기문방위"}
                             </button>
                         ))}
                     </div>
 
-                    {loading && <div className="glass-card p-8 text-center text-slate-500">불러오는 중…</div>}
-
-                    {!loading && full && tab === "명리" && <MyungriView full={full} />}
-                    {!loading && full && tab === "자미" && <JamiView jami={full["자미두수"]} />}
+                    {tab === "자미" && <JamiView profile={profile} />}
                     {tab === "주역" && <JuyeokView />}
                     {tab === "기문" && <GimunView profile={profile} />}
                 </>
@@ -130,53 +109,52 @@ function Section({ title, children }: { title: string; children: any }) {
     </details>;
 }
 
-function MyungsikTable({ m }: { m: any }) {
-    const P = m.pillars;
-    return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-center border-collapse text-sm">
-                <thead><tr className="text-slate-400">
-                    <th className="p-1"></th>{PILLAR_ORDER.map((k) => <th key={k} className="p-1">{PILLAR_KO[k]}</th>)}
-                </tr></thead>
-                <tbody>
-                    <tr><th className="text-slate-400 text-xs">천간</th>{PILLAR_ORDER.map((k) => <td key={k} className="p-1"><div className="text-2xl font-noto-serif font-bold text-[#bf953f]">{P[k].stem}</div><div className="text-[10px] text-slate-400">{m.ten_gods?.[k] || ""}</div></td>)}</tr>
-                    <tr><th className="text-slate-400 text-xs">지지</th>{PILLAR_ORDER.map((k) => <td key={k} className="p-1"><div className="text-2xl font-noto-serif font-bold text-sky-600 dark:text-sky-400">{P[k].branch}</div><div className="text-[10px] text-slate-400">{m.jiji_ten_gods?.[k] || ""}</div></td>)}</tr>
-                    <tr className="text-xs text-slate-500"><th>12운성</th>{PILLAR_ORDER.map((k) => <td key={k}>{m.twelve_growth?.[k] || ""}</td>)}</tr>
-                    <tr className="text-xs text-slate-500"><th>신살</th>{PILLAR_ORDER.map((k) => <td key={k}>{(m.sinsal?.[k] || "").split(",")[0]}</td>)}</tr>
-                </tbody>
-            </table>
-        </div>
-    );
-}
+// 사화 색상
+const HWA_COLOR: Record<string, string> = {
+    "化祿": "text-emerald-600 dark:text-emerald-400", "化權": "text-blue-600 dark:text-blue-400",
+    "化科": "text-amber-600 dark:text-amber-400", "化忌": "text-rose-600 dark:text-rose-400",
+};
 
-function MyungriView({ full }: { full: any }) {
-    const m = full["명리"]; const ms = full["명식"];
-    const sa = ms.strength_analysis || {};
-    const won = (m.원국종합 || []).filter((x: any) => x.그룹 === "원명해설");
-    const etc = (m.원국종합 || []).filter((x: any) => x.그룹 !== "원명해설");
-    const [moreSS, setMoreSS] = useState(false);
+// 자미 명반 1칸 — 원본 스타일(보조성·잡성·주성+묘왕+사화·박사신·장생신·소한·궁명·간지)
+function JamiCell({ cell, zi }: { cell: any; zi: string }) {
+    const hwaOf: Record<string, string> = {};
+    (cell["사화"] || []).forEach((s: any) => { hwaOf[s["성"]] = s["화"]; });
+    const miowang: Record<string, string> = cell["묘왕"] || {};
+    const aux = [...(cell["보좌"] || []), ...(cell["잡성"] || [])];
     return (
-        <div className="space-y-3">
-            <div className="glass-card p-4">
-                <MyungsikTable m={ms} />
-                <div className="flex flex-wrap gap-1.5 mt-3 text-xs">
-                    {Object.entries(ms.five_elements || {}).map(([k, v]) => <span key={k} className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">{k} {v as any}</span>)}
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">{sa.strength} · {sa.gyeokguk}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-[#d4af37]/15 text-[#bf953f]">용신 {(sa.yongsin || []).join("·")}</span>
-                </div>
+        <div className={"rounded-md border p-1 min-h-[112px] flex flex-col font-noto-serif " +
+            (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
+            {/* 보조성·잡성 (위, 작게) */}
+            <div className="flex flex-wrap gap-x-1 text-[8px] text-slate-400 leading-tight">
+                {aux.map((s: string, i: number) => <span key={i}>{s}</span>)}
             </div>
-            {m.원명원리 && <Section title="四柱原命 原理 (조후·용신)"><Pungi>{m.원명원리}</Pungi></Section>}
-            {won.length > 0 && <Section title="원국 종합풀이">{won.map((x: any, i: number) => <div key={i}><div className="text-xs text-slate-400 mt-1">▸{x.조건}</div><Pungi>{x.풀이}</Pungi></div>)}</Section>}
-            {(m.일간론 || []).length > 0 && <Section title="일간론 (성격·금전·애정)">{m.일간론.map((x: any, i: number) => <div key={i}><div className="text-xs text-slate-400 mt-1">▸{x.label}</div><Pungi>{x.text}</Pungi></div>)}</Section>}
-            {m.일주론 && <Section title="일주론"><Pungi>{m.일주론}</Pungi></Section>}
-            {(m.십이신살 || []).length > 0 && <Section title="十二神煞 풀이">{m.십이신살.map((x: any, i: number) => <div key={i}><div className="text-xs text-slate-400 mt-1">▸{x.위치}에 {x.신살}</div><Pungi>{x.풀이}</Pungi></div>)}</Section>}
-            {(m.길흉신살 || []).length > 0 && <Section title={`各種 吉凶神殺 (${m.길흉신살.length})`}>
-                {(moreSS ? m.길흉신살 : m.길흉신살.slice(0, 5)).map((x: any, i: number) => <div key={i}><div className="text-xs text-slate-400 mt-1">▸{x.신살}</div><Pungi>{x.풀이}</Pungi></div>)}
-                {m.길흉신살.length > 5 && <button onClick={() => setMoreSS(!moreSS)} className="text-xs text-[#bf953f]">{moreSS ? "접기" : `+${m.길흉신살.length - 5}개 더보기`}</button>}
-            </Section>}
-            {(m.대운 || []).length > 0 && <Section title="大運 綜合 解說">{m.대운.map((x: any, i: number) => <details key={i} className="border-l-2 border-slate-200 dark:border-slate-700 pl-3"><summary className="cursor-pointer text-sm text-slate-500">{x.age}세~ {x.간지} 대운</summary><Pungi>{x.천간운} {x.지지운}{x.신살 ? "\n\n" + x.신살 : ""}</Pungi></details>)}</Section>}
-            {m.연운 && (m.연운.천간운 || m.연운.지지운) && <Section title={`${m.연운.year}년 年運 (세운 ${m.연운.ganzhi})`}><Pungi>{m.연운.천간운}{m.연운.지지운 ? "\n\n" + m.연운.지지운 : ""}</Pungi></Section>}
-            {etc.length > 0 && <details className="glass-card p-4"><summary className="cursor-pointer text-sm text-slate-500">기타 원국 특징 {etc.length}건 (참고)</summary><div className="mt-2 space-y-2">{etc.map((x: any, i: number) => <div key={i}><div className="text-xs text-slate-400">▸{x.조건}</div><Pungi>{x.풀이}</Pungi></div>)}</div></details>}
+            {/* 주성(한자) + 묘왕 + 사화 */}
+            <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 mt-0.5 flex-1 content-start">
+                {(cell["주성"] || []).length
+                    ? (cell["주성"] || []).map((s: string, i: number) => {
+                        const han = (cell["주성한글"] || [])[i];
+                        const hwa = hwaOf[s];
+                        return (
+                            <span key={i} className="text-[13px] font-bold text-rose-600 dark:text-rose-400 leading-none">
+                                {s}
+                                {miowang[han] && <sub className="text-[7px] font-normal text-slate-400 ml-px">{miowang[han]}</sub>}
+                                {hwa && <sup className={"text-[8px] ml-px " + (HWA_COLOR[hwa] || "")}>{hwa[1]}</sup>}
+                            </span>
+                        );
+                    })
+                    : <span className="text-[9px] text-slate-300 dark:text-slate-600">無主星</span>}
+            </div>
+            {/* 박사신 · 장생신 */}
+            <div className="flex justify-between text-[8px] text-slate-400 leading-none mt-0.5">
+                <span>{cell["박사신"] || ""}</span><span>{cell["장생신"] || ""}</span>
+            </div>
+            {/* 대한 · 소한 */}
+            <div className="text-[7px] text-slate-400 leading-none">大 {cell["대한"]} · 小 {(cell["소한"] || []).slice(0, 5).join(",")}</div>
+            {/* 궁명 + 간지 */}
+            <div className="flex justify-between items-end mt-0.5">
+                <span className={"text-[10px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-500 dark:text-slate-300")}>{cell["궁한자"] || cell["궁"]}</span>
+                <span className="text-[10px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
+            </div>
         </div>
     );
 }
@@ -187,65 +165,63 @@ function JamiBoard({ jami }: { jami: any }) {
     const byZi: Record<string, any> = {};
     board.forEach((c) => (byZi[c["지지"]] = c));
     return (
-        <div className="glass-card p-3">
-            <div className="grid grid-cols-4 grid-rows-4 gap-1.5">
-                {/* 중앙 2×2 정보 */}
+        <div className="glass-card p-2 overflow-x-auto">
+            <div className="grid grid-cols-4 grid-rows-4 gap-1 min-w-[360px]">
                 <div style={{ gridRow: "2 / 4", gridColumn: "2 / 4" }}
-                    className="flex flex-col items-center justify-center text-center gap-1 rounded-lg bg-[#d4af37]/8 border border-[#d4af37]/30">
-                    <div className="text-xs text-slate-400">자미두수 명반</div>
-                    <div className="text-lg font-noto-serif font-bold text-[#bf953f]">{jami["五行局"]}</div>
-                    <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · 주성 {(jami["명궁주성"] || []).join("·") || "무주성"}</div>
+                    className="flex flex-col items-center justify-center text-center gap-1 rounded-lg bg-[#d4af37]/8 border border-[#d4af37]/30 font-noto-serif">
+                    <div className="text-xs text-slate-400">紫微斗數 命盤</div>
+                    <div className="text-lg font-bold text-[#bf953f]">{jami["五行局"]}</div>
+                    <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · {(jami["명궁주성"] || []).join("·") || "無主星"}</div>
                     {jami["음력"] && <div className="text-[10px] text-slate-400">음력 {jami["음력"]}</div>}
+                    <div className="text-[8px] text-slate-400 mt-1">묘왕<sub>아래</sub> · 사화<sup>위</sup></div>
                 </div>
                 {Object.entries(JAMI_POS).map(([zi, [r, c]]) => {
                     const cell = byZi[zi];
                     if (!cell) return null;
-                    return (
-                        <div key={zi} style={{ gridRow: r, gridColumn: c }}
-                            className={"rounded-lg border p-1.5 min-h-[84px] flex flex-col font-noto-serif " +
-                                (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
-                            {/* 주성(한자) */}
-                            <div className="flex flex-wrap gap-x-1 gap-y-0.5 flex-1 content-start">
-                                {(cell["주성"] || []).length
-                                    ? (cell["주성"] || []).map((s: string) => (
-                                        <span key={s} className="text-[12px] font-bold text-rose-500 dark:text-rose-400 leading-none">{s}</span>))
-                                    : <span className="text-[10px] text-slate-300 dark:text-slate-600">無主星</span>}
-                            </div>
-                            {/* 대한 나이 */}
-                            <div className="text-[8px] text-slate-400 leading-none mt-0.5">大限 {cell["대한"]}</div>
-                            {/* 궁명 + 궁간지 */}
-                            <div className="flex justify-between items-end mt-0.5">
-                                <span className={"text-[10px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-500 dark:text-slate-300")}>{cell["궁한자"] || cell["궁"]}</span>
-                                <span className="text-[11px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
-                            </div>
-                        </div>
-                    );
+                    return <div key={zi} style={{ gridRow: r, gridColumn: c }}><JamiCell cell={cell} zi={zi} /></div>;
                 })}
             </div>
         </div>
     );
 }
 
-function JamiView({ jami }: { jami: any }) {
-    if (!jami || jami.error) return <div className="glass-card p-6 text-slate-500">자미 산출 불가</div>;
-    const p = jami["풀이"] || {};
-    const sung = p["성격"] || {};
-    const others = Object.keys(p).filter((k) => k !== "성격");
+function JamiView({ profile }: { profile?: any }) {
+    const init = (() => {
+        const b = profile ? toBirth(profile.sajuData) : null;
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, gender: b.gender }
+            : { y: 1990, m: 1, d: 1, h: 12, gender: "남" };
+    })();
+    const [dt, setDt] = useState(init);
+    const [jami, setJami] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    async function go(d = dt) {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/classic/full`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: "", gender: d.gender, year: d.y, month: d.m, day: d.d, hour: d.h, minute: 0, calendar: "양력" }),
+            });
+            setJami((await res.json())["자미두수"]);
+        } finally { setLoading(false); }
+    }
+    useEffect(() => { go(init); /* eslint-disable-next-line */ }, [profile?.id]);
+    const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+        <input type="number" value={dt[k]} min={min} max={max}
+            onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
+            className="w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
+    );
     return (
         <div className="space-y-3">
-            <JamiBoard jami={jami} />
-            <div className="glass-card p-4 flex flex-wrap gap-1.5 text-xs">
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">명궁 {jami["명궁"]}궁</span>
-                <span className="px-2 py-0.5 rounded-full bg-[#d4af37]/15 text-[#bf953f]">{jami["五行局"]}</span>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">명궁주성 {(jami["명궁주성"] || []).join("·") || "무주성"}</span>
+            <div className="glass-card p-4 flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+                <span className="mr-1">생년월일시(양력)</span>
+                {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>{num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>
+                <select value={dt.gender} onChange={(e) => setDt({ ...dt, gender: e.target.value })}
+                    className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
+                    <option value="남">남</option><option value="여">여</option>
+                </select>
+                <Button onClick={() => go(dt)} disabled={loading} className="ml-1 h-8">명반 보기</Button>
             </div>
-            {sung.LOOK && <Section title="용모"><Pungi>{sung.LOOK}</Pungi></Section>}
-            {sung.CHAR && <Section title="성격"><Pungi>{sung.CHAR}</Pungi></Section>}
-            {sung.FUTURE && <Section title="장래"><Pungi>{sung.FUTURE}</Pungi></Section>}
-            {others.map((k) => {
-                const f = p[k]; const txt = f.DATA || f.CHAR || Object.values(f).filter((v: any) => String(v).length > 20)[0];
-                return txt ? <details key={k} className="glass-card p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-500">{k}</summary><div className="mt-2"><Pungi>{txt as any}</Pungi></div></details> : null;
-            })}
+            {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : jami && <JamiBoard jami={jami} />}
         </div>
     );
 }
