@@ -144,48 +144,51 @@ STAR_HAN = {"자미": "紫微", "천기": "天機", "태양": "太陽", "무곡"
 
 
 def _jami(det: dict) -> dict:
+    """자미두수 12궁 명반(해석 없이 명반만). 원본 프로그램과 동일한 성요·배치 산출."""
     P = det["pillars"]
     lun = solar_to_lunar(*det["_solar"])
     ysi = CHEONGAN.index(P["year"]["stem"])
+    yzi = JIJI.index(P["year"]["branch"])
     hbi = JIJI.index(P["hour"]["branch"])
     j = divination.자미_오행국(ysi, lun["lunar_month"], hbi)
     mi = JIJI.index(j["명궁"])
-    ju = divination.명궁_주성(j["국수"], lun["lunar_day"], mi)
-    sel = content.jami_select(j["명궁"], ju)
-    # 12궁 명반: 명궁에서 역행으로 12궁(명궁→형제→부처…) 배치, 각 궁에 14주성·궁간지·대한
-    chart = divination.자미_14주성(j["국수"], lun["lunar_day"])
     guk = j["국수"]
-    yang_year = ysi % 2 == 0
+    zmi = divination.자미_위치(guk, lun["lunar_day"])
+    ju = divination.명궁_주성(guk, lun["lunar_day"], mi)
     male = str(det.get("gender", "남")).startswith("남")
+    # 14주성 + 보조성·잡성·박사12신·장생12신·소한·묘왕·사화 (3개 원본 명반 오라클 검증)
+    chart = divination.자미_14주성(guk, lun["lunar_day"])
+    aux = divination.자미_보조성(guk, lun["lunar_month"], hbi, lun["lunar_day"], ysi, yzi, mi, zmi, male)
+    yang_year = ysi % 2 == 0
     forward = (yang_year and male) or (not yang_year and not male)  # 양남·음녀 順 / 음남·양녀 逆
     board = []
     for zi in range(12):
         order = (mi - zi) % 12  # 궁 라벨: 명궁→형제→…→부모 (항상 지지 역행)
-        # 大限 진행: 양남·음녀는 지지 順行(명궁→부모궁 방향), 음남·양녀는 지지 逆行(명궁→형제궁 방향)
+        # 大限 진행: 양남·음녀는 지지 順行(명궁→부모궁 방향), 음남·양녀는 지지 逆行
         step = (zi - mi) % 12 if forward else (mi - zi) % 12
         start = guk + step * 10
         gung = GUNG12[order]
         stars = chart.get(zi, [])
+        a = aux[zi]
         board.append({
             "지지": JIJI[zi], "궁간지": CHEONGAN[divination.명궁_천간(ysi, zi)] + JIJI[zi],
             "궁": gung, "궁한자": GUNG_HAN[gung],
             "주성": [STAR_HAN.get(s, s) for s in stars], "주성한글": stars,
             "대한": f"{start}-{start + 9}", "is명궁": zi == mi,
+            "보좌": a["보좌"], "잡성": a["잡성"], "박사신": a["박사신"], "장생신": a["장생신"],
+            "소한": a["소한"], "묘왕": {s: g for s, g in a["묘왕"]},
+            "사화": [{"화": h, "성": STAR_HAN.get(s, s)} for h, s in a["사화"]],
         })
     return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
-            "명궁주성": ju, "명반": board, "풀이": content.jami_aspects(sel) if sel else {}}
+            "명궁주성": ju, "명반": board}
 
 
 @router.post("/full")
 async def full(req: ClassicReq):
-    """명식 + 명리 종합 + 자미두수 (한 번에)."""
+    """자미두수 명반 (해석 없이 명반만)."""
     try:
         det = _chart(req)
-        return {"명식": {"pillars": det["pillars"], "ten_gods": det.get("ten_gods"),
-                        "jiji_ten_gods": det.get("jiji_ten_gods"), "twelve_growth": det.get("twelve_growth"),
-                        "five_elements": det.get("five_elements"), "sinsal": det.get("sinsal"),
-                        "gongmang": det.get("gongmang"), "strength_analysis": det.get("strength_analysis")},
-                "명리": _myungri(det), "자미두수": _jami(det)}
+        return {"자미두수": _jami(det)}
     except Exception as e:
         raise HTTPException(500, str(e))
 
