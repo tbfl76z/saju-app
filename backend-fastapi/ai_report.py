@@ -157,7 +157,9 @@ SYSTEM_INSTRUCTION_EASY = (
     "작성 원칙:\n"
     "1. 십성·십이운성·신살·오행·천간·지지 같은 전문 용어와 한자를 가능한 한 쓰지 마세요. 꼭 필요하면 '마음속 에너지', '관계의 기운'처럼 쉬운 말로 바꿔 설명하세요.\n"
     "2. 점치는 듯한 단정 대신, 친구에게 이야기를 들려주듯 부드럽고 구체적인 일상 언어로 풀어 주세요.\n"
-    "3. 비유와 짧은 이야기를 곁들여 읽는 사람이 자기 삶에 바로 대입할 수 있게 하세요.\n\n"
+    "3. 비유와 짧은 이야기를 곁들여 읽는 사람이 자기 삶에 바로 대입할 수 있게 하세요.\n"
+    "4. [데이터 기준] 제공된 사주 정보와 운세 값은 이미 검증된 것이니 절대 다시 계산하지 말고 그대로 기준으로 삼으세요. 해석의 근거는 아래 제공된 지식(학습 데이터)에 두고, 특정 외부 앱·서비스·프로그램 이름은 절대 언급하지 마세요.\n"
+    "5. 아래 '분석 요청 사항'의 항목들을 하나도 빠뜨리지 말고 모두 다루되, 어려운 용어 대신 일상 언어와 비유로 풀어 네 섹션에 자연스럽게 녹이세요. 시간 운세(이 시기·올해·이달·오늘)라면 타고난 바탕과 지금 흐름이 어떻게 맞물리는지 쉽게 짚어 주세요.\n\n"
     "출력 형식 (매우 중요):\n"
     "- 반드시 다음 네 개의 마크다운 헤딩만 사용하세요: '## 한눈에 보기', '## 요즘 나의 흐름', '## 이렇게 해보세요', '## 따뜻한 한마디'.\n"
     "- 위 네 개의 '## 헤딩' 외에 다른 헤딩(#, ###)이나 기울임(*), 코드블록(`)은 쓰지 마세요.\n"
@@ -457,7 +459,7 @@ def build_prompt(req: Any) -> str:
 
         [대가의 리포트 작성 가이드]
         1. 위 '[이 풀이의 범위]'를 엄격히 지키세요. 이 리포트 고유의 주제에 집중하고, 다른 운세 풀이(전체운·대운·올해 등)와 겹치는 타고난 성격·원국 일반론의 반복을 피하세요.
-        2. 개별 데이터(신살, 운성, 지장간·통근·투출 등)는 전문 지식의 상세 설명을 토대로 '근거 있는 분석'을 제시하되, 자료 출처·파일명은 언급하지 마세요. 특히 지장간·통근·투출은 천간이 지지에 뿌리내린 세력의 강약을 판단하는 핵심 근거로 활용하세요.
+        2. 개별 데이터(신살, 운성, 지장간·통근·투출 등)는 전문 지식의 상세 설명을 토대로 '근거 있는 분석'을 제시하되, 자료 출처·파일명은 언급하지 마세요. 특히 지장간·통근·투출은 천간이 지지에 뿌리내린 세력의 강약을 판단하는 핵심 근거로 활용하세요. ★특히 지지의 土(辰·戌·丑·未)는 여러 기운을 품은 잡기(雜氣)이므로, 겉의 '土'로만 보지 말고 반드시 지장간(속 천간)까지 열어 그 안에 든 기운(예: 辰=乙·癸·戊, 戌=辛·丁·戊, 丑=癸·辛·己, 未=丁·乙·己)으로 세분해 해석하세요.
         3. [다관점 균형 해석 — 가장 중요] 한 가지 틀에 치우치지 말고 아래 관점을 고루 엮어 입체적으로 풀이하세요. 특히 십성을 인물 해석의 주된 언어로 삼고, 용신은 개운·균형 조언에 한정하세요.
            - 십성(十星): 재성=재물·실리·현실감, 관성=직업·명예·조직·책임, 인성=학문·문서·자격·조력, 식상=표현·재능·창의·자식, 비겁=경쟁·독립·동료·자존. 원국에 강한 십성과 부재·과다한 십성으로 그 사람의 재능·욕구·결핍·인간관계를 구체적으로 풀이하세요.
            - 격국(格局): 그 사람의 그릇과 사회적 성향의 큰 틀로 활용하세요.
@@ -465,8 +467,8 @@ def build_prompt(req: Any) -> str:
            - 신강신약·용신·희신·기신: 주로 '개운법'과 오행 균형 조언의 근거로 쓰세요(개운의 색·방향·시기·직업환경은 용신·희신 오행에 근거하고, 기신 보강은 권하지 마세요). 단 용신은 여러 해석 축의 하나일 뿐이니, 성격·재능·직업·재물·대인 풀이 전체를 용신·기신으로 환원하거나 "용신이 ~라 좋다/나쁘다"는 식의 단순 도식에 가두지 마세요.
         4. [궁(宮)별 해석] 명식의 네 기둥을 인생 영역으로 나누어 구체적으로 풀이하세요 — 년주=조상·초년·뿌리, 월주=부모·직업·사회궁(가장 중요), 일지=배우자·가정궁, 시주=자식·말년·결실. 각 궁의 십성과 십이운성을 그 영역의 운으로 연결하세요.
         5. [근거 명시] 모든 단정에는 그 근거가 된 글자나 판정을 괄호로 짧게 덧붙이세요(예: "추진력이 강합니다(편관 투출·신강)"). 근거 없는 막연한 덕담·일반론을 금합니다.
-        6. '## 총평 / ## 정밀 분석 / ## 개운법 / ## 대가의 한마디' 네 개의 헤딩으로만 구조화하여 품격 있는 결과물을 도출하세요.
-        7. 각 섹션은 충분한 분량(섹션당 4~7문장 이상)으로 알차게 작성하고, 너무 짧게 끝내지 마세요. 특히 '정밀 분석'은 궁별·십성별 근거를 들어 가장 깊이 있게 작성하세요.
+        6. 리포트는 위 시스템 지시에 명시된 네 개의 '## 헤딩'으로만 구조화하세요(헤딩 문구는 시스템 지시를 그대로 따르고 임의로 바꾸지 마세요).
+        7. 각 섹션은 충분한 분량(섹션당 4~7문장 이상)으로 알차게 작성하고, 너무 짧게 끝내지 마세요. 특히 핵심 분석 섹션(두 번째 섹션)은 근거를 들어 가장 깊이 있게 작성하세요.
         8. [분석 항목 커버] 위 '[분석 요청 사항]'의 번호 항목을 하나도 빠뜨리지 말고 모두 다루되, 답을 번호로 나열하지 말고 네 섹션(특히 '정밀 분석')에 자연스럽게 녹여 서술하세요. 시간 운세(대운·세운·월운·오늘)라면 원국 → 상위운 → 해당 시기로 이어지는 상호작용을 반드시 짚으세요.
         """
     return prompt
@@ -506,7 +508,7 @@ def _gemini_generate(prompt: str, system_instruction: str) -> Optional[str]:
         try:
             print(f"Attempting analysis with: {model_name}")
             model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
-            response = model.generate_content(prompt)
+            response = model.generate_content(prompt, generation_config={"max_output_tokens": 8192})
             if response and response.text:
                 return _clean(response.text)
         except Exception as e:
@@ -529,7 +531,7 @@ def _openrouter_generate(prompt: str, system_instruction: str) -> Optional[str]:
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": prompt},
         ],
-        "max_tokens": 2500,  # 무료 모델이 너무 짧게 끊지 않도록 충분히 확보
+        "max_tokens": 4096,  # 정형 항목 리포트가 잘리지 않도록 충분히 확보
         "temperature": 0.8,
     }
     for model in OPENROUTER_MODELS:
@@ -591,7 +593,7 @@ def stream_report(req: Any) -> Iterator[str]:
         try:
             model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
             # 첫 청크 전 무한 행 방지: 타임아웃 초과 시 예외 → 다음 모델로 폴백
-            stream = model.generate_content(prompt, stream=True, request_options={"timeout": 40})
+            stream = model.generate_content(prompt, stream=True, generation_config={"max_output_tokens": 8192}, request_options={"timeout": 40})
             for chunk in stream:
                 text = getattr(chunk, "text", "") or ""
                 if text:
@@ -663,7 +665,7 @@ def stream_tutor(question: str, chapter_title: str = "", context_hint: str = "")
         try:
             model = genai.GenerativeModel(model_name, system_instruction=TUTOR_SYSTEM_INSTRUCTION)
             # 첫 청크 전 무한 행 방지: 타임아웃 초과 시 예외 → 다음 모델로 폴백
-            stream = model.generate_content(prompt, stream=True, request_options={"timeout": 40})
+            stream = model.generate_content(prompt, stream=True, generation_config={"max_output_tokens": 8192}, request_options={"timeout": 40})
             for chunk in stream:
                 text = getattr(chunk, "text", "") or ""
                 if text:
