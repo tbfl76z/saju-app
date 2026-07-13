@@ -268,9 +268,10 @@ function JamiView({ profile }: { profile?: any }) {
     const [jami, setJami] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [hangul, setHangul] = useState(false);
-    // AI 해석
+    // AI 해석 (주제별 세분화)
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
+    const [focus, setFocus] = useState("");
     const reqBody = (d: typeof dt) => ({ name: "", gender: d.gender, year: d.y, month: d.m, day: d.d, hour: d.h, minute: 0, calendar: "양력" });
     async function go(d = dt) {
         setLoading(true); setInterp("");
@@ -282,10 +283,10 @@ function JamiView({ profile }: { profile?: any }) {
             setJami((await res.json())["자미두수"]);
         } finally { setLoading(false); }
     }
-    async function interpret() {
-        setInterpreting(true); setInterp("");
+    async function interpret(f: string) {
+        setFocus(f); setInterpreting(true); setInterp("");
         try {
-            await streamSSE(`${API_BASE}/classic/jami/analyze`, reqBody(dt), setInterp);
+            await streamSSE(`${API_BASE}/classic/jami/analyze`, { ...reqBody(dt), focus: f }, setInterp);
         } catch {
             setInterp("해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
         } finally { setInterpreting(false); }
@@ -316,9 +317,19 @@ function JamiView({ profile }: { profile?: any }) {
                         className={"px-3 py-1 rounded-full text-xs font-semibold " + (hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>한글</button>
                 </div>
                 <JamiBoard jami={jami} hangul={hangul} />
-                {/* AI 해석 */}
-                <div className="flex justify-center">
-                    <Button onClick={interpret} disabled={interpreting}>{interpreting ? "해석 중…" : interp ? "🔮 다시 해석" : "🔮 AI 해석 보기"}</Button>
+                {/* AI 해석 — 주제별 세분화 */}
+                <div className="glass-card p-3">
+                    <div className="text-xs text-slate-500 mb-2">🔮 AI 해석 — 주제 선택</div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {[["종합", "종합"], ["성격", "성격·기질"], ["재물", "재물운"], ["애정", "애정·결혼"], ["직업", "직업운"], ["건강", "건강운"], ["대한", "현재 대운"], ["유년", "올해 유년"]].map(([f, label]) => (
+                            <button key={f} onClick={() => interpret(f)} disabled={interpreting}
+                                className={"px-3 py-1.5 rounded-full text-xs font-semibold transition-colors " +
+                                    (focus === f ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
+                                        : "text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
+                                {interpreting && focus === f ? "해석 중…" : label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
                 {interp && <div className="glass-card p-5"><ReportRenderer text={interp} streaming={interpreting} /></div>}
             </>}

@@ -50,6 +50,7 @@ class ClassicReq(BaseModel):
     calendar: str = "양력"
     is_leap: bool = False
     unknown_time: bool = False
+    focus: str = "종합"  # 자미 해석 세분화 초점(종합/성격/재물/애정/직업/건강/대한/유년)
 
 
 def _chart(req: ClassicReq) -> dict:
@@ -195,8 +196,10 @@ def _jami(det: dict) -> dict:
             "소한": a["소한"], "유년": yunyeon(zi)[:5], "묘왕": {s: g for s, g in a["묘왕"]},
             "사화": [{"화": h, "성": STAR_HAN.get(s, s)} for h, s in a["사화"]],
         })
+    age = _dt.date.today().year - det["_solar"][0] + 1  # 세는나이
     return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
-            "명궁주성": ju, "명주": myeongju, "신주": sinju, "신궁": JIJI[sin_idx], "명반": board}
+            "명궁주성": ju, "명주": myeongju, "신주": sinju, "신궁": JIJI[sin_idx],
+            "현재나이": age, "명반": board}
 
 
 @router.post("/full")
@@ -218,7 +221,7 @@ async def jami_analyze(req: ClassicReq):
     except Exception as e:
         raise HTTPException(500, str(e))
     return StreamingResponse(
-        ai_report.stream_jami(jami),
+        ai_report.stream_jami(jami, req.focus),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
