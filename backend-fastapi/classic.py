@@ -196,7 +196,9 @@ def _jami(det: dict) -> dict:
             "소한": a["소한"], "유년": yunyeon(zi)[:5], "묘왕": {s: g for s, g in a["묘왕"]},
             "사화": [{"화": h, "성": STAR_HAN.get(s, s)} for h, s in a["사화"]],
         })
-    age = _dt.date.today().year - det["_solar"][0] + 1  # 세는나이
+    _t = _dt.date.today()
+    _sy, _sm, _sd = det["_solar"]
+    age = _t.year - _sy - (1 if (_t.month, _t.day) < (_sm, _sd) else 0)  # 자미는 만 나이 기준
     return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
             "명궁주성": ju, "명주": myeongju, "신주": sinju, "신궁": JIJI[sin_idx],
             "현재나이": age, "명반": board}
