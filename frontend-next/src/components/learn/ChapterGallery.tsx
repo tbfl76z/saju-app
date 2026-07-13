@@ -38,7 +38,7 @@ export function ChapterGallery({ images, label = "원전 자료 도표", default
                                 src={`${API_BASE}${src}`}
                                 alt={`도표 ${i + 1}`}
                                 loading="lazy"
-                                className="w-full h-28 object-cover object-top"
+                                className="w-full h-36 object-contain bg-white"
                             />
                         </button>
                     ))}
@@ -48,17 +48,18 @@ export function ChapterGallery({ images, label = "원전 자료 도표", default
             {/* 확대 보기 */}
             {zoom && (
                 <div
-                    className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4"
+                    className="fixed inset-0 z-[100] bg-black/90 overflow-auto p-2 sm:p-4"
                     onClick={() => setZoom(null)}
                 >
-                    <button onClick={() => setZoom(null)} className="absolute top-4 right-4 text-white" aria-label="닫기">
-                        <X className="h-8 w-8" />
+                    <button onClick={() => setZoom(null)} className="fixed top-3 right-3 z-10 text-white bg-black/60 rounded-full p-1.5" aria-label="닫기">
+                        <X className="h-7 w-7" />
                     </button>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={`${API_BASE}${zoom}`}
                         alt="명리학 학습 도표 확대"
-                        className="max-w-full max-h-full rounded-xl bg-white"
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-4xl mx-auto rounded-lg bg-white"
                     />
                 </div>
             )}
