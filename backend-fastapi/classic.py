@@ -143,6 +143,12 @@ GUNG_HAN = {"명궁": "命宮", "형제": "兄弟", "부처": "夫妻", "자녀"
 STAR_HAN = {"자미": "紫微", "천기": "天機", "태양": "太陽", "무곡": "武曲", "천동": "天同", "염정": "廉貞",
             "천부": "天府", "태음": "太陰", "탐랑": "貪狼", "거문": "巨門", "천상": "天相", "천량": "天梁",
             "칠살": "七殺", "파군": "破軍"}
+# 命主: 명궁 지지 → 주성 (5개 원본 명반 검증)
+MYUNGJU = {"子": "탐랑", "丑": "거문", "亥": "거문", "寅": "녹존", "戌": "녹존", "卯": "문곡",
+           "酉": "문곡", "辰": "염정", "申": "염정", "巳": "무곡", "未": "무곡", "午": "파군"}
+# 身主: 년지 → 성요 (5개 원본 명반 검증)
+SINJU = {"子": "화성", "午": "화성", "丑": "천상", "未": "천상", "寅": "천량", "申": "천량",
+         "卯": "천동", "酉": "천동", "辰": "문창", "戌": "문창", "巳": "천기", "亥": "천기"}
 
 
 def _jami(det: dict) -> dict:
@@ -158,11 +164,19 @@ def _jami(det: dict) -> dict:
     zmi = divination.자미_위치(guk, lun["lunar_day"])
     ju = divination.명궁_주성(guk, lun["lunar_day"], mi)
     male = str(det.get("gender", "남")).startswith("남")
-    # 14주성 + 보조성·잡성·박사12신·장생12신·소한·묘왕·사화 (3개 원본 명반 오라클 검증)
+    # 身宮: 寅起정월 순행(생월) + 생시 順行 (命宮은 생시 逆行). 命主/身主 산출
+    sin_idx = (2 + (lun["lunar_month"] - 1) + hbi) % 12
+    myeongju = MYUNGJU.get(j["명궁"], "")
+    sinju = SINJU.get(JIJI[yzi], "")
+    # 14주성 + 보조성·잡성·박사12신·장생12신·소한·묘왕·사화 (원본 명반 오라클 검증)
     chart = divination.자미_14주성(guk, lun["lunar_day"])
     aux = divination.자미_보조성(guk, lun["lunar_month"], hbi, lun["lunar_day"], ysi, yzi, mi, zmi, male)
     yang_year = ysi % 2 == 0
     forward = (yang_year and male) or (not yang_year and not male)  # 양남·음녀 順 / 음남·양녀 逆
+
+    def yunyeon(zi):  # 流年: 년지궁=1세, 지지 順行 12년 주기
+        base = ((zi - yzi) % 12) + 1
+        return [base + 12 * k for k in range(10) if base + 12 * k <= 120]
     board = []
     for zi in range(12):
         order = (mi - zi) % 12  # 궁 라벨: 명궁→형제→…→부모 (항상 지지 역행)
@@ -176,13 +190,13 @@ def _jami(det: dict) -> dict:
             "지지": JIJI[zi], "궁간지": CHEONGAN[divination.명궁_천간(ysi, zi)] + JIJI[zi],
             "궁": gung, "궁한자": GUNG_HAN[gung],
             "주성": [STAR_HAN.get(s, s) for s in stars], "주성한글": stars,
-            "대한": f"{start}-{start + 9}", "is명궁": zi == mi,
+            "대한": f"{start}-{start + 9}", "is명궁": zi == mi, "is신궁": zi == sin_idx,
             "보좌": a["보좌"], "잡성": a["잡성"], "박사신": a["박사신"], "장생신": a["장생신"],
-            "소한": a["소한"], "묘왕": {s: g for s, g in a["묘왕"]},
+            "소한": a["소한"], "유년": yunyeon(zi)[:5], "묘왕": {s: g for s, g in a["묘왕"]},
             "사화": [{"화": h, "성": STAR_HAN.get(s, s)} for h, s in a["사화"]],
         })
     return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
-            "명궁주성": ju, "명반": board}
+            "명궁주성": ju, "명주": myeongju, "신주": sinju, "신궁": JIJI[sin_idx], "명반": board}
 
 
 @router.post("/full")

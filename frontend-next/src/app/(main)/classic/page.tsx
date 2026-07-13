@@ -170,7 +170,7 @@ function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean
     const aux = [...(cell["보좌"] || []), ...(cell["잡성"] || [])];
     const tr = (x: string) => (hangul ? ko(x) : x);
     return (
-        <div className={"rounded-md border p-1.5 min-h-[150px] flex flex-col font-noto-serif " +
+        <div className={"rounded-md border p-1.5 min-h-[178px] flex flex-col font-noto-serif " +
             (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
             {/* 보조성·잡성 (위) — 길성 파랑 / 살성 빨강 / 잡성 회색 */}
             <div className="flex flex-wrap gap-x-1 text-[11px] leading-tight">
@@ -196,12 +196,17 @@ function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean
             <div className="flex justify-between text-[11px] text-emerald-700/70 dark:text-emerald-500/70 leading-none mt-1">
                 <span>{tr(cell["박사신"] || "")}</span><span>{tr(cell["장생신"] || "")}</span>
             </div>
-            {/* 대한 · 소한 */}
-            <div className="text-[10px] text-slate-400 leading-none mt-0.5">{hangul ? "대한" : "大"} {cell["대한"]} · {hangul ? "소한" : "小"} {(cell["소한"] || []).slice(0, 5).join(",")}</div>
-            {/* 궁명 + 방위 + 간지 */}
+            {/* 대한 · 소한 · 유년 */}
+            <div className="text-[9px] text-slate-400 leading-tight mt-0.5">
+                <div>{hangul ? "대한" : "大限"} {cell["대한"]}</div>
+                <div>{hangul ? "소한" : "小限"} {(cell["소한"] || []).slice(0, 5).join(",")}</div>
+                <div>{hangul ? "유년" : "流年"} {(cell["유년"] || []).slice(0, 5).join(",")}</div>
+            </div>
+            {/* 궁명 + 신궁 + 방위 + 간지 */}
             <div className="flex justify-between items-end mt-1">
                 <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>
                     {hangul ? (cell["궁"] || tr(cell["궁한자"])) : (cell["궁한자"] || cell["궁"])}
+                    {cell["is신궁"] && <span className="text-[10px] text-rose-500 font-bold ml-0.5">{hangul ? "신" : "身"}</span>}
                     <span className="text-[9px] text-slate-400 ml-0.5">{JAMI_DIR[zi] || ""}</span>
                 </span>
                 <span className="text-[14px] text-indigo-500 dark:text-indigo-400 leading-none">{cell["궁간지"] || zi}</span>
@@ -224,6 +229,9 @@ function JamiBoard({ jami, hangul }: { jami: any; hangul: boolean }) {
                     <div className="text-xs text-slate-400">{hangul ? "자미두수 명반" : "紫微斗數 命盤"}</div>
                     <div className="text-lg font-bold text-[#bf953f]">{jami["五行局"]}</div>
                     <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · {juseong}</div>
+                    {(jami["명주"] || jami["신주"]) && (
+                        <div className="text-[10px] text-slate-500">{hangul ? "명주" : "命主"} {jami["명주"]} · {hangul ? "신주" : "身主"} {jami["신주"]} · {hangul ? "신궁" : "身宮"} {jami["신궁"]}</div>
+                    )}
                     {jami["음력"] && <div className="text-[10px] text-slate-400">음력 {jami["음력"]}</div>}
                     {/* 자화기호 범례 */}
                     <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-0.5 text-[9px] mt-1 font-bold">
