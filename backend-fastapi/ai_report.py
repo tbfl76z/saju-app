@@ -727,10 +727,11 @@ def build_jami_prompt(jami: dict, focus: str = "종합") -> str:
     # 대한/유년 초점이면 현재 나이가 든 궁을 찾아 명시
     age = jami.get("현재나이")
     age_line = ""
-    if age and focus in ("대한", "유년"):
+    if age:
         daehan = next((c["궁한자"] for c in board if _in_range(c.get("대한", ""), age)), "")
         yun = next((c["궁한자"] for c in board if age in (c.get("유년") or [])), "")
-        age_line = f"        - 현재 나이(세는나이): {age}세 → 대한궁 {daehan or '?'} · 유년궁 {yun or '?'}\n"
+        age_line = (f"        - 현재 나이(세는나이) {age}세 → 현재 대한궁 {daehan or '?'} · 올해 유년궁 {yun or '?'}"
+                    f" (반드시 이 나이를 기준으로 해석하고, 나이를 다시 계산하지 마세요)\n")
     q = "\n".join(f"        {i}. {x}" for i, x in enumerate(fc["q"], 1))
     return (
         f"\n        [자미두수 명반 — {fc['scope']}]\n"

@@ -291,7 +291,8 @@ function JamiView({ profile }: { profile?: any }) {
             setInterp("해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
         } finally { setInterpreting(false); }
     }
-    useEffect(() => { go(init); /* eslint-disable-next-line */ }, [profile?.id]);
+    // 프로필 로드/변경 시 날짜 입력창(dt)도 프로필 값으로 동기화 후 명반 로드 (입력창-명반 불일치 방지)
+    useEffect(() => { setDt(init); setInterp(""); setFocus(""); go(init); /* eslint-disable-next-line */ }, [profile?.id]);
     const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
         <input type="number" value={dt[k]} min={min} max={max}
             onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
