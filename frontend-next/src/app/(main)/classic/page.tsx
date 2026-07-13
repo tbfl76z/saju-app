@@ -7,6 +7,34 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { listProfilesPrimaryFirst, type SavedProfile } from "@/lib/storage";
+import { streamSSE } from "@/lib/analyzeStream";
+import { ReportRenderer } from "@/components/ReportRenderer";
+
+// 자미두수 성요·묘왕·사화·궁명 한자 → 한글 (한글 토글용)
+const HANJA_KO: Record<string, string> = {
+    // 14주성
+    "紫微": "자미", "天機": "천기", "太陽": "태양", "武曲": "무곡", "天同": "천동", "廉貞": "염정",
+    "天府": "천부", "太陰": "태음", "貪狼": "탐랑", "巨門": "거문", "天相": "천상", "天梁": "천량", "七殺": "칠살", "破軍": "파군",
+    // 보조성
+    "文昌": "문창", "文曲": "문곡", "左輔": "좌보", "右弼": "우필", "天魁": "천괴", "天鉞": "천월", "祿存": "녹존", "天馬": "천마",
+    "擎羊": "경양", "陀羅": "타라", "火星": "화성", "鈴星": "영성", "地空": "지공", "地劫": "지겁",
+    // 잡성
+    "天刑": "천형", "天姚": "천요", "紅鸞": "홍란", "天喜": "천희", "龍池": "용지", "鳳閣": "봉각", "天哭": "천곡", "天虛": "천허",
+    "孤辰": "고신", "寡宿": "과숙", "三台": "삼태", "八座": "팔좌", "天官": "천관", "天福": "천복", "天傷": "천상", "天使": "천사", "旬空": "순공",
+    // 박사12신
+    "博士": "박사", "力士": "역사", "青龍": "청룡", "小耗": "소모", "將軍": "장군", "奏書": "주서", "飛廉": "비렴", "喜神": "희신",
+    "病符": "병부", "大耗": "대모", "伏兵": "복병", "官符": "관부",
+    // 장생12신
+    "長生": "장생", "沐浴": "목욕", "冠帶": "관대", "臨官": "임관", "帝旺": "제왕", "衰": "쇠", "病": "병", "死": "사", "墓": "묘", "絕": "절", "胎": "태", "養": "양",
+    // 사화
+    "化祿": "화록", "化權": "화권", "化科": "화과", "化忌": "화기",
+    // 묘왕
+    "廟": "묘", "旺": "왕", "得地": "득지", "利": "리", "平": "평", "不得地": "불득지", "陷": "함", "失": "실",
+    // 12궁명
+    "命宮": "명궁", "兄弟": "형제", "夫妻": "부처", "子女": "자녀", "財帛": "재백", "疾厄": "질액",
+    "遷移": "천이", "奴僕": "노복", "官祿": "관록", "田宅": "전택", "福德": "복덕", "父母": "부모",
+};
+const ko = (x: string) => HANJA_KO[x] || x;
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
@@ -116,19 +144,21 @@ const HWA_COLOR: Record<string, string> = {
 };
 
 // 자미 명반 1칸 — 원본 스타일(보조성·잡성·주성+묘왕+사화·박사신·장생신·소한·궁명·간지)
-function JamiCell({ cell, zi }: { cell: any; zi: string }) {
+// hangul=true 이면 성요·묘왕·사화·궁명을 한글로 표시
+function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean }) {
     const hwaOf: Record<string, string> = {};
     (cell["사화"] || []).forEach((s: any) => { hwaOf[s["성"]] = s["화"]; });
     const miowang: Record<string, string> = cell["묘왕"] || {};
     const aux = [...(cell["보좌"] || []), ...(cell["잡성"] || [])];
+    const tr = (x: string) => (hangul ? ko(x) : x);
     return (
         <div className={"rounded-md border p-1.5 min-h-[150px] flex flex-col font-noto-serif " +
             (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
             {/* 보조성·잡성 (위) */}
             <div className="flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                {aux.map((s: string, i: number) => <span key={i}>{s}</span>)}
+                {aux.map((s: string, i: number) => <span key={i}>{tr(s)}</span>)}
             </div>
-            {/* 주성(한자) + 묘왕 + 사화 */}
+            {/* 주성 + 묘왕 + 사화 */}
             <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 flex-1 content-start">
                 {(cell["주성"] || []).length
                     ? (cell["주성"] || []).map((s: string, i: number) => {
@@ -136,49 +166,50 @@ function JamiCell({ cell, zi }: { cell: any; zi: string }) {
                         const hwa = hwaOf[s];
                         return (
                             <span key={i} className="text-[19px] font-bold text-rose-600 dark:text-rose-400 leading-none">
-                                {s}
-                                {miowang[han] && <sub className="text-[11px] font-normal text-slate-400 ml-px">{miowang[han]}</sub>}
-                                {hwa && <sup className={"text-[11px] ml-px " + (HWA_COLOR[hwa] || "")}>{hwa[1]}</sup>}
+                                {hangul ? (han || ko(s)) : s}
+                                {miowang[han] && <sub className="text-[11px] font-normal text-slate-400 ml-px">{tr(miowang[han])}</sub>}
+                                {hwa && <sup className={"text-[11px] ml-px " + (HWA_COLOR[hwa] || "")}>{hangul ? ko(hwa)[1] : hwa[1]}</sup>}
                             </span>
                         );
                     })
-                    : <span className="text-[12px] text-slate-300 dark:text-slate-600">無主星</span>}
+                    : <span className="text-[12px] text-slate-300 dark:text-slate-600">{hangul ? "무주성" : "無主星"}</span>}
             </div>
             {/* 박사신 · 장생신 */}
             <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 leading-none mt-1">
-                <span>{cell["박사신"] || ""}</span><span>{cell["장생신"] || ""}</span>
+                <span>{tr(cell["박사신"] || "")}</span><span>{tr(cell["장생신"] || "")}</span>
             </div>
             {/* 대한 · 소한 */}
-            <div className="text-[10px] text-slate-400 leading-none mt-0.5">大 {cell["대한"]} · 小 {(cell["소한"] || []).slice(0, 5).join(",")}</div>
+            <div className="text-[10px] text-slate-400 leading-none mt-0.5">{hangul ? "대한" : "大"} {cell["대한"]} · {hangul ? "소한" : "小"} {(cell["소한"] || []).slice(0, 5).join(",")}</div>
             {/* 궁명 + 간지 */}
             <div className="flex justify-between items-end mt-1">
-                <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>{cell["궁한자"] || cell["궁"]}</span>
+                <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>{hangul ? (cell["궁"] || tr(cell["궁한자"])) : (cell["궁한자"] || cell["궁"])}</span>
                 <span className="text-[14px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
             </div>
         </div>
     );
 }
 
-function JamiBoard({ jami }: { jami: any }) {
+function JamiBoard({ jami, hangul }: { jami: any; hangul: boolean }) {
     const board: any[] = jami["명반"] || [];
     if (!board.length) return null;
     const byZi: Record<string, any> = {};
     board.forEach((c) => (byZi[c["지지"]] = c));
+    const juseong = (jami["명궁주성"] || []).map((s: string) => (hangul ? ko(s) : s)).join("·") || (hangul ? "무주성" : "無主星");
     return (
         <div className="glass-card p-2 overflow-x-auto">
             <div className="grid grid-cols-4 grid-rows-4 gap-1 min-w-[600px]">
                 <div style={{ gridRow: "2 / 4", gridColumn: "2 / 4" }}
                     className="flex flex-col items-center justify-center text-center gap-1 rounded-lg bg-[#d4af37]/8 border border-[#d4af37]/30 font-noto-serif">
-                    <div className="text-xs text-slate-400">紫微斗數 命盤</div>
+                    <div className="text-xs text-slate-400">{hangul ? "자미두수 명반" : "紫微斗數 命盤"}</div>
                     <div className="text-lg font-bold text-[#bf953f]">{jami["五行局"]}</div>
-                    <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · {(jami["명궁주성"] || []).join("·") || "無主星"}</div>
+                    <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · {juseong}</div>
                     {jami["음력"] && <div className="text-[10px] text-slate-400">음력 {jami["음력"]}</div>}
                     <div className="text-[8px] text-slate-400 mt-1">묘왕<sub>아래</sub> · 사화<sup>위</sup></div>
                 </div>
                 {Object.entries(JAMI_POS).map(([zi, [r, c]]) => {
                     const cell = byZi[zi];
                     if (!cell) return null;
-                    return <div key={zi} style={{ gridRow: r, gridColumn: c }}><JamiCell cell={cell} zi={zi} /></div>;
+                    return <div key={zi} style={{ gridRow: r, gridColumn: c }}><JamiCell cell={cell} zi={zi} hangul={hangul} /></div>;
                 })}
             </div>
         </div>
@@ -194,15 +225,28 @@ function JamiView({ profile }: { profile?: any }) {
     const [dt, setDt] = useState(init);
     const [jami, setJami] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [hangul, setHangul] = useState(false);
+    // AI 해석
+    const [interp, setInterp] = useState("");
+    const [interpreting, setInterpreting] = useState(false);
+    const reqBody = (d: typeof dt) => ({ name: "", gender: d.gender, year: d.y, month: d.m, day: d.d, hour: d.h, minute: 0, calendar: "양력" });
     async function go(d = dt) {
-        setLoading(true);
+        setLoading(true); setInterp("");
         try {
             const res = await fetch(`${API_BASE}/classic/full`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: "", gender: d.gender, year: d.y, month: d.m, day: d.d, hour: d.h, minute: 0, calendar: "양력" }),
+                body: JSON.stringify(reqBody(d)),
             });
             setJami((await res.json())["자미두수"]);
         } finally { setLoading(false); }
+    }
+    async function interpret() {
+        setInterpreting(true); setInterp("");
+        try {
+            await streamSSE(`${API_BASE}/classic/jami/analyze`, reqBody(dt), setInterp);
+        } catch {
+            setInterp("해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        } finally { setInterpreting(false); }
     }
     useEffect(() => { go(init); /* eslint-disable-next-line */ }, [profile?.id]);
     const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
@@ -221,7 +265,21 @@ function JamiView({ profile }: { profile?: any }) {
                 </select>
                 <Button onClick={() => go(dt)} disabled={loading} className="ml-1 h-8">명반 보기</Button>
             </div>
-            {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : jami && <JamiBoard jami={jami} />}
+            {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : jami && <>
+                {/* 한자/한글 토글 */}
+                <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => setHangul(false)}
+                        className={"px-3 py-1 rounded-full text-xs font-semibold " + (!hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>漢字</button>
+                    <button onClick={() => setHangul(true)}
+                        className={"px-3 py-1 rounded-full text-xs font-semibold " + (hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>한글</button>
+                </div>
+                <JamiBoard jami={jami} hangul={hangul} />
+                {/* AI 해석 */}
+                <div className="flex justify-center">
+                    <Button onClick={interpret} disabled={interpreting}>{interpreting ? "해석 중…" : interp ? "🔮 다시 해석" : "🔮 AI 해석 보기"}</Button>
+                </div>
+                {interp && <div className="glass-card p-5"><ReportRenderer text={interp} streaming={interpreting} /></div>}
+            </>}
         </div>
     );
 }

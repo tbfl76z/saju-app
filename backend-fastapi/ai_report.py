@@ -581,15 +581,11 @@ def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-def stream_report(req: Any) -> Iterator[str]:
-    """스트리밍 방식 AI 리포트 생성. SSE 청크(delta)와 종료(done) 이벤트를 흘린다."""
-    prompt = build_prompt(req)
-    system_instruction = _system_for(req)
-    models_to_try = _get_models_to_try()
+def _stream_models(prompt: str, system_instruction: str) -> Iterator[str]:
+    """모델 폴백 스트림(SSE). stream_report·stream_jami 공용."""
     produced = False
     error_msg = ""
-
-    for model_name in models_to_try:
+    for model_name in _get_models_to_try():
         try:
             model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
             # 첫 청크 전 무한 행 방지: 타임아웃 초과 시 예외 → 다음 모델로 폴백
@@ -605,23 +601,93 @@ def stream_report(req: Any) -> Iterator[str]:
         except Exception as e:
             error_msg = str(e)
             if not produced:
-                # 첫 청크 전 오류(할당량 등) → 다음 모델로 폴백
                 continue
-            # 스트리밍 도중 오류 → 에러 플래그와 함께 종료
             yield _sse({"done": True, "error": str(e)})
             return
-
-    # Gemini 전 모델이 아무것도 못 내면 OpenRouter로 폴백(비스트리밍 → 한 번에 전달)
+    # Gemini 전 모델 실패 시 OpenRouter로 폴백(비스트리밍 → 한 번에)
     if not produced:
         fb = _openrouter_generate(prompt, system_instruction)
         if fb:
             yield _sse({"delta": fb})
             yield _sse({"done": True})
             return
-        yield _sse({
-            "delta": "죄송합니다. 현재 AI 모델 사용량이 한도에 도달했습니다. 잠시 후 다시 시도해 주세요."
-        })
+        yield _sse({"delta": "죄송합니다. 현재 AI 모델 사용량이 한도에 도달했습니다. 잠시 후 다시 시도해 주세요."})
         yield _sse({"done": True, "error": error_msg or "no_model"})
+
+
+def stream_report(req: Any) -> Iterator[str]:
+    """스트리밍 방식 AI 리포트 생성. SSE 청크(delta)와 종료(done) 이벤트를 흘린다."""
+    yield from _stream_models(build_prompt(req), _system_for(req))
+
+
+# ---------------------------------------------------------------------------
+# 자미두수(紫微斗數) 명반 해석 — 명반 데이터를 절대 기준으로 자미두수 체계로 풀이
+# ---------------------------------------------------------------------------
+JAMI_SYSTEM = (
+    "당신은 자미두수(紫微斗數)에 정통한 대가입니다.\n"
+    "해석 원칙:\n"
+    "1. [데이터 기준] 제공된 명반(명궁·삼방사정·12궁 성요·사화·대한·묘왕)은 검증된 정밀 데이터입니다. 절대 다시 계산하지 말고, 이 명반을 절대적 기준으로 삼아 해석하세요. 특정 외부 앱·서비스·프로그램 이름은 언급하지 마세요.\n"
+    "2. 자미두수 원리로 풀이하세요 — 14주성 각각의 성질, 묘왕리함(廟·旺·得地·利·平·不得地·陷)에 따른 강약, 삼방사정(명궁+재백+관록+천이)이 이루는 격국, 사화(化祿·化權·化科·化忌)가 든 궁의 강조·주의, 대한(大限)의 시기 흐름을 근거로 삼으세요.\n"
+    "3. 사주(명리)가 아니라 자미두수 체계로 해석하세요. 성요는 한자로 언급하되 그 의미를 풀어 자연스러운 상담 문장으로 녹여내세요.\n"
+    "4. 단정 대신 통찰로, 전문가의 품격에 맞는 존댓말로 따뜻하게 서술하세요.\n\n"
+    "출력 형식(매우 중요):\n"
+    "- 반드시 다음 네 개의 마크다운 헤딩만 사용하세요: '## 총평', '## 명반 정밀 해석', '## 삶의 영역별 조언', '## 대가의 한마디'.\n"
+    "- 위 네 헤딩 외 다른 헤딩(#, ###)·기울임(*)·코드블록(`)은 쓰지 마세요.\n"
+    "- 핵심 키워드·조언은 **굵게**(별표 두 개)로 강조하되 한 섹션에 1~3곳만.\n"
+    "- 각 섹션은 충분한 분량(4~7문장 이상)으로 알차게 작성하세요."
+)
+
+_JAMI_GUNG_ORDER = ["명궁", "형제", "부처", "자녀", "재백", "질액", "천이", "노복", "관록", "전택", "복덕", "부모"]
+
+
+def build_jami_prompt(jami: dict) -> str:
+    """자미두수 명반 데이터 → 해석 프롬프트."""
+    board = jami.get("명반", []) or []
+    byg = {c.get("궁"): c for c in board}
+
+    def cell_desc(c: dict) -> str:
+        mw = c.get("묘왕", {}) or {}
+
+        def _st(s: str, h: str) -> str:
+            g = mw.get(h, "")
+            return f"{s}({g})" if g else s
+        stars = "·".join(_st(s, h) for s, h in zip(c.get("주성", []), c.get("주성한글", []))) or "무주성"
+        aux = "·".join((c.get("보좌", []) or []) + (c.get("잡성", []) or []))
+        hwa = "·".join(f"{x['화']}({x['성']})" for x in (c.get("사화", []) or []))
+        parts = [f"{c.get('궁한자', c.get('궁'))}({c.get('지지')}): 주성 {stars}"]
+        if aux:
+            parts.append(f"보조·잡성 {aux}")
+        if hwa:
+            parts.append(f"사화 {hwa}")
+        parts.append(f"박사 {c.get('박사신', '-')}·장생 {c.get('장생신', '-')}·대한 {c.get('대한', '-')}")
+        return " | ".join(parts)
+
+    lines = "\n".join(f"        - {cell_desc(byg[g])}" for g in _JAMI_GUNG_ORDER if g in byg)
+    sam = [byg.get(g) for g in ("명궁", "재백", "관록", "천이")]
+    samdesc = " / ".join(
+        f"{c.get('궁한자')} {'·'.join(c.get('주성', [])) or '무주성'}" for c in sam if c
+    )
+    questions = [
+        "명궁의 주성과 묘왕을 중심으로 타고난 성격·기질·재능을 설명해 주세요.",
+        "삼방사정(명궁·재백·관록·천이)의 성요 구조로 본 인생의 큰 틀과 사회적 성향을 분석해 주세요.",
+        "부처(배우자)·재백(재물)·관록(직업)·질액(건강)·천이(대외활동) 등 주요 궁을 성요 근거로 영역별 해석해 주세요.",
+        "사화(化祿·化權·化科·化忌)가 어느 궁에 들었는지로 이 명반이 강조하는 지점과 주의할 지점을 짚어 주세요.",
+        "현재 나이가 속한 대한(大限)의 궁·성요로 지금 시기의 흐름과 조언을 들려주세요.",
+        "명반 전체의 균형을 위해 지향해야 할 삶의 태도와 핵심 조언을 들려주세요.",
+    ]
+    q = "\n".join(f"        {i}. {x}" for i, x in enumerate(questions, 1))
+    return (
+        f"\n        [자미두수 명반]\n"
+        f"        - 五行局: {jami.get('五行局')} / 명궁: {jami.get('명궁')}궁 (주성: {'·'.join(jami.get('명궁주성', [])) or '무주성'}) / 음력 {jami.get('음력', '')}\n"
+        f"        - 삼방사정: {samdesc}\n"
+        f"        - 12궁 배치:\n{lines}\n\n"
+        f"        [분석 요청 — 아래 항목을 순서대로 빠짐없이 다루되 네 섹션에 자연스럽게 녹이세요]\n{q}\n"
+    )
+
+
+def stream_jami(jami: dict) -> Iterator[str]:
+    """자미두수 명반 해석 스트림."""
+    yield from _stream_models(build_jami_prompt(jami), JAMI_SYSTEM)
 
 
 # ---------------------------------------------------------------------------

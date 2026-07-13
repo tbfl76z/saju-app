@@ -74,3 +74,40 @@ export async function streamAnalyze(
         return result;
     }
 }
+
+// 범용 SSE 스트림(자미두수 해석 등 임의 엔드포인트). onDelta는 누적 텍스트를 전달.
+export async function streamSSE(
+    url: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    body: any,
+    onDelta: (accumulated: string) => void
+): Promise<string> {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let acc = "";
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const json = trimmed.slice(5).trim();
+            if (!json) continue;
+            try {
+                const evt = JSON.parse(json);
+                if (evt.delta) { acc += evt.delta; onDelta(acc); }
+            } catch { /* 부분 JSON 무시 */ }
+        }
+    }
+    return acc;
+}

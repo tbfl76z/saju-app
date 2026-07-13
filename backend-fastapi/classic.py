@@ -13,12 +13,14 @@ import datetime as _dt
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from sajupy import SajuCalculator, get_saju_details, lunar_to_solar, solar_to_lunar
 from saju_utils import get_extended_saju_data
 from content_db import ContentDB, CHEONGAN, JIJI
 import divination
+import ai_report
 import myungri_engine
 import sinsal_engine
 import yearun_engine
@@ -191,6 +193,21 @@ async def full(req: ClassicReq):
         return {"자미두수": _jami(det)}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@router.post("/jami/analyze")
+async def jami_analyze(req: ClassicReq):
+    """자미두수 명반 AI 해석(SSE 스트림). 명반을 절대 기준으로 자미두수 체계로 풀이."""
+    try:
+        det = _chart(req)
+        jami = _jami(det)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return StreamingResponse(
+        ai_report.stream_jami(jami),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/compatibility")
