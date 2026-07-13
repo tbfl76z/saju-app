@@ -48,7 +48,7 @@ export function ChapterGallery({ images, label = "원전 자료 도표", default
             {/* 확대 보기 */}
             {zoom && (
                 <div
-                    className="fixed inset-0 z-[100] bg-black/90 overflow-auto p-2 sm:p-4"
+                    className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-2"
                     onClick={() => setZoom(null)}
                 >
                     <button onClick={() => setZoom(null)} className="fixed top-3 right-3 z-10 text-white bg-black/60 rounded-full p-1.5" aria-label="닫기">
@@ -58,8 +58,7 @@ export function ChapterGallery({ images, label = "원전 자료 도표", default
                     <img
                         src={`${API_BASE}${zoom}`}
                         alt="명리학 학습 도표 확대"
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-4xl mx-auto rounded-lg bg-white"
+                        className="max-w-full max-h-[96vh] object-contain rounded-lg bg-white"
                     />
                 </div>
             )}
