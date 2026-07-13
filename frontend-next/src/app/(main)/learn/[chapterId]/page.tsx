@@ -193,13 +193,19 @@ export default function ChapterPage() {
                             <ArrowLeft className="h-4 w-4 mr-1" /> 이전
                         </Button>
                         {isLastCard ? (
-                            <Button
-                                onClick={startQuiz}
-                                disabled={quizLoading}
-                                className="rounded-xl flex-[2] bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white font-bold"
-                            >
-                                {quizLoading ? "퀴즈 준비 중…" : "✏️ 확인 퀴즈 시작 (10문항)"}
-                            </Button>
+                            chapterId === "cheatsheet" ? (
+                                <div className="rounded-xl flex-[2] flex items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400 font-semibold px-2">
+                                    📖 아래 &apos;조견표 한눈에보기&apos;에서 원본 표를 확인하세요
+                                </div>
+                            ) : (
+                                <Button
+                                    onClick={startQuiz}
+                                    disabled={quizLoading}
+                                    className="rounded-xl flex-[2] bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white font-bold"
+                                >
+                                    {quizLoading ? "퀴즈 준비 중…" : "✏️ 확인 퀴즈 시작 (10문항)"}
+                                </Button>
+                            )
                         ) : (
                             <Button
                                 onClick={() => goCard(cardIdx + 1)}
@@ -300,7 +306,7 @@ export default function ChapterPage() {
             )}
 
             {/* 원전 자료 도표 (퀴즈 중에는 숨김 — 컨닝 방지보다는 집중 유도) */}
-            {stage !== "quiz" && <ChapterGallery images={chapter.images} />}
+            {stage !== "quiz" && <ChapterGallery images={chapter.images} label={chapterId === "cheatsheet" ? "조견표 한눈에보기" : "원전 자료 도표"} defaultOpen={chapterId === "cheatsheet"} />}
 
             {/* AI 튜터 — 모든 단계에서 사용 가능 */}
             <TutorPanel chapterId={chapterId} contextHint={wrongHint} />
