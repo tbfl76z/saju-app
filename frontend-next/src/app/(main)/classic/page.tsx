@@ -36,6 +36,24 @@ const HANJA_KO: Record<string, string> = {
 };
 const ko = (x: string) => HANJA_KO[x] || x;
 
+// 성요 분류별 색상 (길성=파랑, 살성=빨강, 잡성=회색)
+const GILSEONG = new Set(["文昌", "文曲", "左輔", "右弼", "天魁", "天鉞", "祿存", "天馬"]);
+const SALSEONG = new Set(["擎羊", "陀羅", "火星", "鈴星", "地空", "地劫"]);
+const auxColor = (s: string) =>
+    GILSEONG.has(s) ? "text-sky-600 dark:text-sky-400"
+        : SALSEONG.has(s) ? "text-rose-500 dark:text-rose-400"
+            : "text-slate-400 dark:text-slate-500";
+// 묘왕 색상 (廟旺득지=금색 길 / 함실불득지=회색 / 그 외 중간)
+const mwColor = (g: string) =>
+    ["廟", "旺", "得地"].includes(g) ? "text-amber-600 dark:text-amber-500"
+        : ["陷", "失", "不得地"].includes(g) ? "text-slate-400"
+            : "text-slate-500 dark:text-slate-400";
+// 12지지 방위
+const JAMI_DIR: Record<string, string> = {
+    "子": "정북", "丑": "북동", "寅": "동북", "卯": "정동", "辰": "동남", "巳": "남동",
+    "午": "정남", "未": "남서", "申": "서남", "酉": "정서", "戌": "서북", "亥": "북서",
+};
+
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
 // /calculate 저장응답에서 생년월일시 파싱 → /classic 입력
@@ -154,9 +172,9 @@ function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean
     return (
         <div className={"rounded-md border p-1.5 min-h-[150px] flex flex-col font-noto-serif " +
             (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
-            {/* 보조성·잡성 (위) */}
-            <div className="flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                {aux.map((s: string, i: number) => <span key={i}>{tr(s)}</span>)}
+            {/* 보조성·잡성 (위) — 길성 파랑 / 살성 빨강 / 잡성 회색 */}
+            <div className="flex flex-wrap gap-x-1 text-[11px] leading-tight">
+                {aux.map((s: string, i: number) => <span key={i} className={auxColor(s)}>{tr(s)}</span>)}
             </div>
             {/* 주성 + 묘왕 + 사화 */}
             <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 flex-1 content-start">
@@ -165,25 +183,28 @@ function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean
                         const han = (cell["주성한글"] || [])[i];
                         const hwa = hwaOf[s];
                         return (
-                            <span key={i} className="text-[19px] font-bold text-rose-600 dark:text-rose-400 leading-none">
+                            <span key={i} className="text-[19px] font-bold text-slate-800 dark:text-slate-100 leading-none">
                                 {hangul ? (han || ko(s)) : s}
-                                {miowang[han] && <sub className="text-[11px] font-normal text-slate-400 ml-px">{tr(miowang[han])}</sub>}
-                                {hwa && <sup className={"text-[11px] ml-px " + (HWA_COLOR[hwa] || "")}>{hangul ? ko(hwa)[1] : hwa[1]}</sup>}
+                                {miowang[han] && <sub className={"text-[11px] font-normal ml-px " + mwColor(miowang[han])}>{tr(miowang[han])}</sub>}
+                                {hwa && <sup className={"text-[11px] font-bold ml-px " + (HWA_COLOR[hwa] || "")}>{hangul ? ko(hwa)[1] : hwa[1]}</sup>}
                             </span>
                         );
                     })
                     : <span className="text-[12px] text-slate-300 dark:text-slate-600">{hangul ? "무주성" : "無主星"}</span>}
             </div>
             {/* 박사신 · 장생신 */}
-            <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 leading-none mt-1">
+            <div className="flex justify-between text-[11px] text-emerald-700/70 dark:text-emerald-500/70 leading-none mt-1">
                 <span>{tr(cell["박사신"] || "")}</span><span>{tr(cell["장생신"] || "")}</span>
             </div>
             {/* 대한 · 소한 */}
             <div className="text-[10px] text-slate-400 leading-none mt-0.5">{hangul ? "대한" : "大"} {cell["대한"]} · {hangul ? "소한" : "小"} {(cell["소한"] || []).slice(0, 5).join(",")}</div>
-            {/* 궁명 + 간지 */}
+            {/* 궁명 + 방위 + 간지 */}
             <div className="flex justify-between items-end mt-1">
-                <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>{hangul ? (cell["궁"] || tr(cell["궁한자"])) : (cell["궁한자"] || cell["궁"])}</span>
-                <span className="text-[14px] text-sky-600 dark:text-sky-400 leading-none">{cell["궁간지"] || zi}</span>
+                <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>
+                    {hangul ? (cell["궁"] || tr(cell["궁한자"])) : (cell["궁한자"] || cell["궁"])}
+                    <span className="text-[9px] text-slate-400 ml-0.5">{JAMI_DIR[zi] || ""}</span>
+                </span>
+                <span className="text-[14px] text-indigo-500 dark:text-indigo-400 leading-none">{cell["궁간지"] || zi}</span>
             </div>
         </div>
     );
@@ -204,7 +225,20 @@ function JamiBoard({ jami, hangul }: { jami: any; hangul: boolean }) {
                     <div className="text-lg font-bold text-[#bf953f]">{jami["五行局"]}</div>
                     <div className="text-xs text-slate-500">명궁 {jami["명궁"]} · {juseong}</div>
                     {jami["음력"] && <div className="text-[10px] text-slate-400">음력 {jami["음력"]}</div>}
-                    <div className="text-[8px] text-slate-400 mt-1">묘왕<sub>아래</sub> · 사화<sup>위</sup></div>
+                    {/* 자화기호 범례 */}
+                    <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-0.5 text-[9px] mt-1 font-bold">
+                        <span className="text-emerald-600 dark:text-emerald-400">祿</span>
+                        <span className="text-blue-600 dark:text-blue-400">權</span>
+                        <span className="text-violet-600 dark:text-violet-400">科</span>
+                        <span className="text-rose-600 dark:text-rose-400">忌</span>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-x-1.5 text-[8px] text-slate-400">
+                        <span className="text-sky-600 dark:text-sky-400">길성</span>
+                        <span className="text-rose-500">살성</span>
+                        <span>잡성</span>
+                        <span className="text-amber-600">묘·왕</span>
+                    </div>
+                    <div className="text-[8px] text-slate-400">묘왕<sub>아래</sub> · 사화<sup>위</sup></div>
                 </div>
                 {Object.entries(JAMI_POS).map(([zi, [r, c]]) => {
                     const cell = byZi[zi];
