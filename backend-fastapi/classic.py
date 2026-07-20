@@ -38,6 +38,19 @@ SS12 = {"겁살": 1, "재살": 2, "천살": 3, "지살": 4, "년살": 5, "월살
 DIR_KO = {"子": "정북", "丑": "북북동", "寅": "동북", "卯": "정동", "辰": "동남", "巳": "남남동",
           "午": "정남", "未": "남남서", "申": "서남", "酉": "정서", "戌": "서북", "亥": "북북서"}
 
+# 택일(擇日): 건제12신 + 황도흑도 (표준 산법)
+GEONJE = ["建", "除", "滿", "平", "定", "執", "破", "危", "成", "收", "開", "閉"]
+GEONJE_KO = {"建": "건(建)", "除": "제(除)", "滿": "만(滿)", "平": "평(平)", "定": "정(定)", "執": "집(執)",
+             "破": "파(破)", "危": "위(危)", "成": "성(成)", "收": "수(收)", "開": "개(開)", "閉": "폐(閉)"}
+# 월지 → 청룡(황도 시작) 일지
+CHEONGRYONG = {"子": "申", "丑": "戌", "寅": "子", "卯": "寅", "辰": "辰", "巳": "午",
+               "午": "申", "未": "戌", "申": "子", "酉": "寅", "戌": "辰", "亥": "午"}
+HWANGHEUK = ["청룡", "명당", "천형", "주작", "금궤", "천덕", "백호", "옥당", "천뢰", "현무", "사명", "구진"]
+_HWANGDO_IDX = {0, 1, 4, 5, 7, 10}  # 황도(길): 청룡·명당·금궤·천덕·옥당·사명
+# 목적별 길한 건제신(idx) / 공통 흉신
+PURPOSE_GIL = {"결혼": {4, 8, 10}, "이사": {1, 8, 10}, "개업": {0, 2, 8, 10}, "계약": {4, 8, 10}, "여행": {1, 8, 10}}
+_GEONJE_HYUNG = {6, 11}  # 破·閉 (공통 흉)
+
 
 class ClassicReq(BaseModel):
     name: str = ""
@@ -295,3 +308,37 @@ async def gimun(year: int = 0, month: int = 1, day: int = 1, hour: int = 12, min
     center = palaces.get("中", {}) or {}
     return {"국": pog.get("국"), "purpose": purpose, "방위": out,
             "중궁": {"천반": center.get("천반"), "지반": center.get("지반"), "궁": center.get("palace", 5)}}
+
+
+@router.get("/taegil")
+async def taegil(purpose: str = "결혼", year: int = 0, month: int = 0):
+    """택일(擇日) — 건제12신 + 황도흑도로 목적별 길일 추천 (참고용)."""
+    import calendar
+    t = _dt.date.today()
+    if not year:
+        year = t.year
+    if not month:
+        month = t.month
+    gil = PURPOSE_GIL.get(purpose, PURPOSE_GIL["결혼"])
+    ndays = calendar.monthrange(year, month)[1]
+    out = []
+    for day in range(1, ndays + 1):
+        try:
+            res = _calc.calculate_saju(year, month, day, 12, 0, use_solar_time=True, longitude=127.5, early_zi_time=False)
+            P = get_saju_details(res)["pillars"]
+        except Exception:
+            continue
+        ii = JIJI.index(P["day"]["branch"])
+        wi = JIJI.index(P["month"]["branch"])
+        gj = (ii - wi) % 12  # 건제12신 idx
+        if gj in _GEONJE_HYUNG:  # 파·폐 제외
+            continue
+        hh = (ii - JIJI.index(CHEONGRYONG[JIJI[wi]])) % 12
+        is_hwang = hh in _HWANGDO_IDX
+        score = (2 if gj in gil else 0) + (2 if is_hwang else 0)
+        if score <= 0:
+            continue
+        out.append({"day": day, "간지": P["day"]["pillar"], "요일": ["월", "화", "수", "목", "금", "토", "일"][_dt.date(year, month, day).weekday()],
+                    "건제": GEONJE_KO[GEONJE[gj]], "황도": HWANGHEUK[hh], "황도길": is_hwang, "score": score})
+    out.sort(key=lambda x: (-x["score"], x["day"]))
+    return {"purpose": purpose, "year": year, "month": month, "길일": out}

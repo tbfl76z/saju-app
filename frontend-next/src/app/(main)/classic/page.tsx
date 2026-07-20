@@ -67,7 +67,7 @@ function toBirth(s: any) {
     };
 }
 
-type Tab = "자미" | "주역" | "기문";
+type Tab = "자미" | "주역" | "기문" | "택일";
 
 // 자미두수 명반: 지지 고정 배치(4×4 외곽 12궁) → [row, col]
 const JAMI_POS: Record<string, [number, number]> = {
@@ -147,12 +147,12 @@ export default function ClassicPage() {
 
                     {/* 탭 */}
                     <div className="flex gap-1.5 mb-4 flex-wrap">
-                        {(["자미", "주역", "기문"] as Tab[]).map((t) => (
+                        {(["자미", "주역", "기문", "택일"] as Tab[]).map((t) => (
                             <button key={t} onClick={() => setTab(t)}
                                 className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
                                     (tab === t ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
                                         : "text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
-                                {t === "자미" ? "자미두수" : t === "주역" ? "주역점" : "기문방위"}
+                                {t === "자미" ? "자미두수" : t === "주역" ? "주역점" : t === "기문" ? "기문방위" : "택일"}
                             </button>
                         ))}
                     </div>
@@ -160,6 +160,7 @@ export default function ClassicPage() {
                     {tab === "자미" && <JamiView profile={profile} />}
                     {tab === "주역" && <JuyeokView />}
                     {tab === "기문" && <GimunView profile={profile} />}
+                    {tab === "택일" && <TaegilView />}
                 </>
             )}
         </div>
@@ -445,6 +446,58 @@ function JuyeokView() {
                 <Section title={`본괘 — ${r["괘명"]}`}><Pungi>{r["풀이"]}</Pungi></Section>
                 {r["변괘"] && <Section title={`변괘(지괘) — ${r["변괘"]["괘명"]}`}><Pungi>{r["변괘"]["풀이"]}</Pungi></Section>}
             </>}
+        </div>
+    );
+}
+
+function TaegilView() {
+    const now = new Date();
+    const PURP = ["결혼", "이사", "개업", "계약", "여행"];
+    const [purpose, setPurpose] = useState("결혼");
+    const [y, setY] = useState(now.getFullYear());
+    const [m, setM] = useState(now.getMonth() + 1);
+    const [data, setData] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    async function go(p = purpose, yy = y, mm = m) {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/classic/taegil?purpose=${encodeURIComponent(p)}&year=${yy}&month=${mm}`);
+            setData(await res.json());
+        } finally { setLoading(false); }
+    }
+    useEffect(() => { go(purpose, y, m); /* eslint-disable-next-line */ }, [purpose]);
+    const inp = "w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center";
+    return (
+        <div className="space-y-3">
+            <div className="glass-card p-4 space-y-3">
+                <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+                    <input type="number" value={y} min={1900} max={2100} onChange={(e) => setY(Number(e.target.value))} className={inp} /><span>년</span>
+                    <input type="number" value={m} min={1} max={12} onChange={(e) => setM(Number(e.target.value))} className={inp} /><span>월</span>
+                    <Button onClick={() => go(purpose, y, m)} disabled={loading} className="ml-1 h-8">조회</Button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-slate-500">목적</span>
+                    {PURP.map((p) => <button key={p} onClick={() => setPurpose(p)}
+                        className={"px-3 py-1 rounded-full text-sm " + (purpose === p ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>{p}</button>)}
+                </div>
+            </div>
+            {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : data && (
+                <div className="glass-card p-4">
+                    <div className="text-sm text-slate-500 mb-3">{data.year}년 {data.month}월 <b className="text-[#bf953f]">{data.purpose}</b> 길일 {data["길일"].length}일</div>
+                    {data["길일"].length === 0
+                        ? <p className="text-slate-400 text-sm">이 달에는 추천 길일이 없습니다. 다른 달을 조회해 보세요.</p>
+                        : <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {data["길일"].map((x: any, i: number) => (
+                                <div key={i} className={"rounded-lg border p-2 " + (x.score >= 4 ? "border-[#d4af37] bg-[#d4af37]/8" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
+                                    <div className="font-bold text-[#bf953f]">{x.day}일 <span className="text-xs text-slate-400">({x.요일})</span>{x.score >= 4 && " ★"}</div>
+                                    <div className="text-sm font-noto-serif text-slate-700 dark:text-slate-200">{x["간지"]}</div>
+                                    <div className="text-[11px] text-slate-500">건제 {x["건제"]} · 황도 {x["황도"]}{x["황도길"] && " ✓"}</div>
+                                </div>
+                            ))}
+                        </div>}
+                    <p className="text-[11px] text-slate-400 mt-3">※ 건제12신·황도길일 기반 참고용입니다. ★는 건제 길신+황도 겹친 날.</p>
+                </div>
+            )}
         </div>
     );
 }
