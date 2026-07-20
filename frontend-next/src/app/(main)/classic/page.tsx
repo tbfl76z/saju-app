@@ -76,6 +76,10 @@ const JAMI_POS: Record<string, [number, number]> = {
     "卯": [3, 1], "戌": [3, 4],
     "寅": [4, 1], "丑": [4, 2], "子": [4, 3], "亥": [4, 4],
 };
+const JIJI_ORDER = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+// 삼방사정: 본궁 + 대궁(+6) + 삼합 2궁(+4, +8) 지지idx 집합
+const sambangSet = (zi: number | null): Set<number> =>
+    zi == null ? new Set() : new Set([zi, (zi + 6) % 12, (zi + 4) % 12, (zi + 8) % 12]);
 // 기문 낙서 9궁: 궁번호 → [row, col]
 const GIMUN_POS: Record<number, [number, number]> = {
     4: [1, 1], 9: [1, 2], 2: [1, 3],
@@ -163,14 +167,16 @@ const HWA_COLOR: Record<string, string> = {
 
 // 자미 명반 1칸 — 원본 스타일(보조성·잡성·주성+묘왕+사화·박사신·장생신·소한·궁명·간지)
 // hangul=true 이면 성요·묘왕·사화·궁명을 한글로 표시
-function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean }) {
+function JamiCell({ cell, zi, hangul, sambang, selected, onClick }: { cell: any; zi: string; hangul: boolean; sambang?: boolean; selected?: boolean; onClick?: () => void }) {
     const hwaOf: Record<string, string> = {};
     (cell["사화"] || []).forEach((s: any) => { hwaOf[s["성"]] = s["화"]; });
     const miowang: Record<string, string> = cell["묘왕"] || {};
     const aux = [...(cell["보좌"] || []), ...(cell["잡성"] || [])];
     const tr = (x: string) => (hangul ? ko(x) : x);
+    const ring = selected ? "ring-2 ring-[#d4af37] " : sambang ? "ring-2 ring-sky-400/70 " : "";
     return (
-        <div className={"rounded-md border p-1.5 min-h-[178px] flex flex-col font-noto-serif " +
+        <button onClick={onClick} className={"w-full text-left cursor-pointer transition-shadow " + ring +
+            "rounded-md border p-1.5 min-h-[178px] flex flex-col font-noto-serif " +
             (cell["is명궁"] ? "border-[#d4af37] bg-[#d4af37]/12" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
             {/* 보조성·잡성 (위) — 길성 파랑 / 살성 빨강 / 잡성 회색 */}
             <div className="flex flex-wrap gap-x-1 text-[11px] leading-tight">
@@ -211,15 +217,16 @@ function JamiCell({ cell, zi, hangul }: { cell: any; zi: string; hangul: boolean
                 </span>
                 <span className="text-[14px] text-indigo-500 dark:text-indigo-400 leading-none">{cell["궁간지"] || zi}</span>
             </div>
-        </div>
+        </button>
     );
 }
 
-function JamiBoard({ jami, hangul }: { jami: any; hangul: boolean }) {
+function JamiBoard({ jami, hangul, selZi, onCell }: { jami: any; hangul: boolean; selZi: number | null; onCell: (zi: number, gung: string) => void }) {
     const board: any[] = jami["명반"] || [];
     if (!board.length) return null;
     const byZi: Record<string, any> = {};
     board.forEach((c) => (byZi[c["지지"]] = c));
+    const sam = sambangSet(selZi);
     const juseong = (jami["명궁주성"] || []).map((s: string) => (hangul ? ko(s) : s)).join("·") || (hangul ? "무주성" : "無主星");
     return (
         <div className="glass-card p-2 overflow-x-auto">
@@ -251,7 +258,10 @@ function JamiBoard({ jami, hangul }: { jami: any; hangul: boolean }) {
                 {Object.entries(JAMI_POS).map(([zi, [r, c]]) => {
                     const cell = byZi[zi];
                     if (!cell) return null;
-                    return <div key={zi} style={{ gridRow: r, gridColumn: c }}><JamiCell cell={cell} zi={zi} hangul={hangul} /></div>;
+                    const idx = JIJI_ORDER.indexOf(zi);
+                    return <div key={zi} style={{ gridRow: r, gridColumn: c }}>
+                        <JamiCell cell={cell} zi={zi} hangul={hangul} selected={idx === selZi} sambang={sam.has(idx) && idx !== selZi} onClick={() => onCell(idx, cell["궁"])} />
+                    </div>;
                 })}
             </div>
         </div>
@@ -268,6 +278,7 @@ function JamiView({ profile }: { profile?: any }) {
     const [jami, setJami] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [hangul, setHangul] = useState(false);
+    const [selZi, setSelZi] = useState<number | null>(null);  // 삼방사정 강조·궁 클릭
     // AI 해석 (주제별 세분화)
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
@@ -291,8 +302,10 @@ function JamiView({ profile }: { profile?: any }) {
             setInterp("해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
         } finally { setInterpreting(false); }
     }
+    // 궁 클릭: 삼방사정 강조 + 그 궁 집중 해석
+    const onCell = (zi: number, gung: string) => { setSelZi(zi); interpret(gung); };
     // 프로필 로드/변경 시 날짜 입력창(dt)도 프로필 값으로 동기화 후 명반 로드 (입력창-명반 불일치 방지)
-    useEffect(() => { setDt(init); setInterp(""); setFocus(""); go(init); /* eslint-disable-next-line */ }, [profile?.id]);
+    useEffect(() => { setDt(init); setInterp(""); setFocus(""); setSelZi(null); go(init); /* eslint-disable-next-line */ }, [profile?.id]);
     const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
         <input type="number" value={dt[k]} min={min} max={max}
             onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
@@ -317,7 +330,8 @@ function JamiView({ profile }: { profile?: any }) {
                     <button onClick={() => setHangul(true)}
                         className={"px-3 py-1 rounded-full text-xs font-semibold " + (hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>한글</button>
                 </div>
-                <JamiBoard jami={jami} hangul={hangul} />
+                <JamiBoard jami={jami} hangul={hangul} selZi={selZi} onCell={onCell} />
+                <p className="text-[11px] text-slate-400 text-center -mt-1">궁을 탭하면 삼방사정(파란 테두리)이 강조되고 그 궁을 집중 해석합니다</p>
                 {/* AI 해석 — 주제별 세분화 */}
                 <div className="glass-card p-3">
                     <div className="text-xs text-slate-500 mb-2">🔮 AI 해석 — 주제 선택</div>
