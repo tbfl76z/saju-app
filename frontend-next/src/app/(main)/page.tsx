@@ -26,6 +26,50 @@ const SAMPLE_PILLARS = [
   { lab: "年", stem: "庚", branch: "午", ss: "편관·상관", day: false },
 ];
 
+// 오늘의 운세 위젯 — 저장된 '내 명식'의 오늘 일진 + 십성 기반 한 줄
+const SIPSIN_MENT: Record<string, string> = {
+  "비견": "주체적으로 나서기 좋은 날. 다만 고집은 조금 내려놓으세요.",
+  "겁재": "추진력이 붙는 날. 지출·경쟁은 신중히.",
+  "식신": "표현과 여유가 빛나는 날. 즐기며 풀어가세요.",
+  "상관": "아이디어·말솜씨가 살아나는 날. 과한 직언은 주의.",
+  "편재": "기회를 잡기 좋은 날. 실리를 챙기되 무리한 투자는 금물.",
+  "정재": "성실함이 결실 맺는 날. 알뜰한 관리가 이롭습니다.",
+  "편관": "책임과 도전이 오는 날. 압박에 눌리지 말고 정면돌파.",
+  "정관": "인정받고 질서가 잡히는 날. 원칙대로 처신하세요.",
+  "편인": "직관과 배움의 날. 혼자만의 정리 시간이 이롭습니다.",
+  "정인": "조력과 문서운의 날. 배우고 기대는 것이 도움됩니다.",
+  "인수": "조력과 문서운의 날. 배우고 기대는 것이 도움됩니다.",
+};
+
+function TodayWidget() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [d, setD] = useState<any>(null);
+  const [label, setLabel] = useState("");
+  useEffect(() => {
+    const p = getPrimaryProfile();
+    const sd = p?.sajuData;
+    if (!sd?.pillars?.day?.stem) return;
+    setLabel(p?.label || "내 명식");
+    fetch(`${API_BASE}/ilun`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ day_gan: sd.pillars.day.stem, year_branch: sd.pillars.year.branch, pillars: sd.pillars }),
+    }).then((r) => r.json()).then(setD).catch(() => { });
+  }, []);
+  if (!d?.ganzhi) return null;
+  const ment = SIPSIN_MENT[(d.stem_ten_god || "").replace(/\(.*\)/, "")] || "오늘의 기운을 차분히 살펴보세요.";
+  return (
+    <div className="glass-card p-4 flex items-center gap-3">
+      <div className="text-3xl shrink-0">🌅</div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] text-slate-400">{label} · 오늘의 운세 {d.date || ""}</div>
+        <div className="text-sm"><b className="font-noto-serif text-[#bf953f]">{d.ganzhi}</b> · {d.stem_ten_god}/{d.branch_ten_god} · {d.twelve_growth}</div>
+        <div className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{ment}</div>
+      </div>
+      <a href="/today" className="text-xs text-[#bf953f] underline shrink-0">자세히</a>
+    </div>
+  );
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function HeroPillarsPreview({ onLoad, mounted }: { onLoad: (d: any) => void; mounted: boolean }) {
   const profile = mounted ? getPrimaryProfile() : undefined;
@@ -147,6 +191,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         {!sajuData ? (
           <div className="space-y-6">
+            <TodayWidget />
             {/* 시안 A 히어로: 좌측 카피+CTA / 우측 명식 미리보기 2단 구성 */}
             <div className="hero-sky grid md:grid-cols-[1.15fr_1fr] gap-8 md:gap-10 items-center py-8 md:py-14 px-2 md:px-6 animate-in fade-in duration-1000">
               <div className="text-center md:text-left space-y-4">
