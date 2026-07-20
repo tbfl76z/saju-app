@@ -130,6 +130,30 @@ export function LuckSection({ sajuData, apiBase }: LuckSectionProps) {
                     <span className="text-2xl">⏳</span>
                     <span>대운(大運) 흐름</span>
                 </h3>
+                {/* 대운 타임라인 — 전체 흐름 한눈에, 현재 대운(●) 강조, 클릭 시 선택 */}
+                {sajuData?.fortune?.list?.length > 0 && (() => {
+                    let curAge = -1;
+                    try { curAge = new Date().getFullYear() - parseInt(sajuData.birth_date.split("-")[0]) + 1; } catch { }
+                    return (
+                        <div className="flex overflow-x-auto gap-1 mb-5 pb-1">
+                            {sajuData.fortune.list.map((d: any, idx: number) => {
+                                const isCur = curAge >= d.age && curAge < d.age + 10;
+                                const isSel = selectedDaeun?.age === d.age;
+                                return (
+                                    <button key={idx} onClick={() => handleDaeunSelect(d)}
+                                        className={"flex-1 min-w-[56px] rounded-lg py-1.5 border-b-[3px] transition-colors " +
+                                            (isSel ? "border-[#d4af37] bg-[#d4af37]/10"
+                                                : isCur ? "border-sky-400 bg-sky-50 dark:bg-sky-900/20"
+                                                    : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40")}>
+                                        <div className="text-[10px] text-slate-400 leading-none">{d.age}세{isCur && <span className="text-sky-500 font-bold"> ●</span>}</div>
+                                        <div className="text-sm font-noto-serif font-bold text-[#bf953f] leading-tight">{d.ganzhi}</div>
+                                        <div className="text-[9px] text-slate-400 leading-none">{d.stem_ten_god}</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    );
+                })()}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {sajuData?.fortune?.list?.map((d: any, idx: number) => (
                         <LuckCard
