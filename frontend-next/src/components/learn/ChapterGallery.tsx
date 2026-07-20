@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { ImageIcon, X } from "lucide-react";
 import { API_BASE } from "@/lib/learn";
 
@@ -45,10 +46,10 @@ export function ChapterGallery({ images, label = "원전 자료 도표", default
                 </div>
             )}
 
-            {/* 확대 보기 */}
-            {zoom && (
+            {/* 확대 보기 — Portal로 body에 직접 렌더(조상 transform에 갇히지 않도록) */}
+            {zoom && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-2"
+                    className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-2"
                     onClick={() => setZoom(null)}
                 >
                     <button onClick={() => setZoom(null)} className="fixed top-3 right-3 z-10 text-white bg-black/60 rounded-full p-1.5" aria-label="닫기">
@@ -60,7 +61,8 @@ export function ChapterGallery({ images, label = "원전 자료 도표", default
                         alt="명리학 학습 도표 확대"
                         className="max-w-full max-h-[96vh] object-contain rounded-lg bg-white"
                     />
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
