@@ -310,6 +310,21 @@ async def gimun(year: int = 0, month: int = 1, day: int = 1, hour: int = 12, min
             "중궁": {"천반": center.get("천반"), "지반": center.get("지반"), "궁": center.get("palace", 5)}}
 
 
+@router.post("/jami/compat")
+async def jami_compat(a: ClassicReq, b: ClassicReq):
+    """자미두수 궁합 — 두 명반 비교 AI 해석(SSE 스트림)."""
+    try:
+        ja = _jami(_chart(a))
+        jb = _jami(_chart(b))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return StreamingResponse(
+        ai_report.stream_jami_compat(ja, jb),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.get("/taegil")
 async def taegil(purpose: str = "결혼", year: int = 0, month: int = 0):
     """택일(擇日) — 건제12신 + 황도흑도로 목적별 길일 추천 (참고용)."""

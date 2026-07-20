@@ -67,7 +67,7 @@ function toBirth(s: any) {
     };
 }
 
-type Tab = "자미" | "주역" | "기문" | "택일";
+type Tab = "자미" | "자미궁합" | "주역" | "기문" | "택일";
 
 // 자미두수 명반: 지지 고정 배치(4×4 외곽 12궁) → [row, col]
 const JAMI_POS: Record<string, [number, number]> = {
@@ -147,12 +147,12 @@ export default function ClassicPage() {
 
                     {/* 탭 */}
                     <div className="flex gap-1.5 mb-4 flex-wrap">
-                        {(["자미", "주역", "기문", "택일"] as Tab[]).map((t) => (
+                        {(["자미", "자미궁합", "주역", "기문", "택일"] as Tab[]).map((t) => (
                             <button key={t} onClick={() => setTab(t)}
                                 className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
                                     (tab === t ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
                                         : "text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
-                                {t === "자미" ? "자미두수" : t === "주역" ? "주역점" : t === "기문" ? "기문방위" : "택일"}
+                                {t === "자미" ? "자미두수" : t === "자미궁합" ? "궁합" : t === "주역" ? "주역점" : t === "기문" ? "기문방위" : "택일"}
                             </button>
                         ))}
                     </div>
@@ -160,6 +160,7 @@ export default function ClassicPage() {
                     {tab === "자미" && <JamiView profile={profile} />}
                     {tab === "주역" && <JuyeokView />}
                     {tab === "기문" && <GimunView profile={profile} />}
+                    {tab === "자미궁합" && <JamiCompatView profile={profile} />}
                     {tab === "택일" && <TaegilView />}
                 </>
             )}
@@ -446,6 +447,51 @@ function JuyeokView() {
                 <Section title={`본괘 — ${r["괘명"]}`}><Pungi>{r["풀이"]}</Pungi></Section>
                 {r["변괘"] && <Section title={`변괘(지괘) — ${r["변괘"]["괘명"]}`}><Pungi>{r["변괘"]["풀이"]}</Pungi></Section>}
             </>}
+        </div>
+    );
+}
+
+function JamiCompatView({ profile }: { profile?: any }) {
+    const b0 = profile ? toBirth(profile.sajuData) : null;
+    const initA = b0 && b0.year ? { y: b0.year, m: b0.month, d: b0.day, h: b0.hour, gender: b0.gender } : { y: 1990, m: 1, d: 1, h: 12, gender: "남" };
+    const [pa, setPa] = useState(initA);
+    const [pb, setPb] = useState({ y: 1990, m: 1, d: 1, h: 12, gender: "여" });
+    const [interp, setInterp] = useState("");
+    const [running, setRunning] = useState(false);
+    const body = (p: typeof pa) => ({ name: "", gender: p.gender, year: p.y, month: p.m, day: p.d, hour: p.h, minute: 0, calendar: "양력" });
+    async function go() {
+        setRunning(true); setInterp("");
+        try {
+            await streamSSE(`${API_BASE}/classic/jami/compat`, { a: body(pa), b: body(pb) }, setInterp);
+        } catch { setInterp("궁합 해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."); }
+        finally { setRunning(false); }
+    }
+    const person = (label: string, p: typeof pa, setP: (v: typeof pa) => void) => {
+        const ni = (k: "y" | "m" | "d" | "h", min: number, max: number, w: string) => (
+            <input type="number" value={p[k]} min={min} max={max} onChange={(e) => setP({ ...p, [k]: Number(e.target.value) })}
+                className={w + " px-1 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center"} />
+        );
+        return (
+            <div className="glass-card p-3 space-y-2">
+                <div className="text-sm font-semibold text-[#bf953f]">{label}</div>
+                <div className="flex items-center gap-1 flex-wrap text-xs text-slate-500">
+                    {ni("y", 1900, 2100, "w-16")}<span>년</span>{ni("m", 1, 12, "w-11")}<span>월</span>{ni("d", 1, 31, "w-11")}<span>일</span>{ni("h", 0, 23, "w-11")}<span>시</span>
+                    <select value={p.gender} onChange={(e) => setP({ ...p, gender: e.target.value })}
+                        className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
+                        <option value="남">남</option><option value="여">여</option>
+                    </select>
+                </div>
+            </div>
+        );
+    };
+    return (
+        <div className="space-y-3">
+            {person("A (본인)", pa, setPa)}
+            {person("B (상대)", pb, setPb)}
+            <div className="flex justify-center">
+                <Button onClick={go} disabled={running}>{running ? "궁합 보는 중…" : "💞 자미두수 궁합 보기"}</Button>
+            </div>
+            {interp && <div className="glass-card p-5"><ReportRenderer text={interp} streaming={running} /></div>}
         </div>
     );
 }
