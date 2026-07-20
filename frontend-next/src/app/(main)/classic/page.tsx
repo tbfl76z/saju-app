@@ -9,6 +9,7 @@ import {
 import { listProfilesPrimaryFirst, type SavedProfile } from "@/lib/storage";
 import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
+import { FollowupChat } from "@/components/FollowupChat";
 
 // 자미두수 성요·묘왕·사화·궁명 한자 → 한글 (한글 토글용)
 const HANJA_KO: Record<string, string> = {
@@ -384,6 +385,7 @@ function JamiView({ profile }: { profile?: any }) {
                     </div>
                 </div>
                 {interp && <div className="glass-card p-5"><ReportRenderer text={interp} streaming={interpreting} /></div>}
+                {interp && !interpreting && <FollowupChat prev={interp} />}
             </>}
         </div>
     );
@@ -492,6 +494,7 @@ function JamiCompatView({ profile }: { profile?: any }) {
                 <Button onClick={go} disabled={running}>{running ? "궁합 보는 중…" : "💞 자미두수 궁합 보기"}</Button>
             </div>
             {interp && <div className="glass-card p-5"><ReportRenderer text={interp} streaming={running} /></div>}
+            {interp && !running && <FollowupChat prev={interp} />}
         </div>
     );
 }

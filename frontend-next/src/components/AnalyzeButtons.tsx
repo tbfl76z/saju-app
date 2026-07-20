@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { BookOpen, Sparkles, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReportRenderer } from "@/components/ReportRenderer";
+import { FollowupChat } from "@/components/FollowupChat";
 import { streamAnalyze, type AnalyzeBody } from "@/lib/analyzeStream";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
@@ -113,6 +114,8 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
                         </div>
                         <ReportRenderer text={result} streaming={running !== null} />
                     </div>
+
+                    {done && <FollowupChat prev={result} />}
 
                     {/* 풀이 공유 / 다운로드 (스트리밍 끝난 뒤 노출) */}
                     {done && (

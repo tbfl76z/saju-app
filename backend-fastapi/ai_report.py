@@ -812,6 +812,27 @@ def stream_jami_compat(ja: dict, jb: dict) -> Iterator[str]:
     yield from _stream_models(build_jami_compat_prompt(ja, jb), JAMI_COMPAT_SYSTEM)
 
 
+# 후속 질문 (이미 제공한 해석에 이어 추가 질문에 답)
+FOLLOWUP_SYSTEM = (
+    "당신은 사주·자미두수 상담 대가입니다. 이미 제공한 해석에 이어, 사용자의 추가 질문에 대화하듯 답합니다.\n"
+    "1. 앞선 해석과 제공된 데이터를 기준으로 일관되게 답하세요(데이터를 다시 계산하거나 뒤집지 마세요).\n"
+    "2. 질문에 핵심부터 간결하게 답하세요. 전체 2~4개 문단, 불필요하게 길게 늘이지 마세요.\n"
+    "3. 정중한 존댓말. 특정 외부 앱·프로그램 이름은 언급하지 마세요. '##' 헤딩·코드블록은 쓰지 말고, 강조는 **굵게** 소량만.\n"
+)
+
+
+def build_followup_prompt(prev: str, question: str) -> str:
+    prev = (prev or "")[:2000]
+    return (f"[앞서 제공한 해석]\n{prev}\n\n"
+            f"[사용자의 추가 질문]\n{sanitize(question)}\n\n"
+            f"위 해석의 맥락에 이어 이 질문에 답해 주세요.")
+
+
+def stream_followup(prev: str, question: str) -> Iterator[str]:
+    """이전 해석 맥락 + 추가 질문 → 대화형 답변 스트림."""
+    yield from _stream_models(build_followup_prompt(prev, question), FOLLOWUP_SYSTEM)
+
+
 # ---------------------------------------------------------------------------
 # 학습 모드: AI 튜터 (질의응답형 — 리포트 4섹션 형식을 강제하지 않는다)
 # ---------------------------------------------------------------------------

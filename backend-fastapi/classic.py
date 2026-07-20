@@ -310,6 +310,21 @@ async def gimun(year: int = 0, month: int = 1, day: int = 1, hour: int = 12, min
             "중궁": {"천반": center.get("천반"), "지반": center.get("지반"), "궁": center.get("palace", 5)}}
 
 
+class FollowupReq(BaseModel):
+    prev: str = ""
+    question: str
+
+
+@router.post("/followup")
+async def followup(req: FollowupReq):
+    """해석 후 추가 질문 — 이전 해석 맥락 + 질문 → 대화형 답변(SSE)."""
+    return StreamingResponse(
+        ai_report.stream_followup(req.prev, req.question),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.post("/jami/compat")
 async def jami_compat(a: ClassicReq, b: ClassicReq):
     """자미두수 궁합 — 두 명반 비교 AI 해석(SSE 스트림)."""
