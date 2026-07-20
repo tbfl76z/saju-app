@@ -77,6 +77,23 @@ const JAMI_POS: Record<string, [number, number]> = {
     "寅": [4, 1], "丑": [4, 2], "子": [4, 3], "亥": [4, 4],
 };
 const JIJI_ORDER = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+const JAMI_GUNG12 = ["명궁", "형제", "부처", "자녀", "재백", "질액", "천이", "노복", "관록", "전택", "복덕", "부모"];
+// 년간 idx((year-4)%10) → 사화 성요[록,권,과,기] (한글)
+const JAMI_SAHWA: Record<number, string[]> = {
+    0: ["염정", "파군", "무곡", "태양"], 1: ["천기", "천량", "자미", "태음"], 2: ["천동", "천기", "문창", "염정"],
+    3: ["태음", "천동", "천기", "거문"], 4: ["탐랑", "태음", "우필", "천기"], 5: ["무곡", "탐랑", "천량", "문곡"],
+    6: ["태양", "무곡", "태음", "천동"], 7: ["거문", "태양", "문곡", "문창"], 8: ["천량", "자미", "좌보", "무곡"],
+    9: ["파군", "거문", "태음", "탐랑"],
+};
+const HWA_NAMES = ["祿", "權", "科", "忌"];
+// 유년(流年): 특정 연도 → 流命궁 지지idx + 流사화맵(성요한글→화)
+function liuData(year: number) {
+    const liuMyeong = (year - 4) % 12;      // 그 해 지지 = 流命宮
+    const gan = ((year - 4) % 10 + 10) % 10; // 그 해 천간idx
+    const sahwa: Record<string, string> = {};
+    (JAMI_SAHWA[gan] || []).forEach((star, i) => { sahwa[star] = HWA_NAMES[i]; });
+    return { liuMyeong, sahwa };
+}
 // 삼방사정: 본궁 + 대궁(+6) + 삼합 2궁(+4, +8) 지지idx 집합
 const sambangSet = (zi: number | null): Set<number> =>
     zi == null ? new Set() : new Set([zi, (zi + 6) % 12, (zi + 4) % 12, (zi + 8) % 12]);
@@ -167,7 +184,7 @@ const HWA_COLOR: Record<string, string> = {
 
 // 자미 명반 1칸 — 원본 스타일(보조성·잡성·주성+묘왕+사화·박사신·장생신·소한·궁명·간지)
 // hangul=true 이면 성요·묘왕·사화·궁명을 한글로 표시
-function JamiCell({ cell, zi, hangul, sambang, selected, onClick }: { cell: any; zi: string; hangul: boolean; sambang?: boolean; selected?: boolean; onClick?: () => void }) {
+function JamiCell({ cell, zi, hangul, sambang, selected, onClick, liuGung, liuSahwa }: { cell: any; zi: string; hangul: boolean; sambang?: boolean; selected?: boolean; onClick?: () => void; liuGung?: string; liuSahwa?: Record<string, string> }) {
     const hwaOf: Record<string, string> = {};
     (cell["사화"] || []).forEach((s: any) => { hwaOf[s["성"]] = s["화"]; });
     const miowang: Record<string, string> = cell["묘왕"] || {};
@@ -188,11 +205,13 @@ function JamiCell({ cell, zi, hangul, sambang, selected, onClick }: { cell: any;
                     ? (cell["주성"] || []).map((s: string, i: number) => {
                         const han = (cell["주성한글"] || [])[i];
                         const hwa = hwaOf[s];
+                        const liuHwa = liuSahwa?.[han];
                         return (
                             <span key={i} className="text-[19px] font-bold text-slate-800 dark:text-slate-100 leading-none">
                                 {hangul ? (han || ko(s)) : s}
                                 {miowang[han] && <sub className={"text-[11px] font-normal ml-px " + mwColor(miowang[han])}>{tr(miowang[han])}</sub>}
                                 {hwa && <sup className={"text-[11px] font-bold ml-px " + (HWA_COLOR[hwa] || "")}>{hangul ? ko(hwa)[1] : hwa[1]}</sup>}
+                                {liuHwa && <sup className="text-[10px] font-bold ml-px text-orange-500">流{liuHwa}</sup>}
                             </span>
                         );
                     })
@@ -213,6 +232,7 @@ function JamiCell({ cell, zi, hangul, sambang, selected, onClick }: { cell: any;
                 <span className={"text-[14px] leading-none " + (cell["is명궁"] ? "text-[#bf953f] font-bold" : "text-slate-600 dark:text-slate-300")}>
                     {hangul ? (cell["궁"] || tr(cell["궁한자"])) : (cell["궁한자"] || cell["궁"])}
                     {cell["is신궁"] && <span className="text-[10px] text-rose-500 font-bold ml-0.5">{hangul ? "신" : "身"}</span>}
+                    {liuGung && <span className="text-[10px] text-orange-500 font-bold ml-0.5">流{liuGung}</span>}
                     <span className="text-[9px] text-slate-400 ml-0.5">{JAMI_DIR[zi] || ""}</span>
                 </span>
                 <span className="text-[14px] text-indigo-500 dark:text-indigo-400 leading-none">{cell["궁간지"] || zi}</span>
@@ -221,12 +241,13 @@ function JamiCell({ cell, zi, hangul, sambang, selected, onClick }: { cell: any;
     );
 }
 
-function JamiBoard({ jami, hangul, selZi, onCell }: { jami: any; hangul: boolean; selZi: number | null; onCell: (zi: number, gung: string) => void }) {
+function JamiBoard({ jami, hangul, selZi, onCell, liuYear }: { jami: any; hangul: boolean; selZi: number | null; onCell: (zi: number, gung: string) => void; liuYear: number | null }) {
     const board: any[] = jami["명반"] || [];
     if (!board.length) return null;
     const byZi: Record<string, any> = {};
     board.forEach((c) => (byZi[c["지지"]] = c));
     const sam = sambangSet(selZi);
+    const liu = liuYear ? liuData(liuYear) : null;
     const juseong = (jami["명궁주성"] || []).map((s: string) => (hangul ? ko(s) : s)).join("·") || (hangul ? "무주성" : "無主星");
     return (
         <div className="glass-card p-2 overflow-x-auto">
@@ -259,8 +280,9 @@ function JamiBoard({ jami, hangul, selZi, onCell }: { jami: any; hangul: boolean
                     const cell = byZi[zi];
                     if (!cell) return null;
                     const idx = JIJI_ORDER.indexOf(zi);
+                    const liuGung = liu ? JAMI_GUNG12[((liu.liuMyeong - idx) % 12 + 12) % 12] : undefined;
                     return <div key={zi} style={{ gridRow: r, gridColumn: c }}>
-                        <JamiCell cell={cell} zi={zi} hangul={hangul} selected={idx === selZi} sambang={sam.has(idx) && idx !== selZi} onClick={() => onCell(idx, cell["궁"])} />
+                        <JamiCell cell={cell} zi={zi} hangul={hangul} selected={idx === selZi} sambang={sam.has(idx) && idx !== selZi} onClick={() => onCell(idx, cell["궁"])} liuGung={liuGung} liuSahwa={liu?.sahwa} />
                     </div>;
                 })}
             </div>
@@ -279,6 +301,7 @@ function JamiView({ profile }: { profile?: any }) {
     const [loading, setLoading] = useState(false);
     const [hangul, setHangul] = useState(false);
     const [selZi, setSelZi] = useState<number | null>(null);  // 삼방사정 강조·궁 클릭
+    const [liuYear, setLiuYear] = useState<number | null>(null);  // 유년(流年) 명반
     // AI 해석 (주제별 세분화)
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
@@ -305,7 +328,7 @@ function JamiView({ profile }: { profile?: any }) {
     // 궁 클릭: 삼방사정 강조 + 그 궁 집중 해석
     const onCell = (zi: number, gung: string) => { setSelZi(zi); interpret(gung); };
     // 프로필 로드/변경 시 날짜 입력창(dt)도 프로필 값으로 동기화 후 명반 로드 (입력창-명반 불일치 방지)
-    useEffect(() => { setDt(init); setInterp(""); setFocus(""); setSelZi(null); go(init); /* eslint-disable-next-line */ }, [profile?.id]);
+    useEffect(() => { setDt(init); setInterp(""); setFocus(""); setSelZi(null); setLiuYear(null); go(init); /* eslint-disable-next-line */ }, [profile?.id]);
     const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
         <input type="number" value={dt[k]} min={min} max={max}
             onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
@@ -323,14 +346,26 @@ function JamiView({ profile }: { profile?: any }) {
                 <Button onClick={() => go(dt)} disabled={loading} className="ml-1 h-8">명반 보기</Button>
             </div>
             {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : jami && <>
-                {/* 한자/한글 토글 */}
-                <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => setHangul(false)}
-                        className={"px-3 py-1 rounded-full text-xs font-semibold " + (!hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>漢字</button>
-                    <button onClick={() => setHangul(true)}
-                        className={"px-3 py-1 rounded-full text-xs font-semibold " + (hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>한글</button>
+                {/* 유년 + 한자/한글 토글 */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 text-xs text-slate-500">
+                        <span className="mr-0.5">유년(流年)</span>
+                        <button onClick={() => setLiuYear(null)}
+                            className={"px-2 py-1 rounded-full text-xs font-semibold " + (!liuYear ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>본명</button>
+                        <input type="number" value={liuYear ?? ""} min={1900} max={2100} placeholder="연도"
+                            onChange={(e) => setLiuYear(e.target.value ? Number(e.target.value) : null)}
+                            className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs text-center" />
+                        <button onClick={() => setLiuYear(new Date().getFullYear())} className="text-[11px] text-[#bf953f] underline">올해</button>
+                    </div>
+                    <div className="flex gap-1">
+                        <button onClick={() => setHangul(false)}
+                            className={"px-3 py-1 rounded-full text-xs font-semibold " + (!hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>漢字</button>
+                        <button onClick={() => setHangul(true)}
+                            className={"px-3 py-1 rounded-full text-xs font-semibold " + (hangul ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>한글</button>
+                    </div>
                 </div>
-                <JamiBoard jami={jami} hangul={hangul} selZi={selZi} onCell={onCell} />
+                {liuYear && <p className="text-[11px] text-orange-500 text-center -mb-1">流{liuYear}년 명반 오버레이 — 각 궁의 流궁명·流사화(流祿權科忌)를 주황색으로 표시</p>}
+                <JamiBoard jami={jami} hangul={hangul} selZi={selZi} onCell={onCell} liuYear={liuYear} />
                 <p className="text-[11px] text-slate-400 text-center -mt-1">궁을 탭하면 삼방사정(파란 테두리)이 강조되고 그 궁을 집중 해석합니다</p>
                 {/* AI 해석 — 주제별 세분화 */}
                 <div className="glass-card p-3">
