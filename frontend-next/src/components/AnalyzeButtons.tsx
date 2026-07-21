@@ -26,13 +26,22 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
     const [shownLevel, setShownLevel] = useState<"easy" | "advanced">("advanced");
     const [downloading, setDownloading] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
+    const resultRef = useRef<HTMLDivElement>(null); // 결과 생성 시 이 위치로 자동 스크롤
 
     const run = async (level: "easy" | "advanced") => {
         setRunning(level);
         setShownLevel(level);
         setResult("");
         try {
-            const finalText = await streamAnalyze(apiBase, { ...body, level }, setResult);
+            // 첫 응답이 도착하면 결과 영역으로 한 번 부드럽게 스크롤한다
+            let scrolled = false;
+            const finalText = await streamAnalyze(apiBase, { ...body, level }, (txt) => {
+                setResult(txt);
+                if (!scrolled && txt) {
+                    scrolled = true;
+                    requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                }
+            });
             // 풀이 보관함 자동 저장 — 같은 명식·종류는 하루 1건으로 갱신 (저장됨 탭에서 다시 보기)
             const name = body?.saju_data?.name || "이름 없음";
             const birth = body?.saju_data?.birth_date || "";
@@ -104,7 +113,7 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
             </div>
 
             {result && (
-                <div className="mt-6">
+                <div className="mt-6 scroll-mt-24" ref={resultRef}>
                     <div ref={reportRef} className="glass-card p-6 md:p-8 animate-in fade-in zoom-in-95 duration-500">
                         <div className="flex items-center gap-2 mb-5">
                             <span className="text-lg">{shownLevel === "easy" ? "📖" : "✨"}</span>

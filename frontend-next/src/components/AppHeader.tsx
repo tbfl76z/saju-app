@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { NavBarDesktop } from "@/components/NavBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { FontSizeToggle } from "@/components/FontSizeToggle";
 
 // 모든 라우트가 공유하는 상단 헤더. 로고 + 네비 + 다크토글을 한 곳에 통합한다.
 export function AppHeader() {
@@ -24,6 +25,7 @@ export function AppHeader() {
 
                 <div className="flex items-center gap-2">
                     <NavBarDesktop />
+                    <FontSizeToggle />
                     <ThemeToggle />
                 </div>
             </div>

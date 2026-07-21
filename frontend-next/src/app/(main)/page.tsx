@@ -14,7 +14,7 @@ import SavedProfilesModal from "@/components/SavedProfilesModal";
 import { Button } from "@/components/ui/button";
 import { Bookmark } from "lucide-react";
 import { notify } from "@/lib/useToast";
-import { getProfile, getPrimaryProfile, LOAD_PROFILE_KEY } from "@/lib/storage";
+import { getProfile, getPrimaryProfile, listProfiles, LOAD_PROFILE_KEY } from "@/lib/storage";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
@@ -187,6 +187,9 @@ export default function Home() {
 
   if (!isMounted) return null;
 
+  // 저장된 명식(빠른 전환 칩용) — 마운트 후에만 읽어 hydration 불일치를 피한다
+  const savedProfiles = listProfiles();
+
   return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         {!sajuData ? (
@@ -213,9 +216,29 @@ export default function Home() {
             <div ref={formRef} className="scroll-mt-24">
               <SajuForm onCalculate={handleCalculate} isLoading={isLoading} />
             </div>
+
+            {/* 저장된 명식 빠른 전환 — 다시 입력할 필요 없이 원탭으로 명식을 연다 */}
+            {savedProfiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-center text-xs font-semibold text-slate-400 dark:text-slate-500">⚡ 저장된 명식 빠른 열기</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {savedProfiles.slice(0, 8).map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSajuData(p.sajuData)}
+                      className="text-xs font-semibold px-3.5 py-2 rounded-full border border-[#d4af37]/30 bg-white/60 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:border-[#d4af37] hover:text-[#bf953f] transition-colors max-w-[200px] truncate"
+                      title={p.label}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-center">
               <Button variant="ghost" onClick={() => setSavedOpen(true)} className="rounded-full text-slate-500 dark:text-slate-400 hover:text-[#bf953f]">
-                <Bookmark className="h-4 w-4 mr-1.5" /> 저장된 명식 불러오기
+                <Bookmark className="h-4 w-4 mr-1.5" /> 저장된 명식 전체 보기
               </Button>
             </div>
           </div>

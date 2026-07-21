@@ -113,6 +113,31 @@ export function listProfilesPrimaryFirst(): SavedProfile[] {
     return [list[idx], ...list.slice(0, idx), ...list.slice(idx + 1)];
 }
 
+// ---------- 최근 입력값 기억 ----------
+// 매번 생년월일을 다시 치지 않도록 마지막 계산 입력을 기억한다
+const LAST_INPUT_KEY = "destiny-last-input";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getLastInput(): Record<string, any> | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = window.localStorage.getItem(LAST_INPUT_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function setLastInput(data: Record<string, any>): void {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(LAST_INPUT_KEY, JSON.stringify(data));
+    } catch {
+        // 무시
+    }
+}
+
 // ---------- AI 풀이 보관함 ----------
 // 토큰을 들여 생성한 AI 리포트를 자동 보관해 재호출 없이 다시 본다
 export interface SavedReport {
@@ -122,6 +147,7 @@ export interface SavedReport {
     type: string; // analysis_type
     text: string;
     savedAt: number;
+    pinned?: boolean; // 즐겨찾기(핀) 고정 여부
 }
 
 const REPORTS_KEY = "destiny-saved-reports";
@@ -153,7 +179,17 @@ function writeReports(reports: SavedReport[]): void {
 }
 
 export function listReports(): SavedReport[] {
-    return readReports().sort((a, b) => b.savedAt - a.savedAt);
+    // 핀 고정 항목을 맨 앞에, 그다음 최신순
+    return readReports().sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        return b.savedAt - a.savedAt;
+    });
+}
+
+// 리포트 즐겨찾기(핀) 토글
+export function toggleReportPin(id: string): void {
+    const all = readReports();
+    writeReports(all.map((r) => (r.id === id ? { ...r, pinned: !r.pinned } : r)));
 }
 
 export function saveReport(input: { title: string; profileLabel: string; type: string; text: string }): void {

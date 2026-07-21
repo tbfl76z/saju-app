@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { notify } from "@/lib/useToast";
+import { getLastInput, setLastInput } from "@/lib/storage";
 
 interface SajuFormProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,6 +34,26 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
         is_leap: false,
         unknown_time: false,
     });
+
+    // 마운트 후 최근 입력값을 복원한다(있으면). SSR-클라 hydration 불일치를 피하려 effect에서 처리.
+    useEffect(() => {
+        const last = getLastInput();
+        if (last) setFormData((prev) => ({ ...prev, ...last }));
+    }, []);
+
+    // 달력에서 날짜를 고르면 연·월·일 칸을 한 번에 채운다(양력 기준)
+    const handleDatePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = e.target.value; // YYYY-MM-DD
+        if (!v) return;
+        const [y, m, d] = v.split("-").map((n) => parseInt(n, 10));
+        setFormData({ ...formData, year: y, month: m, day: d, calendar_type: "양력" });
+    };
+
+    // 현재 연·월·일을 date input value(YYYY-MM-DD)로 (유효할 때만)
+    const dateValue =
+        formData.year >= 1900 && formData.year <= 2100 && formData.month >= 1 && formData.day >= 1
+            ? `${formData.year}-${String(formData.month).padStart(2, "0")}-${String(formData.day).padStart(2, "0")}`
+            : "";
 
     // 클라이언트 입력 검증으로 백엔드 500을 예방한다
     const validate = (): string | null => {
@@ -55,6 +76,7 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
             notify.error("입력값을 확인해 주세요", error);
             return;
         }
+        setLastInput(formData); // 다음 방문 때 다시 채워지도록 기억
         onCalculate(formData);
     };
 
@@ -91,9 +113,24 @@ export function SajuForm({ onCalculate, isLoading }: SajuFormProps) {
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold ml-1">
-                            <span className="text-lg">📅</span> 생년월일
-                        </Label>
+                        <div className="flex items-center justify-between ml-1">
+                            <Label className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold">
+                                <span className="text-lg">📅</span> 생년월일
+                            </Label>
+                            {/* 달력에서 한 번에 고르기 (양력 기준) — 직접 숫자 입력도 그대로 가능 */}
+                            <label className="relative inline-flex items-center text-xs font-bold px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 hover:border-[#d4af37] cursor-pointer transition-all">
+                                🗓️ 달력에서 고르기
+                                <input
+                                    type="date"
+                                    value={dateValue}
+                                    min="1900-01-01"
+                                    max="2100-12-31"
+                                    onChange={handleDatePick}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    aria-label="달력에서 생년월일 선택"
+                                />
+                            </label>
+                        </div>
                         <div className="grid grid-cols-4 gap-2">
                             <div className="relative col-span-2">
                                 <Input
