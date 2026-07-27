@@ -340,18 +340,41 @@ async def jami_compat(a: ClassicReq, b: ClassicReq):
     )
 
 
+# 지지 띠 이름 (년지 → 한국어 띠)
+_TTI_KO = {"子": "쥐", "丑": "소", "寅": "호랑이", "卯": "토끼", "辰": "용", "巳": "뱀",
+           "午": "말", "未": "양", "申": "원숭이", "酉": "닭", "戌": "개", "亥": "돼지"}
+
+
 @router.get("/taegil")
-async def taegil(purpose: str = "결혼", year: int = 0, month: int = 0):
-    """택일(擇日) — 건제12신 + 황도흑도로 목적별 길일 추천 (참고용)."""
+async def taegil(purpose: str = "결혼", year: int = 0, month: int = 0,
+                 birth_year: int = 0, birth_month: int = 0, birth_day: int = 0):
+    """택일(擇日) — 건제12신 + 황도흑도로 목적별 길일 추천 (참고용).
+
+    생년월일(birth_*)을 주면 본인 생년지(띠)와 충(沖)하는 날(본명충일, 本命沖日)을
+    길일에서 제외해 개인별로 다른 결과를 낸다.
+    """
     import calendar
     t = _dt.date.today()
     if not year:
         year = t.year
     if not month:
         month = t.month
+
+    # 본인 생년지(띠) — 입춘 경계를 반영하려 만세력으로 실제 연주 지지를 구한다
+    own_branch = None
+    if birth_year and birth_month and birth_day:
+        try:
+            bres = _calc.calculate_saju(birth_year, birth_month, birth_day, 12, 0,
+                                        use_solar_time=True, longitude=127.5, early_zi_time=False)
+            own_branch = get_saju_details(bres)["pillars"]["year"]["branch"]
+        except Exception:
+            own_branch = None
+    own_idx = JIJI.index(own_branch) if own_branch else None
+
     gil = PURPOSE_GIL.get(purpose, PURPOSE_GIL["결혼"])
     ndays = calendar.monthrange(year, month)[1]
     out = []
+    excluded_bonmyeong = 0  # 본명충일로 제외된 날 수 (안내용)
     for day in range(1, ndays + 1):
         try:
             res = _calc.calculate_saju(year, month, day, 12, 0, use_solar_time=True, longitude=127.5, early_zi_time=False)
@@ -368,7 +391,14 @@ async def taegil(purpose: str = "결혼", year: int = 0, month: int = 0):
         score = (2 if gj in gil else 0) + (2 if is_hwang else 0)
         if score <= 0:
             continue
+        # 길일 조건을 충족한 날이라도 본명충일(일지가 본인 생년지와 沖 = 지지 6칸 차이)이면
+        # 개인 흉일로 제외한다 → 여기서 세야 "제외된 길일 수"가 정확하다
+        if own_idx is not None and (ii - own_idx) % 12 == 6:
+            excluded_bonmyeong += 1
+            continue
         out.append({"day": day, "간지": P["day"]["pillar"], "요일": ["월", "화", "수", "목", "금", "토", "일"][_dt.date(year, month, day).weekday()],
                     "건제": GEONJE_KO[GEONJE[gj]], "황도": HWANGHEUK[hh], "황도길": is_hwang, "score": score})
     out.sort(key=lambda x: (-x["score"], x["day"]))
-    return {"purpose": purpose, "year": year, "month": month, "길일": out}
+    return {"purpose": purpose, "year": year, "month": month, "길일": out,
+            "본인띠": own_branch or "", "본인띠명": _TTI_KO.get(own_branch, "") if own_branch else "",
+            "본명충제외": excluded_bonmyeong}

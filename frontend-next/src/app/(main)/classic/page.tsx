@@ -162,7 +162,7 @@ export default function ClassicPage() {
                     {tab === "주역" && <JuyeokView />}
                     {tab === "기문" && <GimunView profile={profile} />}
                     {tab === "자미궁합" && <JamiCompatView profile={profile} />}
-                    {tab === "택일" && <TaegilView />}
+                    {tab === "택일" && <TaegilView profile={profile} />}
                 </>
             )}
         </div>
@@ -499,30 +499,52 @@ function JamiCompatView({ profile }: { profile?: any }) {
     );
 }
 
-function TaegilView() {
+function TaegilView({ profile }: { profile?: any }) {
     const now = new Date();
     const PURP = ["결혼", "이사", "개업", "계약", "여행"];
+    // 본인 생년월일시 — 저장된 명식 자동 로드, 없으면 기본값(직접 입력 가능)
+    const initBirth = (() => {
+        const b = profile ? toBirth(profile.sajuData) : null;
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour }
+            : { y: 1990, m: 1, d: 1, h: 12 };
+    })();
+    const [birth, setBirth] = useState(initBirth);
     const [purpose, setPurpose] = useState("결혼");
     const [y, setY] = useState(now.getFullYear());
     const [m, setM] = useState(now.getMonth() + 1);
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    async function go(p = purpose, yy = y, mm = m) {
+    async function go(p = purpose, yy = y, mm = m, b = birth) {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/classic/taegil?purpose=${encodeURIComponent(p)}&year=${yy}&month=${mm}`);
+            const q = `${API_BASE}/classic/taegil?purpose=${encodeURIComponent(p)}&year=${yy}&month=${mm}`
+                + `&birth_year=${b.y}&birth_month=${b.m}&birth_day=${b.d}`;
+            const res = await fetch(q);
             setData(await res.json());
         } finally { setLoading(false); }
     }
-    useEffect(() => { go(purpose, y, m); /* eslint-disable-next-line */ }, [purpose]);
+    // 프로필 변경/목적 변경 시 생년 동기화 후 재조회 (입력창-결과 불일치 방지)
+    useEffect(() => { setBirth(initBirth); go(purpose, y, m, initBirth); /* eslint-disable-next-line */ }, [profile?.id, purpose]);
     const inp = "w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center";
+    const bnum = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+        <input type="number" value={birth[k]} min={min} max={max}
+            onChange={(e) => setBirth({ ...birth, [k]: Number(e.target.value) })}
+            className="w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
+    );
     return (
         <div className="space-y-3">
             <div className="glass-card p-4 space-y-3">
+                {/* 본인 생년월일시 — 본명충일(띠) 개인화에 사용 */}
                 <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+                    <span className="mr-1">본인 생년월일시(양력)</span>
+                    {bnum("y", 1900, 2100)}<span>년</span>{bnum("m", 1, 12)}<span>월</span>{bnum("d", 1, 31)}<span>일</span>{bnum("h", 0, 23)}<span>시</span>
+                </div>
+                {/* 조회할 연·월 */}
+                <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+                    <span className="mr-1">조회 월</span>
                     <input type="number" value={y} min={1900} max={2100} onChange={(e) => setY(Number(e.target.value))} className={inp} /><span>년</span>
                     <input type="number" value={m} min={1} max={12} onChange={(e) => setM(Number(e.target.value))} className={inp} /><span>월</span>
-                    <Button onClick={() => go(purpose, y, m)} disabled={loading} className="ml-1 h-8">조회</Button>
+                    <Button onClick={() => go(purpose, y, m, birth)} disabled={loading} className="ml-1 h-8">조회</Button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-slate-500">목적</span>
@@ -532,7 +554,13 @@ function TaegilView() {
             </div>
             {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : data && (
                 <div className="glass-card p-4">
-                    <div className="text-sm text-slate-500 mb-3">{data.year}년 {data.month}월 <b className="text-[#bf953f]">{data.purpose}</b> 길일 {data["길일"].length}일</div>
+                    <div className="text-sm text-slate-500 mb-1">
+                        {data.year}년 {data.month}월 <b className="text-[#bf953f]">{data.purpose}</b> 길일 {data["길일"].length}일
+                        {data["본인띠"] && <span> · 본인 <b className="text-slate-600 dark:text-slate-300">{data["본인띠명"]}띠({data["본인띠"]})</b> 기준</span>}
+                    </div>
+                    {data["본명충제외"] > 0 && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-3">※ 본명충일(본인 띠와 충하는 날) {data["본명충제외"]}일을 길일에서 제외했습니다.</p>
+                    )}
                     {data["길일"].length === 0
                         ? <p className="text-slate-400 text-sm">이 달에는 추천 길일이 없습니다. 다른 달을 조회해 보세요.</p>
                         : <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -544,7 +572,7 @@ function TaegilView() {
                                 </div>
                             ))}
                         </div>}
-                    <p className="text-[11px] text-slate-400 mt-3">※ 건제12신·황도길일 기반 참고용입니다. ★는 건제 길신+황도 겹친 날.</p>
+                    <p className="text-[11px] text-slate-400 mt-3">※ 건제12신·황도길일 + 본명충일 제외 기반 참고용입니다. ★는 건제 길신+황도 겹친 날. 택일은 생일(띠) 기준이라 태어난 시각은 결과에 영향을 주지 않습니다.</p>
                 </div>
             )}
         </div>
