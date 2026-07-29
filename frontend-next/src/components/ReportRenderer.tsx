@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 // AI 리포트 렌더러. '## 헤딩' 단위로 섹션 카드를 구성한다(경량 자체 파서).
@@ -127,9 +128,11 @@ export function ReportRenderer({ text, streaming = false }: ReportRendererProps)
                 </div>
             )}
 
-            {/* 용어 사전 바텀시트 — 본문 속 용어를 탭하면 뜻이 뜬다 */}
-            {selected && (
-                <div className="fixed inset-x-0 bottom-0 z-[90] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none">
+            {/* 용어 사전 바텀시트 — 본문 속 용어를 탭하면 뜻이 뜬다.
+                Portal로 body에 직접 렌더해 조상(결과 카드)의 transform에 갇히지 않고
+                항상 뷰포트 하단에 고정되도록 한다(다른 카드에 가리는 문제 방지). */}
+            {selected && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-x-0 bottom-0 z-[9999] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none">
                     <div className="pointer-events-auto max-w-xl mx-auto glass-card !rounded-2xl p-5 shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
                         <div className="flex items-start justify-between gap-3">
                             <h5 className="font-bold text-[#bf953f] dark:text-[#e6c35c] font-noto-serif text-lg">📖 {selected.name}</h5>
@@ -139,7 +142,8 @@ export function ReportRenderer({ text, streaming = false }: ReportRendererProps)
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200">{selected.desc}</p>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
