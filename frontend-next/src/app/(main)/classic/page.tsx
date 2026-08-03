@@ -665,6 +665,11 @@ function RaejeongView({ profile }: { profile?: any }) {
                                 </div>
                             ))}
                         </div>
+                        {data["방문특징"]?.length > 0 && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                <span className="text-slate-400">방문 지지 12운성·신살 · </span>{data["방문특징"].join(" / ")}
+                            </div>
+                        )}
                         {/* 목적 랭킹 — 항목을 누르면 그 목적에 집중해 해석한다 */}
                         <div className="space-y-1 pt-1">
                             <div className="text-[11px] text-slate-400 mb-1">목적을 누르면 그 주제로 집중 해석합니다.</div>

@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from sajupy import SajuCalculator, get_saju_details, lunar_to_solar, solar_to_lunar
-from saju_utils import get_extended_saju_data
+from saju_utils import get_extended_saju_data, get_sinsal_list, TWELVE_GROWTH
 from content_db import ContentDB, CHEONGAN, JIJI
 import divination
 import ai_report
@@ -425,24 +425,51 @@ _RAE_POS_W = {
     ("month", "stem"): 1.5, ("hour", "branch"): 1.5, ("hour", "stem"): 1.0,
     ("year", "stem"): 1.0, ("year", "branch"): 1.0,
 }
+# 방문 지지의 12운성 세력 배율 — 왕(旺)이면 그 십신 세력↑, 쇠·병·사·묘·절이면↓
+_UNSEONG_MULT = {
+    "장생": 1.3, "관대": 1.3, "건록": 1.3, "제왕": 1.3,
+    "목욕": 1.0, "양": 1.0, "쇠": 1.0,
+    "병": 0.75, "사": 0.75, "묘": 0.75, "절": 0.75, "태": 0.75,
+}
+# 방문 지지의 12신살(내담자 띠=년지 기준) → 방문 목적 보너스
+_SINSAL_PURPOSE = {
+    "년살": ("애정·이성", 1.5), "망신살": ("애정·이성", 0.8),
+    "역마살": ("문서·계약·이사", 1.5), "지살": ("문서·계약·이사", 1.2), "화개살": ("문서·계약·이사", 1.0),
+    "장성살": ("직장·사업", 1.2), "반안살": ("직장·사업", 1.0),
+    "겁살": ("건강·질병", 0.8), "재살": ("건강·질병", 0.8), "천살": ("건강·질병", 0.8),
+}
 
 
 def _raejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh, vmi=0):
-    """래정 산출 — 내담자 일간 대비 방문시각 십신 분포 + 목적 랭킹."""
+    """래정 산출 — 내담자 일간 대비 방문시각 십신 분포 + 12운성·12신살 + 목적 랭킹."""
     cres = _calc.calculate_saju(y, m, d, h, mi, use_solar_time=True, longitude=127.5, early_zi_time=False)
-    day_stem = get_saju_details(cres)["pillars"]["day"]["stem"]
+    cP = get_saju_details(cres)["pillars"]
+    day_stem = cP["day"]["stem"]
+    c_year_branch = cP["year"]["branch"]  # 내담자 띠(년지) — 12신살 기준
     vres = _calc.calculate_saju(vy, vm, vd, vh, vmi, use_solar_time=True, longitude=127.5, early_zi_time=False)
     vP = get_saju_details(vres)["pillars"]
 
     group_w = defaultdict(float)
     detail = []
+    sinsal_found = []  # 방문 지지의 12신살 목록
     for pos in ("year", "month", "day", "hour"):
         for kind in ("stem", "branch"):
             ch = vP[pos][kind]
             sp = yearun_engine.sipsin(day_stem, ch)  # 지지는 본기 천간으로 자동 치환
             grp = _SIP_GROUP[sp]
-            group_w[grp] += _RAE_POS_W[(pos, kind)]
-            detail.append({"위치": pos, "종류": kind, "글자": ch, "십신": _SIP_KO[sp], "그룹": grp})
+            w = _RAE_POS_W[(pos, kind)]
+            info = {"위치": pos, "종류": kind, "글자": ch, "십신": _SIP_KO[sp], "그룹": grp}
+            if kind == "branch":
+                us = TWELVE_GROWTH.get(day_stem, {}).get(ch)
+                if us:
+                    w *= _UNSEONG_MULT.get(us, 1.0)  # 12운성 세력 반영
+                    info["운성"] = us
+                ss = get_sinsal_list(c_year_branch, ch)  # 내담자 띠 기준 12신살
+                if ss:
+                    info["신살"] = ss
+                    sinsal_found.append(ss)
+            group_w[grp] += w
+            detail.append(info)
 
     g = lambda k: group_w.get(k, 0.0)
     male = gender in ("남", "M", "남자")
@@ -455,15 +482,29 @@ def _raejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh, vmi=0):
         "건강·질병": g("관성") * 0.3 + g("식상") * 0.3,
         "인간관계·경쟁": g("비겁") * 1.0,
     }
+    # 12신살 목적 보너스 (도화=애정, 역마·지살=이사, 화개=문서, 장성·반안=직장, 겁·재·천살=관재/건강)
+    for ss in sinsal_found:
+        hit = _SINSAL_PURPOSE.get(ss)
+        if hit:
+            P[hit[0]] = P.get(hit[0], 0.0) + hit[1]
+
     total = sum(v for v in P.values() if v > 0) or 1.0
     ranking = [{"목적": k, "score": round(v, 1), "pct": round(v / total * 100)}
                for k, v in sorted(P.items(), key=lambda x: -x[1]) if v > 0]
+    # AI 해석용 방문 지지 특징(운성·신살) 요약
+    feat = []
+    for it in detail:
+        if it.get("운성") or it.get("신살"):
+            tags = [t for t in (it.get("운성"), it.get("신살")) if t]
+            feat.append(f"{it['글자']}({', '.join(tags)})")
     return {
         "내담자일간": day_stem,
+        "내담자띠": c_year_branch,
         "방문사주": {"연": vP["year"]["pillar"], "월": vP["month"]["pillar"],
                     "일": vP["day"]["pillar"], "시": vP["hour"]["pillar"]},
         "방문일진": vP["day"]["pillar"],
         "십신분포": {k: round(v, 1) for k, v in group_w.items()},
+        "방문특징": feat,
         "목적랭킹": ranking,
         "상세": detail,
     }
