@@ -25,6 +25,7 @@ import myungri_engine
 import sinsal_engine
 import yearun_engine
 import gimun_engine
+from collections import defaultdict
 
 router = APIRouter(prefix="/classic", tags=["classic"])
 _calc = SajuCalculator()
@@ -402,3 +403,104 @@ async def taegil(purpose: str = "결혼", year: int = 0, month: int = 0,
     return {"purpose": purpose, "year": year, "month": month, "길일": out,
             "본인띠": own_branch or "", "본인띠명": _TTI_KO.get(own_branch, "") if own_branch else "",
             "본명충제외": excluded_bonmyeong}
+
+
+# ==== 래정법(來情法) ====
+# 내담자 사주 + 방문 연월일시 → 방문 시각 8글자를 내담자 일간 기준 십신으로 변환해
+# 방문 목적(용건)을 가능성 순으로 추정한다. 표준 명리 십신 통설 기반이며, 단정이 아니라
+# '가능성 높은 용건 순'으로 제시한다.
+_SIP_GROUP = {
+    "比肩": "비겁", "劫財": "비겁", "食神": "식상", "傷官": "식상",
+    "偏財": "재성", "正財": "재성", "偏官": "관성", "正官": "관성",
+    "偏印": "인성", "正印": "인성",
+}
+_SIP_KO = {
+    "比肩": "비견", "劫財": "겁재", "食神": "식신", "傷官": "상관",
+    "偏財": "편재", "正財": "정재", "偏官": "편관", "正官": "정관",
+    "偏印": "편인", "正印": "정인",
+}
+# 방문 8글자 위치별 가중(월지 최강=왕, 일주 강조 — 전통 래정 '월지 중심 + 일진')
+_RAE_POS_W = {
+    ("month", "branch"): 3.0, ("day", "stem"): 2.0, ("day", "branch"): 2.0,
+    ("month", "stem"): 1.5, ("hour", "branch"): 1.5, ("hour", "stem"): 1.0,
+    ("year", "stem"): 1.0, ("year", "branch"): 1.0,
+}
+
+
+def _raejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh):
+    """래정 산출 — 내담자 일간 대비 방문시각 십신 분포 + 목적 랭킹."""
+    cres = _calc.calculate_saju(y, m, d, h, mi, use_solar_time=True, longitude=127.5, early_zi_time=False)
+    day_stem = get_saju_details(cres)["pillars"]["day"]["stem"]
+    vres = _calc.calculate_saju(vy, vm, vd, vh, 0, use_solar_time=True, longitude=127.5, early_zi_time=False)
+    vP = get_saju_details(vres)["pillars"]
+
+    group_w = defaultdict(float)
+    detail = []
+    for pos in ("year", "month", "day", "hour"):
+        for kind in ("stem", "branch"):
+            ch = vP[pos][kind]
+            sp = yearun_engine.sipsin(day_stem, ch)  # 지지는 본기 천간으로 자동 치환
+            grp = _SIP_GROUP[sp]
+            group_w[grp] += _RAE_POS_W[(pos, kind)]
+            detail.append({"위치": pos, "종류": kind, "글자": ch, "십신": _SIP_KO[sp], "그룹": grp})
+
+    g = lambda k: group_w.get(k, 0.0)
+    male = gender in ("남", "M", "남자")
+    # 십신그룹 → 방문 목적 배점 (남명 재성=이성/여명 관성=이성)
+    P = {
+        "재물·금전": g("재성") * 1.0 + g("비겁") * 0.4,
+        "애정·이성": (g("재성") if male else g("관성")) * 0.8,
+        "직장·사업": g("관성") * 1.0 + g("식상") * 0.6,
+        "문서·계약·이사": g("인성") * 1.0,
+        "건강·질병": g("관성") * 0.3 + g("식상") * 0.3,
+        "인간관계·경쟁": g("비겁") * 1.0,
+    }
+    total = sum(v for v in P.values() if v > 0) or 1.0
+    ranking = [{"목적": k, "score": round(v, 1), "pct": round(v / total * 100)}
+               for k, v in sorted(P.items(), key=lambda x: -x[1]) if v > 0]
+    return {
+        "내담자일간": day_stem,
+        "방문사주": {"연": vP["year"]["pillar"], "월": vP["month"]["pillar"],
+                    "일": vP["day"]["pillar"], "시": vP["hour"]["pillar"]},
+        "방문일진": vP["day"]["pillar"],
+        "십신분포": {k: round(v, 1) for k, v in group_w.items()},
+        "목적랭킹": ranking,
+        "상세": detail,
+    }
+
+
+class RaejeongReq(BaseModel):
+    # 내담자(상담자) 사주
+    gender: str = "남"
+    year: int = 1990
+    month: int = 1
+    day: int = 1
+    hour: int = 12
+    minute: int = 0
+    # 방문(내방) 연월일시 — 0이면 현재 시각으로
+    visit_year: int = 0
+    visit_month: int = 0
+    visit_day: int = 0
+    visit_hour: int = -1
+
+
+def _visit_or_now(req: "RaejeongReq"):
+    """방문 시각 미지정(0/-1) 시 현재 시각으로 보정."""
+    t = _dt.datetime.now()
+    vh = req.visit_hour if req.visit_hour is not None and req.visit_hour >= 0 else t.hour
+    return (req.visit_year or t.year, req.visit_month or t.month, req.visit_day or t.day, vh)
+
+
+@router.post("/raejeong")
+async def raejeong(req: RaejeongReq):
+    """래정법 — 방문 목적 추정(십신 분포 + 목적 랭킹)."""
+    vy, vm, vd, vh = _visit_or_now(req)
+    return _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh)
+
+
+@router.post("/raejeong/analyze")
+async def raejeong_analyze(req: RaejeongReq):
+    """래정 AI 해석(스트리밍)."""
+    vy, vm, vd, vh = _visit_or_now(req)
+    data = _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh)
+    return StreamingResponse(ai_report.stream_raejeong(data, req.gender), media_type="text/event-stream")
