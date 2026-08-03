@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from sajupy import SajuCalculator, get_saju_details, lunar_to_solar, solar_to_lunar
-from saju_utils import get_extended_saju_data, get_sinsal_list, TWELVE_GROWTH
+from saju_utils import get_extended_saju_data, get_sinsal_list, TWELVE_GROWTH, get_gongmang
 from content_db import ContentDB, CHEONGAN, JIJI
 import divination
 import ai_report
@@ -510,6 +510,101 @@ def _raejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh, vmi=0):
     }
 
 
+# ==== 박일우 명리 일진내정법(日辰來情法) ====
+# 내방일(상담일)의 일진 지지를 0으로 두고 순행 한 칸씩 진(辰)을 배열한다.
+# 2진~5진 = 일진 +1~+4, 대2진~대5진 = 일진 -1~-4. 4진(實)이 방문 목적.
+_ILJIN_JIN = [
+    (-4, "대5진", "상문충", "해결"),
+    (-3, "대4진", "목적충", "실망"),
+    (-2, "대3진", "준개", "이연"),
+    (-1, "대2진", "반안", "무기력·오가객"),
+    (0, "일진", "군(根)", "두마음"),
+    (1, "2진", "양인", "능력·욕심"),
+    (2, "3진", "상문", "천액·상해·조심"),
+    (3, "4진", "목적(實)", "방문 목적"),
+    (4, "5진", "비복(비겁)", "이별"),
+]
+# 지지 원진(元嗔) 쌍
+_WONJIN = {"子": "未", "未": "子", "丑": "午", "午": "丑", "寅": "酉", "酉": "寅",
+           "卯": "申", "申": "卯", "辰": "亥", "亥": "辰", "巳": "戌", "戌": "巳"}
+# 원국 각 주의 상징(공간·관련사)
+_JU_INFO = {
+    "year": ("년주", "토지·선산·부동산(조부모)"),
+    "month": ("월주", "가정·가장(직장)"),
+    "day": ("일주", "안방·배우자·이성"),
+    "hour": ("시주", "사업장·사업·자식"),
+}
+# 원진이 걸린 주별 해석
+_WONJIN_JU = {
+    "year": "현재 모든 방향이 힘들고 부담스러움",
+    "month": "직장·가정이 힘듦",
+    "day": "배우자·연인 문제",
+    "hour": "사업·자식 문제",
+}
+# 공망(空亡)에 걸린 육신(십신그룹)별 해석
+_GONGMANG_YUKSIN = {
+    "인성": "문서로 조심해야 하며, 허영을 버리고 나아가야 함",
+    "재성": "노동으로 종사하며, 돈을 쉽게 벌지 못함",
+    "관성": "명예직에 뜻을 두나 관운을 쉽게 얻기 어려움",
+    "식상": "(여성) 자식 두기 어렵고, 문서 관련 애로가 있음",
+    "비겁": "인복 없이 홀로 노력함",
+}
+
+
+def _iljin_naejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh, vmi=0):
+    """박일우 일진내정법 — 내방일 일진 기준 진(辰) 배열 + 4진 목적 + 공망·원진·원국 대조."""
+    cres = _calc.calculate_saju(y, m, d, h, mi, use_solar_time=True, longitude=127.5, early_zi_time=False)
+    cP = get_saju_details(cres)["pillars"]
+    day_stem = cP["day"]["stem"]
+    ju_branch = {pos: cP[pos]["branch"] for pos in ("year", "month", "day", "hour")}
+
+    vres = _calc.calculate_saju(vy, vm, vd, vh, vmi, use_solar_time=True, longitude=127.5, early_zi_time=False)
+    vP = get_saju_details(vres)["pillars"]
+    iljin_ganzhi = vP["day"]["pillar"]
+    iljin_branch = vP["day"]["branch"]
+    ii = JIJI.index(iljin_branch)
+
+    # 진(辰) 배열 — 각 진 지지의 내방자 일간 대비 십성 + 원국 어느 주에 걸리는지
+    jin = []
+    for off, name, star, mean in _ILJIN_JIN:
+        bz = JIJI[(ii + off) % 12]
+        sp = _SIP_KO[yearun_engine.sipsin(day_stem, bz)]
+        in_ju = [_JU_INFO[p][0] for p, b in ju_branch.items() if b == bz]
+        jin.append({"자리": name, "offset": off, "지지": bz, "성": star, "의미": mean,
+                    "십성": sp, "원국주": in_ju})
+    sa_jin = next(j for j in jin if j["자리"] == "4진")  # 4진 = 방문 목적
+
+    # 공망(내방일 일진의 공망) → 내방자 일간 대비 육신
+    gm = get_gongmang(iljin_ganzhi)  # 예: "戌亥"
+    gongmang = []
+    for gb in (gm or ""):
+        if gb not in JIJI:
+            continue
+        grp = _SIP_GROUP[yearun_engine.sipsin(day_stem, gb)]
+        gongmang.append({"지지": gb, "육신": grp, "해석": _GONGMANG_YUKSIN.get(grp, "")})
+
+    # 원진(일진 지지의 원진)이 원국 어느 주에 걸리는지
+    wj_branch = _WONJIN.get(iljin_branch, "")
+    wonjin = []
+    for p, b in ju_branch.items():
+        if b == wj_branch:
+            wonjin.append({"주": _JU_INFO[p][0], "지지": b, "해석": _WONJIN_JU[p]})
+
+    # 원국 각 주 정보 (진 배열이 어느 주에 걸리는지 함께 해석)
+    won_guk = [{"주": _JU_INFO[p][0], "지지": ju_branch[p], "상징": _JU_INFO[p][1]}
+               for p in ("year", "month", "day", "hour")]
+
+    return {
+        "내담자일간": day_stem,
+        "내방일진": iljin_ganzhi,
+        "진배열": jin,
+        "방문목적진": {"지지": sa_jin["지지"], "십성": sa_jin["십성"], "원국주": sa_jin["원국주"]},
+        "공망": {"공망지지": gm, "해석": gongmang},
+        "원진": {"원진지지": wj_branch, "걸린주": wonjin},
+        "원국": won_guk,
+    }
+
+
 class RaejeongReq(BaseModel):
     # 내담자(상담자) 사주
     gender: str = "남"
@@ -538,14 +633,14 @@ def _visit_or_now(req: "RaejeongReq"):
 
 @router.post("/raejeong")
 async def raejeong(req: RaejeongReq):
-    """래정법 — 방문 목적 추정(십신 분포 + 목적 랭킹)."""
+    """박일우 일진내정법 — 진(辰) 배열 + 4진 방문 목적 + 공망·원진·원국 대조."""
     vy, vm, vd, vh, vmi = _visit_or_now(req)
-    return _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
+    return _iljin_naejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
 
 
 @router.post("/raejeong/analyze")
 async def raejeong_analyze(req: RaejeongReq):
-    """래정 AI 해석(스트리밍). focus가 있으면 해당 목적에 집중해 풀이."""
+    """일진내정법 AI 해석(스트리밍)."""
     vy, vm, vd, vh, vmi = _visit_or_now(req)
-    data = _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
-    return StreamingResponse(ai_report.stream_raejeong(data, req.gender, req.focus), media_type="text/event-stream")
+    data = _iljin_naejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
+    return StreamingResponse(ai_report.stream_iljin_naejeong(data, req.gender), media_type="text/event-stream")

@@ -580,11 +580,7 @@ function TaegilView({ profile }: { profile?: any }) {
     );
 }
 
-// 래정법(來情法) — 내담자 사주 + 방문한 연월일시로 방문 목적을 추정
-const _RAE_ICON: Record<string, string> = {
-    "재물·금전": "💰", "애정·이성": "💕", "직장·사업": "💼",
-    "문서·계약·이사": "📄", "건강·질병": "🩺", "인간관계·경쟁": "🤝",
-};
+// 래정(방문점) — 박일우 명리 일진내정법: 내방일 일진 기준 진(辰) 배열 + 4진 방문 목적
 function RaejeongView({ profile }: { profile?: any }) {
     const now = new Date();
     // 내담자(상담자) 사주 — 저장 명식 자동 로드
@@ -600,13 +596,12 @@ function RaejeongView({ profile }: { profile?: any }) {
     const [loading, setLoading] = useState(false);
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
-    const [sel, setSel] = useState<string>("");  // 선택한 목적(빈값=전체)
     const body = (cc = c, vv = v) => ({
         gender: cc.gender, year: cc.y, month: cc.m, day: cc.d, hour: cc.h, minute: cc.min,
         visit_year: vv.y, visit_month: vv.m, visit_day: vv.d, visit_hour: vv.h, visit_minute: vv.min,
     });
     async function go(cc = c, vv = v) {
-        setLoading(true); setInterp(""); setSel("");
+        setLoading(true); setInterp("");
         try {
             const res = await fetch(`${API_BASE}/classic/raejeong`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
@@ -615,17 +610,16 @@ function RaejeongView({ profile }: { profile?: any }) {
             setData(await res.json());
         } finally { setLoading(false); }
     }
-    // focus="" → 전체 목적 풀이 / focus=목적 → 그 목적 집중 해석
-    async function interpret(focus = "") {
-        setSel(focus); setInterpreting(true); setInterp("");
+    async function interpret() {
+        setInterpreting(true); setInterp("");
         try {
-            await streamSSE(`${API_BASE}/classic/raejeong/analyze`, { ...body(), focus }, setInterp);
+            await streamSSE(`${API_BASE}/classic/raejeong/analyze`, body(), setInterp);
         } catch {
             setInterp("해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
         } finally { setInterpreting(false); }
     }
     // 프로필 변경 시 내담자 동기화 후 재조회
-    useEffect(() => { const ci = initC; setC(ci); setInterp(""); setSel(""); go(ci, v); /* eslint-disable-next-line */ }, [profile?.id]);
+    useEffect(() => { const ci = initC; setC(ci); setInterp(""); go(ci, v); /* eslint-disable-next-line */ }, [profile?.id]);
     const setVNow = () => { const t = new Date(); setV({ y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate(), h: t.getHours(), min: t.getMinutes() }); };
     const numCls = "w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center";
     const cnum = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number) => (
@@ -656,42 +650,46 @@ function RaejeongView({ profile }: { profile?: any }) {
             {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : data && (
                 <>
                     <div className="glass-card p-4 space-y-3">
-                        <div className="text-sm text-slate-500">방문 사주 · 내담자 일간 <b className="text-[#bf953f]">{data["내담자일간"]}</b></div>
-                        <div className="grid grid-cols-4 gap-2 text-center">
-                            {(["연", "월", "일", "시"] as const).map((lab) => (
-                                <div key={lab} className="rounded-xl border border-[#d4af37]/25 bg-white/50 dark:bg-slate-800/50 py-2">
-                                    <div className="text-[10px] text-slate-400">{lab}</div>
-                                    <div className="font-noto-serif text-lg text-slate-800 dark:text-slate-100">{data["방문사주"][lab]}</div>
-                                </div>
-                            ))}
+                        <div className="text-sm text-slate-500">내방자 일간 <b className="text-[#bf953f]">{data["내담자일간"]}</b> · 내방일진 <b className="text-[#bf953f] font-noto-serif">{data["내방일진"]}</b></div>
+                        {/* 진(辰) 배열 — 일진 기준 순행, 4진(實)이 방문 목적 */}
+                        <div className="space-y-1">
+                            {data["진배열"].map((j: any) => {
+                                const is4 = j["자리"] === "4진";
+                                return (
+                                    <div key={j["자리"]} className={"flex items-center gap-2 rounded-lg px-2 py-1.5 " + (is4 ? "bg-[#d4af37]/15 ring-1 ring-[#d4af37]/40" : (j["자리"] === "일진" ? "bg-slate-100/70 dark:bg-slate-800/50" : ""))}>
+                                        <span className="w-12 shrink-0 text-[11px] text-slate-400">{j["자리"]}</span>
+                                        <span className="w-6 shrink-0 font-noto-serif text-lg text-slate-800 dark:text-slate-100">{j["지지"]}</span>
+                                        <span className="w-16 shrink-0 text-xs font-semibold text-[#bf953f]">{j["성"]}</span>
+                                        <span className="w-10 shrink-0 text-xs text-slate-500">{j["십성"]}</span>
+                                        <span className="flex-1 min-w-0 text-xs text-slate-500 truncate">{j["의미"]}</span>
+                                        {j["원국주"]?.length > 0 && <span className="shrink-0 text-[10px] text-purple-500 dark:text-purple-400">원국 {j["원국주"].join("·")}</span>}
+                                    </div>
+                                );
+                            })}
                         </div>
-                        {data["방문특징"]?.length > 0 && (
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                <span className="text-slate-400">방문 지지 12운성·신살 · </span>{data["방문특징"].join(" / ")}
+                        {/* 4진 = 방문 목적 */}
+                        <div className="rounded-xl bg-[#d4af37]/10 border border-[#d4af37]/30 p-3 text-sm text-slate-700 dark:text-slate-200">
+                            <b className="text-[#bf953f]">🎯 방문 목적(4진)</b> · {data["방문목적진"]["지지"]} · 내방자 기준 <b>{data["방문목적진"]["십성"]}</b>
+                            {data["방문목적진"]["원국주"]?.length > 0 && <span> · 원국 {data["방문목적진"]["원국주"].join("·")}</span>}
+                        </div>
+                        {/* 공망·원진 */}
+                        {data["공망"]?.["해석"]?.length > 0 && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="font-semibold text-slate-600 dark:text-slate-300">공망 {data["공망"]["공망지지"]}</span> · {data["공망"]["해석"].map((g: any) => `${g["지지"]}(${g["육신"]})`).join(", ")} — {data["공망"]["해석"][0]?.["해석"]}
                             </div>
                         )}
-                        {/* 목적 랭킹 — 항목을 누르면 그 목적에 집중해 해석한다 */}
-                        <div className="space-y-1 pt-1">
-                            <div className="text-[11px] text-slate-400 mb-1">목적을 누르면 그 주제로 집중 해석합니다.</div>
-                            {data["목적랭킹"].map((r: any, i: number) => (
-                                <button key={r["목적"]} onClick={() => interpret(r["목적"])} disabled={interpreting}
-                                    className={"w-full flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors " + (sel === r["목적"] ? "bg-[#d4af37]/15 ring-1 ring-[#d4af37]/40" : "hover:bg-slate-100 dark:hover:bg-slate-800")}>
-                                    <span className="w-28 shrink-0 text-sm text-left text-slate-600 dark:text-slate-300">{_RAE_ICON[r["목적"]] || "•"} {r["목적"]}</span>
-                                    <div className="flex-1 h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                                        <div className={"h-full rounded-full " + (i === 0 ? "bg-gradient-to-r from-[#d4af37] to-[#bf953f]" : "bg-slate-300 dark:bg-slate-500")} style={{ width: `${r.pct}%` }} />
-                                    </div>
-                                    <span className="w-10 text-right text-xs text-slate-500">{r.pct}%</span>
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[11px] text-slate-400">※ 방문 시각 십신 분포 기반 추정입니다. 단정이 아닌 가능성 순 참고용.</p>
-                        <Button onClick={() => interpret("")} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                            {interpreting && !sel ? "풀이 중..." : "✨ 전체 방문 목적 해석"}
+                        {data["원진"]?.["원진지지"] && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                <span className="font-semibold text-slate-600 dark:text-slate-300">원진 {data["원진"]["원진지지"]}</span> · {data["원진"]["걸린주"].length > 0 ? data["원진"]["걸린주"].map((w: any) => `${w["주"]}(${w["해석"]})`).join(", ") : "원국에 걸린 주 없음"}
+                            </div>
+                        )}
+                        <p className="text-[11px] text-slate-400">※ 박일우 일진내정법 — 내방일 일진 기준. 단정이 아닌 참고용.</p>
+                        <Button onClick={() => interpret()} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                            {interpreting ? "풀이 중..." : "✨ AI 일진내정 해석"}
                         </Button>
                     </div>
                     {interp && (
                         <div className="glass-card p-5">
-                            {sel && <div className="text-xs font-semibold text-[#bf953f] mb-2">🔎 ‘{sel}’ 집중 해석</div>}
                             <ReportRenderer text={interp} streaming={interpreting} />
                         </div>
                     )}
