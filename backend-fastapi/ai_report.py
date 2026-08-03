@@ -844,26 +844,35 @@ RAEJEONG_SYSTEM = (
 )
 
 
-def build_raejeong_prompt(data: dict, gender: str = "남") -> str:
+def build_raejeong_prompt(data: dict, gender: str = "남", focus: str = "") -> str:
     v = data.get("방문사주", {})
     dist = data.get("십신분포", {})
     rank = data.get("목적랭킹", [])
     dist_txt = ", ".join(f"{k} {val}" for k, val in dist.items()) or "정보 없음"
     rank_txt = ", ".join(f"{r['목적']}({r['pct']}%)" for r in rank) or "정보 없음"
-    return (
+    base = (
         f"[내담자] 일간 {data.get('내담자일간', '')}, 성별 {gender}\n"
         f"[방문 시각 사주] 연 {v.get('연', '')} · 월 {v.get('월', '')} · 일 {v.get('일', '')} · 시 {v.get('시', '')} "
         f"(방문 일진 {data.get('방문일진', '')})\n"
         f"[방문 시각 십신 분포(가중합)] {dist_txt}\n"
         f"[방문 목적 가능성 랭킹] {rank_txt}\n\n"
+    )
+    focus = (focus or "").strip()
+    if focus:
+        return base + (
+            f"상담자가 '{focus}' 목적을 선택했습니다. 이 방문이 '{focus}'과(와) 관련해 온 것인지, "
+            f"관련 있다면 어떤 상황이고 앞으로 어떻게 흘러갈지, 방문 시각의 십신 근거로 이 목적에 집중해 상세히 풀이해 주세요. "
+            f"이 목적에 대한 구체적 조언을 중심으로 서술하고, 다른 목적은 필요한 만큼만 짧게 언급하세요."
+        )
+    return base + (
         f"위 래정 데이터를 바탕으로, 이 방문객이 지금 무슨 일로 찾아왔는지 가능성이 높은 순으로 풀이해 주세요. "
         f"각 목적이 왜 유력한지 방문 시각의 십신 근거로 설명하고, 용건별로 상담자가 짚어줄 조언을 덧붙여 주세요."
     )
 
 
-def stream_raejeong(data: dict, gender: str = "남") -> Iterator[str]:
-    """래정법 해석 스트림 — 방문 목적을 가능성 순으로."""
-    yield from _stream_models(build_raejeong_prompt(data, gender), RAEJEONG_SYSTEM)
+def stream_raejeong(data: dict, gender: str = "남", focus: str = "") -> Iterator[str]:
+    """래정법 해석 스트림 — 방문 목적을 가능성 순으로(또는 선택 목적 집중)."""
+    yield from _stream_models(build_raejeong_prompt(data, gender, focus), RAEJEONG_SYSTEM)
 
 
 # ---------------------------------------------------------------------------

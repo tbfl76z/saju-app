@@ -427,11 +427,11 @@ _RAE_POS_W = {
 }
 
 
-def _raejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh):
+def _raejeong_calc(gender, y, m, d, h, mi, vy, vm, vd, vh, vmi=0):
     """래정 산출 — 내담자 일간 대비 방문시각 십신 분포 + 목적 랭킹."""
     cres = _calc.calculate_saju(y, m, d, h, mi, use_solar_time=True, longitude=127.5, early_zi_time=False)
     day_stem = get_saju_details(cres)["pillars"]["day"]["stem"]
-    vres = _calc.calculate_saju(vy, vm, vd, vh, 0, use_solar_time=True, longitude=127.5, early_zi_time=False)
+    vres = _calc.calculate_saju(vy, vm, vd, vh, vmi, use_solar_time=True, longitude=127.5, early_zi_time=False)
     vP = get_saju_details(vres)["pillars"]
 
     group_w = defaultdict(float)
@@ -477,30 +477,34 @@ class RaejeongReq(BaseModel):
     day: int = 1
     hour: int = 12
     minute: int = 0
-    # 방문(내방) 연월일시 — 0이면 현재 시각으로
+    # 방문(내방) 연월일시 — visit_hour<0이면 현재 시각으로
     visit_year: int = 0
     visit_month: int = 0
     visit_day: int = 0
     visit_hour: int = -1
+    visit_minute: int = 0
+    focus: str = ""  # 집중 해석할 방문 목적(빈 값이면 전체)
 
 
 def _visit_or_now(req: "RaejeongReq"):
-    """방문 시각 미지정(0/-1) 시 현재 시각으로 보정."""
+    """방문 시각 미지정(visit_hour<0) 시 현재 연월일시로 보정. (년/월/일/시/분)"""
     t = _dt.datetime.now()
-    vh = req.visit_hour if req.visit_hour is not None and req.visit_hour >= 0 else t.hour
-    return (req.visit_year or t.year, req.visit_month or t.month, req.visit_day or t.day, vh)
+    if req.visit_hour is None or req.visit_hour < 0:
+        return (req.visit_year or t.year, req.visit_month or t.month, req.visit_day or t.day, t.hour, t.minute)
+    return (req.visit_year or t.year, req.visit_month or t.month, req.visit_day or t.day,
+            req.visit_hour, max(0, req.visit_minute))
 
 
 @router.post("/raejeong")
 async def raejeong(req: RaejeongReq):
     """래정법 — 방문 목적 추정(십신 분포 + 목적 랭킹)."""
-    vy, vm, vd, vh = _visit_or_now(req)
-    return _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh)
+    vy, vm, vd, vh, vmi = _visit_or_now(req)
+    return _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
 
 
 @router.post("/raejeong/analyze")
 async def raejeong_analyze(req: RaejeongReq):
-    """래정 AI 해석(스트리밍)."""
-    vy, vm, vd, vh = _visit_or_now(req)
-    data = _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh)
-    return StreamingResponse(ai_report.stream_raejeong(data, req.gender), media_type="text/event-stream")
+    """래정 AI 해석(스트리밍). focus가 있으면 해당 목적에 집중해 풀이."""
+    vy, vm, vd, vh, vmi = _visit_or_now(req)
+    data = _raejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
+    return StreamingResponse(ai_report.stream_raejeong(data, req.gender, req.focus), media_type="text/event-stream")

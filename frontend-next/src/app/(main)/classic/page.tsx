@@ -297,8 +297,8 @@ function JamiBoard({ jami, hangul, selZi, onCell, liuYear }: { jami: any; hangul
 function JamiView({ profile }: { profile?: any }) {
     const init = (() => {
         const b = profile ? toBirth(profile.sajuData) : null;
-        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, gender: b.gender }
-            : { y: 1990, m: 1, d: 1, h: 12, gender: "남" };
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, min: b.minute || 0, gender: b.gender }
+            : { y: 1990, m: 1, d: 1, h: 12, min: 0, gender: "남" };
     })();
     const [dt, setDt] = useState(init);
     const [jami, setJami] = useState<any>(null);
@@ -310,7 +310,7 @@ function JamiView({ profile }: { profile?: any }) {
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
     const [focus, setFocus] = useState("");
-    const reqBody = (d: typeof dt) => ({ name: "", gender: d.gender, year: d.y, month: d.m, day: d.d, hour: d.h, minute: 0, calendar: "양력" });
+    const reqBody = (d: typeof dt) => ({ name: "", gender: d.gender, year: d.y, month: d.m, day: d.d, hour: d.h, minute: d.min, calendar: "양력" });
     async function go(d = dt) {
         setLoading(true); setInterp("");
         try {
@@ -333,7 +333,7 @@ function JamiView({ profile }: { profile?: any }) {
     const onCell = (zi: number, gung: string) => { setSelZi(zi); interpret(gung); };
     // 프로필 로드/변경 시 날짜 입력창(dt)도 프로필 값으로 동기화 후 명반 로드 (입력창-명반 불일치 방지)
     useEffect(() => { setDt(init); setInterp(""); setFocus(""); setSelZi(null); setLiuYear(null); go(init); /* eslint-disable-next-line */ }, [profile?.id]);
-    const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+    const num = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number) => (
         <input type="number" value={dt[k]} min={min} max={max}
             onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
             className="w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
@@ -342,7 +342,7 @@ function JamiView({ profile }: { profile?: any }) {
         <div className="space-y-3">
             <div className="glass-card p-4 flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
                 <span className="mr-1">생년월일시(양력)</span>
-                {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>{num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>
+                {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>{num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>{num("min", 0, 59)}<span>분</span>
                 <select value={dt.gender} onChange={(e) => setDt({ ...dt, gender: e.target.value })}
                     className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
                     <option value="남">남</option><option value="여">여</option>
@@ -456,12 +456,12 @@ function JuyeokView() {
 
 function JamiCompatView({ profile }: { profile?: any }) {
     const b0 = profile ? toBirth(profile.sajuData) : null;
-    const initA = b0 && b0.year ? { y: b0.year, m: b0.month, d: b0.day, h: b0.hour, gender: b0.gender } : { y: 1990, m: 1, d: 1, h: 12, gender: "남" };
+    const initA = b0 && b0.year ? { y: b0.year, m: b0.month, d: b0.day, h: b0.hour, min: b0.minute || 0, gender: b0.gender } : { y: 1990, m: 1, d: 1, h: 12, min: 0, gender: "남" };
     const [pa, setPa] = useState(initA);
-    const [pb, setPb] = useState({ y: 1990, m: 1, d: 1, h: 12, gender: "여" });
+    const [pb, setPb] = useState({ y: 1990, m: 1, d: 1, h: 12, min: 0, gender: "여" });
     const [interp, setInterp] = useState("");
     const [running, setRunning] = useState(false);
-    const body = (p: typeof pa) => ({ name: "", gender: p.gender, year: p.y, month: p.m, day: p.d, hour: p.h, minute: 0, calendar: "양력" });
+    const body = (p: typeof pa) => ({ name: "", gender: p.gender, year: p.y, month: p.m, day: p.d, hour: p.h, minute: p.min, calendar: "양력" });
     async function go() {
         setRunning(true); setInterp("");
         try {
@@ -470,7 +470,7 @@ function JamiCompatView({ profile }: { profile?: any }) {
         finally { setRunning(false); }
     }
     const person = (label: string, p: typeof pa, setP: (v: typeof pa) => void) => {
-        const ni = (k: "y" | "m" | "d" | "h", min: number, max: number, w: string) => (
+        const ni = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number, w: string) => (
             <input type="number" value={p[k]} min={min} max={max} onChange={(e) => setP({ ...p, [k]: Number(e.target.value) })}
                 className={w + " px-1 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center"} />
         );
@@ -478,7 +478,7 @@ function JamiCompatView({ profile }: { profile?: any }) {
             <div className="glass-card p-3 space-y-2">
                 <div className="text-sm font-semibold text-[#bf953f]">{label}</div>
                 <div className="flex items-center gap-1 flex-wrap text-xs text-slate-500">
-                    {ni("y", 1900, 2100, "w-16")}<span>년</span>{ni("m", 1, 12, "w-11")}<span>월</span>{ni("d", 1, 31, "w-11")}<span>일</span>{ni("h", 0, 23, "w-11")}<span>시</span>
+                    {ni("y", 1900, 2100, "w-16")}<span>년</span>{ni("m", 1, 12, "w-11")}<span>월</span>{ni("d", 1, 31, "w-11")}<span>일</span>{ni("h", 0, 23, "w-11")}<span>시</span>{ni("min", 0, 59, "w-11")}<span>분</span>
                     <select value={p.gender} onChange={(e) => setP({ ...p, gender: e.target.value })}
                         className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
                         <option value="남">남</option><option value="여">여</option>
@@ -506,8 +506,8 @@ function TaegilView({ profile }: { profile?: any }) {
     // 본인 생년월일시 — 저장된 명식 자동 로드, 없으면 기본값(직접 입력 가능)
     const initBirth = (() => {
         const b = profile ? toBirth(profile.sajuData) : null;
-        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour }
-            : { y: 1990, m: 1, d: 1, h: 12 };
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, min: b.minute || 0 }
+            : { y: 1990, m: 1, d: 1, h: 12, min: 0 };
     })();
     const [birth, setBirth] = useState(initBirth);
     const [purpose, setPurpose] = useState("결혼");
@@ -527,7 +527,7 @@ function TaegilView({ profile }: { profile?: any }) {
     // 프로필 변경/목적 변경 시 생년 동기화 후 재조회 (입력창-결과 불일치 방지)
     useEffect(() => { setBirth(initBirth); go(purpose, y, m, initBirth); /* eslint-disable-next-line */ }, [profile?.id, purpose]);
     const inp = "w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center";
-    const bnum = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+    const bnum = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number) => (
         <input type="number" value={birth[k]} min={min} max={max}
             onChange={(e) => setBirth({ ...birth, [k]: Number(e.target.value) })}
             className="w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
@@ -538,7 +538,7 @@ function TaegilView({ profile }: { profile?: any }) {
                 {/* 본인 생년월일시 — 본명충일(띠) 개인화에 사용 */}
                 <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
                     <span className="mr-1">본인 생년월일시(양력)</span>
-                    {bnum("y", 1900, 2100)}<span>년</span>{bnum("m", 1, 12)}<span>월</span>{bnum("d", 1, 31)}<span>일</span>{bnum("h", 0, 23)}<span>시</span>
+                    {bnum("y", 1900, 2100)}<span>년</span>{bnum("m", 1, 12)}<span>월</span>{bnum("d", 1, 31)}<span>일</span>{bnum("h", 0, 23)}<span>시</span>{bnum("min", 0, 59)}<span>분</span>
                 </div>
                 {/* 조회할 연·월 */}
                 <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
@@ -590,22 +590,23 @@ function RaejeongView({ profile }: { profile?: any }) {
     // 내담자(상담자) 사주 — 저장 명식 자동 로드
     const initC = (() => {
         const b = profile ? toBirth(profile.sajuData) : null;
-        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, gender: b.gender }
-            : { y: 1990, m: 1, d: 1, h: 12, gender: "남" };
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, min: b.minute || 0, gender: b.gender }
+            : { y: 1990, m: 1, d: 1, h: 12, min: 0, gender: "남" };
     })();
     const [c, setC] = useState(initC);
     // 방문(내방) 시각 — 기본값 '지금'
-    const [v, setV] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours() });
+    const [v, setV] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), min: now.getMinutes() });
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
+    const [sel, setSel] = useState<string>("");  // 선택한 목적(빈값=전체)
     const body = (cc = c, vv = v) => ({
-        gender: cc.gender, year: cc.y, month: cc.m, day: cc.d, hour: cc.h, minute: 0,
-        visit_year: vv.y, visit_month: vv.m, visit_day: vv.d, visit_hour: vv.h,
+        gender: cc.gender, year: cc.y, month: cc.m, day: cc.d, hour: cc.h, minute: cc.min,
+        visit_year: vv.y, visit_month: vv.m, visit_day: vv.d, visit_hour: vv.h, visit_minute: vv.min,
     });
     async function go(cc = c, vv = v) {
-        setLoading(true); setInterp("");
+        setLoading(true); setInterp(""); setSel("");
         try {
             const res = await fetch(`${API_BASE}/classic/raejeong`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
@@ -614,22 +615,23 @@ function RaejeongView({ profile }: { profile?: any }) {
             setData(await res.json());
         } finally { setLoading(false); }
     }
-    async function interpret() {
-        setInterpreting(true); setInterp("");
+    // focus="" → 전체 목적 풀이 / focus=목적 → 그 목적 집중 해석
+    async function interpret(focus = "") {
+        setSel(focus); setInterpreting(true); setInterp("");
         try {
-            await streamSSE(`${API_BASE}/classic/raejeong/analyze`, body(), setInterp);
+            await streamSSE(`${API_BASE}/classic/raejeong/analyze`, { ...body(), focus }, setInterp);
         } catch {
             setInterp("해석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
         } finally { setInterpreting(false); }
     }
     // 프로필 변경 시 내담자 동기화 후 재조회
-    useEffect(() => { const ci = initC; setC(ci); setInterp(""); go(ci, v); /* eslint-disable-next-line */ }, [profile?.id]);
-    const setVNow = () => { const t = new Date(); setV({ y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate(), h: t.getHours() }); };
+    useEffect(() => { const ci = initC; setC(ci); setInterp(""); setSel(""); go(ci, v); /* eslint-disable-next-line */ }, [profile?.id]);
+    const setVNow = () => { const t = new Date(); setV({ y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate(), h: t.getHours(), min: t.getMinutes() }); };
     const numCls = "w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center";
-    const cnum = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+    const cnum = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number) => (
         <input type="number" value={c[k]} min={min} max={max} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) })} className={numCls} />
     );
-    const vnum = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+    const vnum = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number) => (
         <input type="number" value={v[k]} min={min} max={max} onChange={(e) => setV({ ...v, [k]: Number(e.target.value) })} className={numCls} />
     );
     return (
@@ -637,7 +639,7 @@ function RaejeongView({ profile }: { profile?: any }) {
             <div className="glass-card p-4 space-y-3">
                 <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
                     <span className="mr-1">내담자(생년월일시)</span>
-                    {cnum("y", 1900, 2100)}<span>년</span>{cnum("m", 1, 12)}<span>월</span>{cnum("d", 1, 31)}<span>일</span>{cnum("h", 0, 23)}<span>시</span>
+                    {cnum("y", 1900, 2100)}<span>년</span>{cnum("m", 1, 12)}<span>월</span>{cnum("d", 1, 31)}<span>일</span>{cnum("h", 0, 23)}<span>시</span>{cnum("min", 0, 59)}<span>분</span>
                     <select value={c.gender} onChange={(e) => setC({ ...c, gender: e.target.value })}
                         className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
                         <option value="남">남</option><option value="여">여</option>
@@ -645,7 +647,7 @@ function RaejeongView({ profile }: { profile?: any }) {
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
                     <span className="mr-1">방문 시각</span>
-                    {vnum("y", 1900, 2100)}<span>년</span>{vnum("m", 1, 12)}<span>월</span>{vnum("d", 1, 31)}<span>일</span>{vnum("h", 0, 23)}<span>시</span>
+                    {vnum("y", 1900, 2100)}<span>년</span>{vnum("m", 1, 12)}<span>월</span>{vnum("d", 1, 31)}<span>일</span>{vnum("h", 0, 23)}<span>시</span>{vnum("min", 0, 59)}<span>분</span>
                     <button onClick={setVNow} className="text-[11px] text-[#bf953f] underline">지금</button>
                     <Button onClick={() => go(c, v)} disabled={loading} className="ml-1 h-8">방문 목적 보기</Button>
                 </div>
@@ -663,24 +665,28 @@ function RaejeongView({ profile }: { profile?: any }) {
                                 </div>
                             ))}
                         </div>
-                        <div className="space-y-1.5 pt-1">
+                        {/* 목적 랭킹 — 항목을 누르면 그 목적에 집중해 해석한다 */}
+                        <div className="space-y-1 pt-1">
+                            <div className="text-[11px] text-slate-400 mb-1">목적을 누르면 그 주제로 집중 해석합니다.</div>
                             {data["목적랭킹"].map((r: any, i: number) => (
-                                <div key={r["목적"]} className="flex items-center gap-2">
-                                    <span className="w-28 shrink-0 text-sm text-slate-600 dark:text-slate-300">{_RAE_ICON[r["목적"]] || "•"} {r["목적"]}</span>
+                                <button key={r["목적"]} onClick={() => interpret(r["목적"])} disabled={interpreting}
+                                    className={"w-full flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors " + (sel === r["목적"] ? "bg-[#d4af37]/15 ring-1 ring-[#d4af37]/40" : "hover:bg-slate-100 dark:hover:bg-slate-800")}>
+                                    <span className="w-28 shrink-0 text-sm text-left text-slate-600 dark:text-slate-300">{_RAE_ICON[r["목적"]] || "•"} {r["목적"]}</span>
                                     <div className="flex-1 h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                                         <div className={"h-full rounded-full " + (i === 0 ? "bg-gradient-to-r from-[#d4af37] to-[#bf953f]" : "bg-slate-300 dark:bg-slate-500")} style={{ width: `${r.pct}%` }} />
                                     </div>
                                     <span className="w-10 text-right text-xs text-slate-500">{r.pct}%</span>
-                                </div>
+                                </button>
                             ))}
                         </div>
                         <p className="text-[11px] text-slate-400">※ 방문 시각 십신 분포 기반 추정입니다. 단정이 아닌 가능성 순 참고용.</p>
-                        <Button onClick={interpret} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                            {interpreting ? "풀이 중..." : "✨ AI 래정 해석"}
+                        <Button onClick={() => interpret("")} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                            {interpreting && !sel ? "풀이 중..." : "✨ 전체 방문 목적 해석"}
                         </Button>
                     </div>
                     {interp && (
                         <div className="glass-card p-5">
+                            {sel && <div className="text-xs font-semibold text-[#bf953f] mb-2">🔎 ‘{sel}’ 집중 해석</div>}
                             <ReportRenderer text={interp} streaming={interpreting} />
                         </div>
                     )}
@@ -696,11 +702,11 @@ function GimunView({ profile }: { profile?: any }) {
     // 출생국(命局): 선택 프로필 생년월일시 → 고정
     const natal = (() => {
         const b = profile ? toBirth(profile.sajuData) : null;
-        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour } : null;
+        return b && b.year ? { y: b.year, m: b.month, d: b.day, h: b.hour, min: b.minute || 0 } : null;
     })();
     const [mode, setMode] = useState<"natal" | "div">("div");  // 기문방위는 날짜 가변이 기본 — 점단·방위로 진입
     const [purpose, setPurpose] = useState("금전");
-    const [dt, setDt] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours() });
+    const [dt, setDt] = useState({ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), min: now.getMinutes() });
     const [r, setR] = useState<any>(null);
     const [pick, setPick] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -709,7 +715,7 @@ function GimunView({ profile }: { profile?: any }) {
     async function go(d = baseDt, pp = purpose) {
         setLoading(true); setPick(null);
         try {
-            const q = `${API_BASE}/classic/gimun?year=${d.y}&month=${d.m}&day=${d.d}&hour=${d.h}&purpose=${encodeURIComponent(pp)}`;
+            const q = `${API_BASE}/classic/gimun?year=${d.y}&month=${d.m}&day=${d.d}&hour=${d.h}&minute=${d.min}&purpose=${encodeURIComponent(pp)}`;
             setR(await (await fetch(q)).json());
         } finally { setLoading(false); }
     }
@@ -720,7 +726,7 @@ function GimunView({ profile }: { profile?: any }) {
             : "bg-white/40 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700";
     const byPalace: Record<number, any> = {};
     (r?.["방위"] || []).forEach((b: any) => { if (b["궁"]) byPalace[b["궁"]] = b; });
-    const num = (k: "y" | "m" | "d" | "h", min: number, max: number) => (
+    const num = (k: "y" | "m" | "d" | "h" | "min", min: number, max: number) => (
         <input type="number" value={dt[k]} min={min} max={max}
             onChange={(e) => setDt({ ...dt, [k]: Number(e.target.value) })}
             className="w-14 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
@@ -736,14 +742,14 @@ function GimunView({ profile }: { profile?: any }) {
                         className={"px-3 py-1.5 rounded-full text-sm font-semibold " + (mode === "div" ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>점단·방위</button>
                 </div>
                 {mode === "natal" && natal ? (
-                    <p className="text-sm text-slate-500">출생 {natal.y}.{natal.m}.{natal.d} {natal.h}시 기준 <b className="text-slate-700 dark:text-slate-200">평생 고정 명국</b></p>
+                    <p className="text-sm text-slate-500">출생 {natal.y}.{natal.m}.{natal.d} {natal.h}시 {natal.min}분 기준 <b className="text-slate-700 dark:text-slate-200">평생 고정 명국</b></p>
                 ) : (
                     <div className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
                         <span className="mr-1">일시</span>
                         {num("y", 1900, 2100)}<span>년</span>{num("m", 1, 12)}<span>월</span>
-                        {num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>
+                        {num("d", 1, 31)}<span>일</span>{num("h", 0, 23)}<span>시</span>{num("min", 0, 59)}<span>분</span>
                         <Button onClick={() => go(dt, purpose)} disabled={loading} className="ml-1 h-8">조회</Button>
-                        <button onClick={() => { const n = new Date(); const nd = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), h: n.getHours() }; setDt(nd); go(nd, purpose); }}
+                        <button onClick={() => { const n = new Date(); const nd = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), h: n.getHours(), min: n.getMinutes() }; setDt(nd); go(nd, purpose); }}
                             className="text-xs text-[#bf953f] underline">지금</button>
                     </div>
                 )}
