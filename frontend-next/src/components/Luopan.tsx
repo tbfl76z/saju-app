@@ -318,6 +318,14 @@ export default function Luopan({
       display: "flex", flexDirection: "column", alignItems: "center",
       fontFamily: "'Nanum Myeongjo', Batang, serif", color: "#EDE3CB",
     }}>
+      <div style={{ display: "flex", gap: 9, flexWrap: "wrap", justifyContent: "center", marginBottom: 16 }}>
+        {!started && <button style={btn} onClick={start}>센서 켜기</button>}
+        <button style={trueNorth ? btnOn : btn} aria-pressed={trueNorth}
+          onClick={() => setTrueNorth((v) => !v)}>진북 보정 −8°</button>
+        <button style={held ? btnOn : btn} aria-pressed={held}
+          onClick={() => setHeld((v) => !v)}>{held ? "고정 해제" : "측정값 고정"}</button>
+        {source === "relative" && <button style={btn} onClick={setNorthHere}>여기가 북</button>}
+      </div>
       <div style={{ position: "relative", width: "min(94vw, 420px)", aspectRatio: "1" }}>
         <svg viewBox="0 0 400 400" style={{ width: "100%", display: "block" }}
           role="img" aria-label={`나경 방위판, 현재 ${heading.toFixed(0)}도`}>
@@ -594,15 +602,6 @@ export default function Luopan({
           </div>
         </div>
       )}
-
-      <div style={{ display: "flex", gap: 9, flexWrap: "wrap", justifyContent: "center", marginTop: 20 }}>
-        {!started && <button style={btn} onClick={start}>센서 켜기</button>}
-        <button style={trueNorth ? btnOn : btn} aria-pressed={trueNorth}
-          onClick={() => setTrueNorth((v) => !v)}>진북 보정 −8°</button>
-        <button style={held ? btnOn : btn} aria-pressed={held}
-          onClick={() => setHeld((v) => !v)}>{held ? "고정 해제" : "측정값 고정"}</button>
-        {source === "relative" && <button style={btn} onClick={setNorthHere}>여기가 북</button>}
-      </div>
 
       <p style={{
         maxWidth: "min(94vw, 420px)", marginTop: 16, fontSize: 12,
