@@ -16,8 +16,11 @@ const STAR_COLOR: Record<Star, string> = {
   화해: "#C08A5A", 육살: "#B5734A", 오귀: "#A5503C", 절명: "#8C2F26",
 };
 
-/** 한반도 자침편차 약 8°W */
-const DECLINATION = -8;
+/** 자침편차(서울 인근) — NOAA WMM-2025: 2025-02-24 기준 8.95°W, 연 0.04°W씩 증가.
+ *  서편각은 음수(진북 = 자북 방위각 − 편각). 경과 연수만큼 자동 반영한다. */
+const DECLINATION = -(8.95 + 0.04 * Math.max(0, new Date().getFullYear() + (new Date().getMonth() + 0.5) / 12 - 2025.15));
+/** 버튼 표기용 반올림 값 (예: 9.0) */
+const DECL_LABEL = Math.abs(DECLINATION).toFixed(1);
 
 type Source = "absolute-event" | "orientation-sensor" | "relative" | null;
 const RANK: Record<string, number> = {
@@ -321,7 +324,7 @@ export default function Luopan({
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", justifyContent: "center", marginBottom: 16 }}>
         {!started && <button style={btn} onClick={start}>센서 켜기</button>}
         <button style={trueNorth ? btnOn : btn} aria-pressed={trueNorth}
-          onClick={() => setTrueNorth((v) => !v)}>진북 보정 −8°</button>
+          onClick={() => setTrueNorth((v) => !v)}>진북 보정 −{DECL_LABEL}°</button>
         <button style={held ? btnOn : btn} aria-pressed={held}
           onClick={() => setHeld((v) => !v)}>{held ? "고정 해제" : "측정값 고정"}</button>
         {source === "relative" && <button style={btn} onClick={setNorthHere}>여기가 북</button>}
