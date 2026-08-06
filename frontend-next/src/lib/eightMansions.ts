@@ -213,8 +213,10 @@ export const MOUNTAINS: { hanja: string; hangul: string; kind: MountainKind; deg
 /* ────────────────────────────────────────────
    공망(空亡) — 경계선에 걸린 좌향
    측정값이 두 산의 경계에 놓이면 기운이 어느 쪽에도 온전히 속하지 못한다고 본다.
-   그 경계가 팔괘의 경계까지 겸하면 대공망, 같은 괘 안의 산끼리면 소공망이다.
-   허용 오차는 유파마다 다르다. 1.5°를 쓰는 곳도 3°를 쓰는 곳도 있다.
+   경계 폭은 균일하지 않다(실전 경계표 기준):
+   - 팔괘 경계(계축·인갑·을진·사병·정미·신경·신술·해임) = 대공망, 폭 6°(±3°)
+   - 지지·천간 경계(자계·갑묘 등) 및 지지→사유 경계(축간 등) = 소공망, 폭 3°(±1.5°)
+   - 사유→지지 경계(간인·손사·곤신·건해) = 소공망, 폭 1°(±0.5°)
    ──────────────────────────────────────────── */
 
 export type VoidLevel = "대공망" | "소공망" | null;
@@ -227,26 +229,34 @@ export interface VoidResult {
   boundary: number;
   /** 경계를 이루는 두 산 */
   between: [string, string];
+  /** 이 경계의 공망 반폭(도) */
+  halfWidth: number;
 }
 
 export function voidCheck(deg: number, tolerance = 3): VoidResult {
   const d = ((deg % 360) + 360) % 360;
-  /* 산의 경계선은 7.5° + 15°k 지점에 놓인다 */
+  /* 산의 경계선은 7.5° + 15°k 지점에 놓인다 (k=0 이 子-癸 경계) */
   const k = Math.round((d - 7.5) / 15);
   const boundary = (((7.5 + 15 * k) % 360) + 360) % 360;
   let distance = Math.abs(d - boundary);
   if (distance > 180) distance = 360 - distance;
 
   /* 7.5+15k 가 팔괘 경계(22.5+45m)와 겹치려면 k ≡ 1 (mod 3) */
-  const isGuaBoundary = ((k % 3) + 3) % 3 === 1;
-  const lo = MOUNTAINS[((k % 24) + 24) % 24];
-  const hi = MOUNTAINS[(((k + 1) % 24) + 24) % 24];
+  const km = ((k % 24) + 24) % 24;
+  const isGuaBoundary = km % 3 === 1;
+  /* 경계표 기준 반폭: 대공망 ±3°, 사유→지지(간인·손사·곤신·건해, k≡3 mod 6) ±0.5°, 그 외 ±1.5° */
+  const baseHalf = isGuaBoundary ? 3 : km % 6 === 3 ? 0.5 : 1.5;
+  /* tolerance 는 대공망 반폭 기준 스케일(기본 3 = 경계표 그대로) */
+  const halfWidth = baseHalf * (tolerance / 3);
+  const lo = MOUNTAINS[km];
+  const hi = MOUNTAINS[(km + 1) % 24];
 
   return {
-    level: distance <= tolerance ? (isGuaBoundary ? "대공망" : "소공망") : null,
+    level: distance <= halfWidth ? (isGuaBoundary ? "대공망" : "소공망") : null,
     distance,
     boundary,
     between: [lo.hanja, hi.hanja],
+    halfWidth,
   };
 }
 
