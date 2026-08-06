@@ -161,12 +161,13 @@ export function starChart(sitting: string, period: number): StarChart {
 export const STAR_NAMES: Record<number, string> = {
   1: "一白", 2: "二黑", 3: "三碧", 4: "四綠", 5: "五黃", 6: "六白", 7: "七赤", 8: "八白", 9: "九紫",
 };
-/** 9운 기준 성수 기운(당운·생기·퇴기·살기) — 안내용 */
+/** 성수 기운(당운·생기·퇴기·살기) — 안내용.
+ *  생기는 다음 한 운만 취한다(9운이면 1白). 그다음 운까지 생기로 보는 관행도 있으나
+ *  9운 기준 2黑은 병부성이라 실무에서 생기로 쓰지 않으므로 보수적으로 좁혔다. */
 export function starMood(n: number, period: number): "왕기" | "생기" | "퇴기" | "쇠살" {
   if (n === period) return "왕기";
   const next = (period % 9) + 1;
-  const next2 = (next % 9) + 1;
-  if (n === next || n === next2) return "생기";
+  if (n === next) return "생기";
   const prev = ((period - 2 + 9) % 9) + 1;
   if (n === prev) return "퇴기";
   return "쇠살";
