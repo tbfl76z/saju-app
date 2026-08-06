@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
     mountainFromDeg, annualChart, comboFor, type Palace,
@@ -40,6 +40,95 @@ interface Props {
     gender?: "male" | "female";
 }
 
+/* ── 회전 나경판(24산+8괘) 그리기 도우미 ── */
+const BRANCH_SET = new Set(["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]);
+const YUY_SET = new Set(["乾", "坤", "艮", "巽"]);
+// 방위각(0=북, 시계방향) → SVG 좌표
+function pt(cx: number, cy: number, r: number, deg: number): [number, number] {
+    const rad = (deg * Math.PI) / 180;
+    return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
+}
+function sectorPath(cx: number, cy: number, r1: number, r2: number, a1: number, a2: number): string {
+    const [x1, y1] = pt(cx, cy, r2, a1); const [x2, y2] = pt(cx, cy, r2, a2);
+    const [x3, y3] = pt(cx, cy, r1, a2); const [x4, y4] = pt(cx, cy, r1, a1);
+    return `M${x1},${y1} A${r2},${r2} 0 0 1 ${x2},${y2} L${x3},${y3} A${r1},${r1} 0 0 0 ${x4},${y4} Z`;
+}
+
+// 현공용 회전 나경판 — heading만큼 판이 돌아 위쪽 붉은 포인터가 '지금 향한 방위(向)'를 가리킨다.
+function RotatingPlate({ heading, sitting, facing }: { heading: number | null; sitting: string; facing: string }) {
+    const rot = -(heading ?? 0);
+    const gua: [Trigram, string][] = [["坎", "북"], ["艮", "북동"], ["震", "동"], ["巽", "남동"], ["離", "남"], ["坤", "남서"], ["兌", "서"], ["乾", "북서"]];
+    return (
+        <div className="relative max-w-sm mx-auto select-none">
+            <svg viewBox="0 0 400 400" className="w-full block" role="img"
+                aria-label={`현공 나경판, 현재 ${heading == null ? "정지" : heading.toFixed(0) + "도"}`}>
+                {/* 바탕 */}
+                <circle cx={200} cy={200} r={192} fill="#f6efdc" stroke="#b09b62" strokeWidth={2} />
+                <g transform={`rotate(${rot} 200 200)`}>
+                    {/* 눈금 링: 5° 간격, 30° 굵게 + 숫자 */}
+                    {Array.from({ length: 72 }, (_, i) => i * 5).map((a) => {
+                        const major = a % 30 === 0;
+                        const [x1, y1] = pt(200, 200, major ? 178 : 183, a);
+                        const [x2, y2] = pt(200, 200, 190, a);
+                        return <line key={a} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#8a744a" strokeWidth={major ? 1.6 : 0.7} />;
+                    })}
+                    {Array.from({ length: 12 }, (_, i) => i * 30).map((a) => {
+                        const [x, y] = pt(200, 200, 170, a);
+                        return <text key={a} x={x} y={y + 3} fontSize={9} fill="#7a6435" textAnchor="middle"
+                            transform={`rotate(${a} ${x} ${y})`}>{a}</text>;
+                    })}
+                    {/* 24산 링 */}
+                    {Object.entries(MOUNTAIN_INFO).map(([m, info]) => {
+                        const a1 = info.deg - 7.5, a2 = info.deg + 7.5;
+                        const isSit = m === sitting, isFace = m === facing;
+                        const fill = isSit ? "#d4af37" : isFace ? "#9cc7e8" : "#faf4e4";
+                        const color = BRANCH_SET.has(m) ? "#2b2b2b" : YUY_SET.has(m) ? "#a5303c" : "#1d4f8f";
+                        const [tx, ty] = pt(200, 200, 138, info.deg);
+                        return (
+                            <g key={m}>
+                                <path d={sectorPath(200, 200, 112, 163, a1, a2)} fill={fill} stroke="#b09b62" strokeWidth={0.8} />
+                                <text x={tx} y={ty + 6} fontSize={19} fontWeight={700} fill={isSit ? "#fff" : color}
+                                    textAnchor="middle" fontFamily="'Noto Serif KR',serif"
+                                    transform={`rotate(${info.deg} ${tx} ${ty})`}>{m}</text>
+                            </g>
+                        );
+                    })}
+                    {/* 8괘 링 */}
+                    {gua.map(([g, ko], i) => {
+                        const mid = i * 45, a1 = mid - 22.5, a2 = mid + 22.5;
+                        const [tx, ty] = pt(200, 200, 88, mid);
+                        return (
+                            <g key={g}>
+                                <path d={sectorPath(200, 200, 62, 112, a1, a2)} fill="#f1e6c8" stroke="#b09b62" strokeWidth={0.8} />
+                                <text x={tx} y={ty} fontSize={17} fontWeight={700} fill="#6b532a" textAnchor="middle"
+                                    fontFamily="'Noto Serif KR',serif" transform={`rotate(${mid} ${tx} ${ty})`}>{g}</text>
+                                <text x={tx} y={ty + 13} fontSize={8.5} fill="#8a744a" textAnchor="middle"
+                                    transform={`rotate(${mid} ${tx} ${ty})`}>{ko}</text>
+                            </g>
+                        );
+                    })}
+                    {/* 중심 */}
+                    <circle cx={200} cy={200} r={62} fill="#efe3c2" stroke="#b09b62" />
+                    <line x1={200} y1={142} x2={200} y2={258} stroke="#c33" strokeWidth={0.8} opacity={0.6} />
+                    <line x1={142} y1={200} x2={258} y2={200} stroke="#c33" strokeWidth={0.8} opacity={0.6} />
+                </g>
+                {/* 고정 포인터: 위=向(붉음), 아래=坐(파랑) */}
+                <polygon points="200,6 193,26 207,26" fill="#c0392b" />
+                <text x={214} y={22} fontSize={13} fontWeight={700} fill="#c0392b">向</text>
+                <polygon points="200,394 193,374 207,374" fill="#1d4f8f" />
+                <text x={214} y={386} fontSize={13} fontWeight={700} fill="#1d4f8f">坐</text>
+                {/* 중앙 방위 표시 */}
+                <text x={200} y={195} fontSize={16} fontWeight={700} fill="#6b532a" textAnchor="middle">
+                    {heading == null ? "—" : `${heading.toFixed(0)}°`}
+                </text>
+                <text x={200} y={214} fontSize={11} fill="#8a744a" textAnchor="middle">
+                    {heading == null ? "센서 대기" : `向 ${mountainFromDeg(heading)} · 坐 ${mountainFromDeg(heading + 180)}`}
+                </text>
+            </svg>
+        </div>
+    );
+}
+
 export default function FlyingStarsView({ birthYear, gender }: Props) {
     const now = new Date();
     const nowYear = now.getFullYear();
@@ -51,6 +140,41 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     const [degInput, setDegInput] = useState("");   // 좌향 각도(도) 직접 입력
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
+
+    // ── 간이 나침반: 센서로 현재 방위를 읽어 좌산을 잡는다 (자북 기준) ──
+    const [sensorOn, setSensorOn] = useState(false);
+    const [heading, setHeading] = useState<number | null>(null);
+    const cleanupRef = useRef<(() => void) | null>(null);
+    useEffect(() => () => { cleanupRef.current?.(); }, []); // 언마운트 시 리스너 해제
+
+    async function startSensor() {
+        // iOS는 사용자 제스처 안에서 권한 요청이 필요하다
+        const DOE = window.DeviceOrientationEvent as (typeof DeviceOrientationEvent & {
+            requestPermission?: () => Promise<PermissionState>;
+        }) | undefined;
+        if (DOE && typeof DOE.requestPermission === "function") {
+            try { if ((await DOE.requestPermission()) !== "granted") return; } catch { return; }
+        }
+        const onOrient = (e: DeviceOrientationEvent) => {
+            const compass = (e as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+            let h: number | null = null;
+            if (typeof compass === "number") h = compass;                    // iOS
+            else if (e.absolute && e.alpha != null) h = 360 - e.alpha;       // 절대 방위
+            else if (e.alpha != null) h = 360 - e.alpha;                     // 상대(참고용)
+            if (h != null) setHeading(((h % 360) + 360) % 360);
+        };
+        // deviceorientationabsolute 우선, 없으면 deviceorientation
+        const evName = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
+        window.addEventListener(evName as "deviceorientation", onOrient as EventListener);
+        cleanupRef.current = () => window.removeEventListener(evName as "deviceorientation", onOrient as EventListener);
+        setSensorOn(true);
+    }
+
+    // 휴대폰 위쪽을 집 정면(향)으로 향한 상태에서 좌(반대 방위)를 잡는다
+    const captureSitting = () => {
+        if (heading == null) return;
+        setSitting(mountainFromDeg(heading + 180));
+    };
 
     const chart = useMemo(() => {
         try { return starChart(sitting, periodOf(year)); } catch { return null; }
@@ -140,7 +264,25 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         className="w-20 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
                     <span className="text-xs text-slate-400">{period}운 ({py0}~{py1})</span>
                 </div>
-                {/* 팔택 나경 측정값 연동: 잰 각도를 입력하면 좌산 자동 선택 */}
+                {/* 회전 나경판 — 센서 heading에 따라 판이 돌고, 위 포인터가 지금 향한 방위(向) */}
+                <RotatingPlate heading={heading} sitting={sitting} facing={chart?.facing ?? ""} />
+                {/* 센서 제어 — 현재 방위를 읽어 좌산 자동 설정 */}
+                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                    {!sensorOn ? (
+                        <Button onClick={startSensor} variant="outline" className="h-8 rounded-full text-xs">🧭 센서로 방위 재기</Button>
+                    ) : heading == null ? (
+                        <span className="text-xs text-slate-400">센서 신호 대기 중… (실제 휴대폰에서만 동작)</span>
+                    ) : (
+                        <>
+                            <span className="text-xs">지금 향한 방위 <b className="text-[#bf953f]">{heading.toFixed(1)}°</b> (<b className="font-noto-serif">{mountainFromDeg(heading)}</b>)</span>
+                            <Button onClick={captureSitting} className="h-8 rounded-full text-xs bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                                집 정면을 향하고 → 좌향 잡기
+                            </Button>
+                        </>
+                    )}
+                    <span className="text-[11px] text-slate-400">휴대폰 위쪽을 집 정면(향)으로 향한 뒤 누르면 좌(坐)가 자동 설정됩니다</span>
+                </div>
+                {/* 각도 직접 입력(팔택 나경 측정값 옮겨 적기) */}
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                     <span>좌향 각도(도)</span>
                     <input type="number" value={degInput} placeholder="예: 187.5"
@@ -148,7 +290,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         onKeyDown={(e) => { if (e.key === "Enter") applyDeg(); }}
                         className="w-24 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
                     <Button onClick={applyDeg} variant="outline" className="h-8 rounded-full text-xs">각도 → 좌산</Button>
-                    <span className="text-[11px] text-slate-400">팔택 나경 탭에서 잰 좌 방위각을 그대로 입력</span>
+                    <span className="text-[11px] text-slate-400">팔택 나경 탭에서 잰 좌 방위각을 그대로 입력해도 됩니다</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
                     건물이 지어진(입주한) 시기의 운(運)과 좌향으로 비성반을 세웁니다. 좌(坐)는 건물이 등지는 방위, 향(向)은 정면이 바라보는 방위입니다.
