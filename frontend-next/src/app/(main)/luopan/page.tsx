@@ -1,0 +1,63 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Luopan from "@/components/Luopan";
+import { getPrimaryProfile } from "@/lib/storage";
+
+// 연주(年柱) 간지로 입춘 보정 연도를 역산한다.
+// 만세력이 낸 연주 간지는 이미 입춘 기준이므로, 양력 연도의 표준 년간지와
+// 다르면 입춘 전 출생(→ 전년)으로 판정한다. (근사 보정보다 정확)
+const STEMS = "甲乙丙丁戊己庚辛壬癸";
+const BRANCHES = "子丑寅卯辰巳午未申酉戌亥";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function correctedYear(sajuData: any): number | undefined {
+    const bd: string = sajuData?.birth_date || "";
+    const y = parseInt(String(bd).slice(0, 4), 10);
+    if (!y || y < 1900) return undefined;
+    const yz = sajuData?.pillars?.year;
+    const gz: string = yz?.pillar || `${yz?.stem ?? ""}${yz?.branch ?? ""}`;
+    if (gz.length >= 2) {
+        const stdStem = STEMS[((y - 4) % 10 + 10) % 10];
+        const stdBranch = BRANCHES[((y - 4) % 12 + 12) % 12];
+        // 연주가 전년 간지 = 입춘 전 출생
+        if (gz[0] !== stdStem || gz[1] !== stdBranch) return y - 1;
+    }
+    return y;
+}
+
+// "남"/"여"(또는 M/F, male/female) → 컴포넌트가 받는 "male" | "female"
+function toGender(g: unknown): "male" | "female" | undefined {
+    if (g === "남" || g === "M" || g === "male" || g === 0) return "male";
+    if (g === "여" || g === "F" || g === "female" || g === 1) return "female";
+    return undefined;
+}
+
+export default function LuopanPage() {
+    const [ready, setReady] = useState(false);
+    const [birthYear, setBirthYear] = useState<number | undefined>(undefined);
+    const [gender, setGender] = useState<"male" | "female" | undefined>(undefined);
+
+    // 저장된 '내 명식'이 있으면 본명괘가 자동으로 잡히도록 값을 확정한 뒤 마운트한다
+    useEffect(() => {
+        const p = getPrimaryProfile();
+        const sd = p?.sajuData;
+        if (sd) {
+            setBirthYear(correctedYear(sd));
+            setGender(toGender(sd.gender));
+        }
+        setReady(true);
+    }, []);
+
+    if (!ready) return null;
+
+    return (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-24">
+            <div className="text-center space-y-2 py-5 md:py-8">
+                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🧭 나경(패철)</h2>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰 방위 센서로 좌향을 재고 팔택풍수 길흉 방위를 확인합니다.</p>
+            </div>
+            <Luopan birthYear={birthYear} gender={gender} />
+        </div>
+    );
+}

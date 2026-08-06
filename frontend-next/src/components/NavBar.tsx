@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sun, HeartHandshake, Bookmark, GraduationCap, ScrollText } from "lucide-react";
+import { Home, Sun, HeartHandshake, Bookmark, GraduationCap, ScrollText, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // 네비게이션 항목 정의 (단일 출처)
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     { href: "/today", label: "오늘의 운세", icon: Sun },
     { href: "/classic", label: "고전", icon: ScrollText },
     { href: "/compatibility", label: "궁합", icon: HeartHandshake },
+    { href: "/luopan", label: "나경", icon: Compass },
     { href: "/learn", label: "공부", icon: GraduationCap },
     { href: "/saved", label: "저장됨", icon: Bookmark },
 ] as const;
@@ -50,7 +51,7 @@ export function NavBarMobile() {
     return (
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 glass-card !rounded-none !rounded-t-3xl border-b-0 border-x-0 px-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             {/* 라벨 폭과 무관하게 항상 대칭이 되도록 N등분 그리드 */}
-            <div className="grid grid-cols-6">
+            <div className="grid grid-cols-7">
                 {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
                     <Link
                         key={href}
