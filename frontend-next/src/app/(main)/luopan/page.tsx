@@ -86,7 +86,7 @@ export default function LuopanPage() {
                     <Luopan birthYear={birthYear} gender={gender} />
                 </div>
             )}
-            {mode === "현공" && <FlyingStarsView />}
+            {mode === "현공" && <FlyingStarsView birthYear={birthYear} gender={gender} />}
             {mode === "삼합" && <SamhapView />}
         </div>
     );

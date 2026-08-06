@@ -172,3 +172,41 @@ export function starMood(n: number, period: number): "왕기" | "생기" | "퇴�
   if (n === prev) return "퇴기";
   return "쇠살";
 }
+
+/* ── 연자백(年紫白) — 해마다 도는 유년 비성 ── */
+
+/** 그 해의 연자백 중궁수 — 1864(갑자, 1白 입중) 기점 매년 역행.
+ *  입춘(2/4경) 기준 연도를 넣을 것. 예: 2024=3碧, 2025=2黑, 2026=1白. */
+export function annualCenter(year: number): number {
+  return ((1864 - year) % 9 + 9) % 9 + 1;
+}
+
+/** 연자백 반(盤) — 중궁수를 넣고 순비 */
+export function annualChart(year: number): Record<Palace, number> {
+  return flyChart(annualCenter(year), true);
+}
+
+/* ── 성요 조합(산성·향성 동궁) 해석 — 심씨현공 계열 통용 조합 ── */
+
+export interface ComboNote { grade: "길" | "흉"; name: string; note: string }
+const _COMBOS: Record<string, ComboNote> = {
+  "2,5": { grade: "흉", name: "이흑오황", note: "질병·재해 조합 — 침실·주방 부적합, 이 방위 공사·동토 금지" },
+  "5,5": { grade: "흉", name: "오황중첩", note: "대흉 — 절대 동토 금지, 조용히 둘 것" },
+  "2,2": { grade: "흉", name: "병부중첩", note: "건강 유의 — 환자·노약자 방 배치 회피" },
+  "2,3": { grade: "흉", name: "투우살", note: "시비·구설·소송 주의 — 다툼이 잦아지는 조합" },
+  "6,7": { grade: "흉", name: "교검살", note: "금속 상해·다툼 주의 — 날카로운 물건 정리" },
+  "7,9": { grade: "흉", name: "화풍", note: "화재·화상 주의 — 화기 관리 철저" },
+  "1,4": { grade: "길", name: "문창", note: "일사동궁(一四同宮) — 학업·시험·문서·창작에 길, 공부방 적합" },
+  "1,6": { grade: "길", name: "문무귀인", note: "관운·명예·귀인 조력에 길" },
+  "8,9": { grade: "길", name: "생왕경사", note: "재물·경사에 길 — 출입구·거실 적합" },
+  "1,9": { grade: "길", name: "수화기제", note: "왕기·생기 만남 — 발전·성취에 길" },
+  "9,9": { grade: "길", name: "왕기중첩", note: "9운 당왕 기운 집중 — 핵심 공간(출입구·안방) 적합" },
+  "8,8": { grade: "길", name: "재성중첩", note: "재물 기운 — 금고·사업 공간에 길" },
+  "1,1": { grade: "길", name: "생기중첩", note: "새 기회·인연의 기운" },
+};
+
+/** 산성·향성 조합의 통용 해석 (순서 무관, 등록된 주요 조합만 반환) */
+export function comboFor(a: number, b: number): ComboNote | null {
+  const key = a <= b ? `${a},${b}` : `${b},${a}`;
+  return _COMBOS[key] ?? null;
+}

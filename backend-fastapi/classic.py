@@ -644,3 +644,22 @@ async def raejeong_analyze(req: RaejeongReq):
     vy, vm, vd, vh, vmi = _visit_or_now(req)
     data = _iljin_naejeong_calc(req.gender, req.year, req.month, req.day, req.hour, req.minute, vy, vm, vd, vh, vmi)
     return StreamingResponse(ai_report.stream_iljin_naejeong(data, req.gender), media_type="text/event-stream")
+
+
+# ==== 현공비성(玄空飛星) AI 해석 ====
+# 비성반 계산은 프론트 lib/flyingStars.ts(문헌·실전 검증 완료)에서 수행하고,
+# 여기서는 그 결과를 받아 해석 프롬프트만 구성한다(재계산 금지 원칙).
+class HyeongongReq(BaseModel):
+    sitting: str = "子"
+    facing: str = "午"
+    period: int = 9
+    structure: str = ""
+    annual_year: int = 0
+    cells: list = []      # [{방위,산성,향성,운반,연성,조합,팔택}]
+    ming_gua: str = ""    # 팔택 본명괘(선택)
+
+
+@router.post("/hyeongong/analyze")
+async def hyeongong_analyze(req: HyeongongReq):
+    """현공비성 AI 해석(스트리밍)."""
+    return StreamingResponse(ai_report.stream_hyeongong(req.model_dump()), media_type="text/event-stream")
