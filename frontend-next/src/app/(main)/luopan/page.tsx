@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Luopan from "@/components/Luopan";
+import FlyingStarsView from "@/components/FlyingStarsView";
+import SamhapView from "@/components/SamhapView";
 import { getPrimaryProfile } from "@/lib/storage";
 
 // 연주(年柱) 간지로 입춘 보정 연도를 역산한다.
@@ -33,8 +35,11 @@ function toGender(g: unknown): "male" | "female" | undefined {
     return undefined;
 }
 
+type Mode = "팔택" | "현공" | "삼합";
+
 export default function LuopanPage() {
     const [ready, setReady] = useState(false);
+    const [mode, setMode] = useState<Mode>("팔택");
     const [birthYear, setBirthYear] = useState<number | undefined>(undefined);
     const [gender, setGender] = useState<"male" | "female" | undefined>(undefined);
 
@@ -57,16 +62,32 @@ export default function LuopanPage() {
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🧭 나경(패철)</h2>
                 <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰 방위 센서로 좌향을 재고 팔택풍수 길흉 방위를 확인합니다.</p>
             </div>
-            {/* 나경은 어두운 배경 전제로 디자인돼 있어, 밝은 배경 카드로 감싸면 텍스트가 흐리다.
-                원 디자인 의도대로 짙은 배경 카드에 담아 가독성을 확보한다. */}
-            <div style={{
-                background: "linear-gradient(160deg, #1b2233, #10151f)",
-                borderRadius: 20,
-                padding: "22px 10px",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
-            }}>
-                <Luopan birthYear={birthYear} gender={gender} />
+            {/* 유파 탭: 팔택 나경(센서) / 현공비성 / 삼합수법 */}
+            <div className="flex gap-1.5 mb-4 flex-wrap justify-center">
+                {(["팔택", "현공", "삼합"] as Mode[]).map((m) => (
+                    <button key={m} onClick={() => setMode(m)}
+                        className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
+                            (mode === m ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
+                                : "text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
+                        {m === "팔택" ? "팔택 나경" : m === "현공" ? "현공비성" : "삼합수법"}
+                    </button>
+                ))}
             </div>
+
+            {mode === "팔택" && (
+                /* 나경은 어두운 배경 전제로 디자인돼 있어, 밝은 배경 카드로 감싸면 텍스트가 흐리다.
+                   원 디자인 의도대로 짙은 배경 카드에 담아 가독성을 확보한다. */
+                <div style={{
+                    background: "linear-gradient(160deg, #1b2233, #10151f)",
+                    borderRadius: 20,
+                    padding: "22px 10px",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+                }}>
+                    <Luopan birthYear={birthYear} gender={gender} />
+                </div>
+            )}
+            {mode === "현공" && <FlyingStarsView />}
+            {mode === "삼합" && <SamhapView />}
         </div>
     );
 }
