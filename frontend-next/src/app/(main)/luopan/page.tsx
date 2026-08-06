@@ -57,7 +57,16 @@ export default function LuopanPage() {
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🧭 나경(패철)</h2>
                 <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰 방위 센서로 좌향을 재고 팔택풍수 길흉 방위를 확인합니다.</p>
             </div>
-            <Luopan birthYear={birthYear} gender={gender} />
+            {/* 나경은 어두운 배경 전제로 디자인돼 있어, 밝은 배경 카드로 감싸면 텍스트가 흐리다.
+                원 디자인 의도대로 짙은 배경 카드에 담아 가독성을 확보한다. */}
+            <div style={{
+                background: "linear-gradient(160deg, #1b2233, #10151f)",
+                borderRadius: 20,
+                padding: "22px 10px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+            }}>
+                <Luopan birthYear={birthYear} gender={gender} />
+            </div>
         </div>
     );
 }

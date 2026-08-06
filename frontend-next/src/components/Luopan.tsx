@@ -326,9 +326,18 @@ export default function Luopan({
           onClick={() => setHeld((v) => !v)}>{held ? "고정 해제" : "측정값 고정"}</button>
         {source === "relative" && <button style={btn} onClick={setNorthHere}>여기가 북</button>}
       </div>
-      <div style={{ position: "relative", width: "min(94vw, 420px)", aspectRatio: "1" }}>
-        <svg viewBox="0 0 400 400" style={{ width: "100%", display: "block" }}
-          role="img" aria-label={`나경 방위판, 현재 ${heading.toFixed(0)}도`}>
+      {/* 판을 탭하면 현재 방위로 고정/해제 — 초기화가 아니라 그 자리에서 멈춰 하단 결과를 본다 */}
+      <div
+        onClick={() => setHeld((v) => !v)}
+        role="button"
+        tabIndex={0}
+        aria-pressed={held}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setHeld((v) => !v); } }}
+        title={held ? "탭하면 다시 회전합니다" : "탭하면 현재 방위로 고정됩니다"}
+        style={{ position: "relative", width: "min(94vw, 420px)", aspectRatio: "1", cursor: "pointer" }}
+      >
+        <svg viewBox="0 0 400 400" style={{ width: "100%", display: "block", pointerEvents: "none" }}
+          role="img" aria-label={`나경 방위판, 현재 ${heading.toFixed(0)}도${held ? " (고정됨)" : ""}`}>
           <defs>
             <radialGradient id="lp-plate" cx="42%" cy="34%">
               <stop offset="0%" stopColor="#F4ECD9" />
@@ -605,10 +614,10 @@ export default function Luopan({
 
       <p style={{
         maxWidth: "min(94vw, 420px)", marginTop: 16, fontSize: 12,
-        lineHeight: 1.75, color: "#78867D", textAlign: "center",
+        lineHeight: 1.75, color: "#CBD4C8", textAlign: "center",
       }}>
         {note}
-        {source && <><br /><span style={{ color: "#5F6D64" }}>신호 출처: {SOURCE_LABEL[source]}</span></>}
+        {source && <><br /><span style={{ color: "#AAB6AB" }}>신호 출처: {SOURCE_LABEL[source]}</span></>}
       </p>
     </div>
   );
