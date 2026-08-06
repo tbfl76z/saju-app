@@ -33,7 +33,13 @@ export default function FloorPlanView({ birthYear, gender }: Props) {
     const [center, setCenter] = useState<[number, number] | null>(null);
     const [northDeg, setNorthDeg] = useState(0);      // 도면 상단이 가리키는 실제 방위각
     const [mode, setMode] = useState<OverlayMode>("24산");
-    const [sitting, setSitting] = useState("子");     // 현공 모드용 좌산
+    // 현공 모드용 좌산 — 현공비성 탭에서 실측한 값이 있으면 이어받는다(실측 우선 플로우)
+    const [sitting, setSitting] = useState(() => {
+        try {
+            const saved = typeof window !== "undefined" ? window.localStorage.getItem("destiny-luopan-sitting") : null;
+            return saved && MOUNTAIN_INFO[saved] ? saved : "子";
+        } catch { return "子"; }
+    });
     const [year, setYear] = useState(new Date().getFullYear());
     const [saving, setSaving] = useState(false);
     const boxRef = useRef<HTMLDivElement>(null);
@@ -99,6 +105,12 @@ export default function FloorPlanView({ birthYear, gender }: Props) {
 
     return (
         <div className="space-y-3">
+            {/* 실측 우선 경고 — 도면 오버레이는 실측 좌향이 있어야 의미가 있다 */}
+            <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
+                <b>도면 오버레이는 참고용입니다.</b> 아파트는 동마다 배치각이 달라 도면이 얼마나 틀어져 있는지 실측 없이는 알 수 없습니다.
+                먼저 <b>현공비성 탭에서 좌향을 실측</b>(또는 실물 패철로 측정)한 뒤, 그 값에 맞춰 아래 &lsquo;도면 상단의 실제 방위&rsquo;를 조정하세요.
+                위성지도 캡처는 대개 위=북(0°)이라 그대로 쓸 수 있습니다.
+            </div>
             <div className="glass-card p-4 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                     <label className="inline-flex items-center px-3 py-1.5 rounded-full border border-[#d4af37]/40 text-[#bf953f] text-xs font-bold cursor-pointer hover:bg-[#d4af37]/10">

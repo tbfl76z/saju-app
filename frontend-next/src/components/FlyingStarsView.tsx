@@ -15,11 +15,16 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").re
 // 현공비성(玄空飛星) 뷰 — 좌산·조성(입주)년도로 비성반을 산출해 9궁으로 보여준다.
 // 계산은 lib/flyingStars.ts(문헌 표준 + 실전 감정 사례 대조 검증 완료)만 사용한다.
 
-// 낙서 3×3 배치
-const GRID: Palace[][] = [
+// 9궁 3×3 배치 — 남상(전통: 위=남, 동=왼쪽) / 북상(지도식: 위=북, 동=오른쪽)
+const GRID_S: Palace[][] = [
     ["巽", "離", "坤"],
     ["震", "中", "兌"],
     ["艮", "坎", "乾"],
+];
+const GRID_N: Palace[][] = [
+    ["乾", "坎", "艮"],
+    ["兌", "中", "震"],
+    ["坤", "離", "巽"],
 ];
 const PALACE_DIR: Record<Palace, string> = {
     坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서", 中: "중궁",
@@ -135,15 +140,25 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     // 연자백은 입춘(2/4경) 기준 연도
     const annualYear = now.getMonth() + 1 < 2 || (now.getMonth() + 1 === 2 && now.getDate() < 4) ? nowYear - 1 : nowYear;
 
-    const [sitting, setSitting] = useState("子");
+    const [sitting, setSittingRaw] = useState("子");
     const [year, setYear] = useState(nowYear);
     const [degInput, setDegInput] = useState("");   // 좌향 각도(도) 직접 입력
+    const [mapView, setMapView] = useState(false);  // 9궁 배치: false=남상(전통) / true=북상(지도식)
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
 
-    // ── 간이 나침반: 센서로 현재 방위를 읽어 좌산을 잡는다 (자북 기준) ──
+    // 좌산 설정 — 도면 방위 탭이 이어받을 수 있게 저장해 둔다(실측 우선 플로우 연동)
+    const setSitting = (m: string) => {
+        setSittingRaw(m);
+        try { window.localStorage.setItem("destiny-luopan-sitting", m); } catch { /* 무시 */ }
+    };
+
+    // ── 나침반: 센서로 현재 방위를 읽어 좌산을 잡는다 (자북 기준) ──
     const [sensorOn, setSensorOn] = useState(false);
     const [heading, setHeading] = useState<number | null>(null);
+    const [capturing, setCapturing] = useState(false);   // 3초 평균 측정 중
+    const [capNote, setCapNote] = useState("");           // 측정 결과 안내(평균·편차)
+    const headingRef = useRef<number | null>(null);
     const cleanupRef = useRef<(() => void) | null>(null);
     useEffect(() => () => { cleanupRef.current?.(); }, []); // 언마운트 시 리스너 해제
 
@@ -161,7 +176,11 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             if (typeof compass === "number") h = compass;                    // iOS
             else if (e.absolute && e.alpha != null) h = 360 - e.alpha;       // 절대 방위
             else if (e.alpha != null) h = 360 - e.alpha;                     // 상대(참고용)
-            if (h != null) setHeading(((h % 360) + 360) % 360);
+            if (h != null) {
+                const norm = ((h % 360) + 360) % 360;
+                headingRef.current = norm;   // 평균 측정용 최신값
+                setHeading(norm);
+            }
         };
         // deviceorientationabsolute 우선, 없으면 deviceorientation
         const evName = "ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation";
@@ -170,10 +189,32 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         setSensorOn(true);
     }
 
-    // 휴대폰 위쪽을 집 정면(향)으로 향한 상태에서 좌(반대 방위)를 잡는다
+    // 휴대폰 위쪽을 집 정면(향)으로 향한 상태에서 3초간 표본을 모아 원형 평균으로
+    // 좌(반대 방위)를 잡는다. 손떨림·자기 간섭에 의한 순간값 오차를 줄인다.
     const captureSitting = () => {
-        if (heading == null) return;
-        setSitting(mountainFromDeg(heading + 180));
+        if (headingRef.current == null || capturing) return;
+        setCapturing(true); setCapNote("");
+        const samples: number[] = [];
+        const iv = setInterval(() => {
+            if (headingRef.current != null) samples.push(headingRef.current);
+        }, 100);
+        setTimeout(() => {
+            clearInterval(iv);
+            setCapturing(false);
+            if (samples.length < 5) { setCapNote("표본이 부족합니다. 다시 측정해 주세요."); return; }
+            // 원형 평균(각도는 0/360 경계가 있어 산술 평균 불가)
+            const sx = samples.reduce((a, d) => a + Math.sin((d * Math.PI) / 180), 0);
+            const sy = samples.reduce((a, d) => a + Math.cos((d * Math.PI) / 180), 0);
+            const mean = ((Math.atan2(sx, sy) * 180) / Math.PI + 360) % 360;
+            const R = Math.hypot(sx, sy) / samples.length;          // 집중도(1=완전 일치)
+            const stdDeg = Math.sqrt(Math.max(0, -2 * Math.log(Math.max(R, 1e-9)))) * (180 / Math.PI);
+            const sit = mountainFromDeg(mean + 180);
+            setSitting(sit);
+            setCapNote(
+                `평균 向 ${mean.toFixed(1)}° (편차 ±${stdDeg.toFixed(1)}°) → 坐 ${sit}`
+                + (stdDeg > 8 ? " ⚠ 값이 많이 흔들립니다. 철골·가전에서 떨어져 다른 지점에서 다시 재보세요." : "")
+            );
+        }, 3000);
     };
 
     const chart = useMemo(() => {
@@ -195,21 +236,24 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         if (Number.isFinite(d)) setSitting(mountainFromDeg(d));
     };
 
+    // 9궁 배치(남상/북상 토글 반영)
+    const grid = mapView ? GRID_N : GRID_S;
+
     // 궁별 표시 데이터 — 조합·팔택까지 합성
     const cells = useMemo(() => {
         if (!chart) return [];
-        return GRID.flat().map((p) => {
+        return grid.flat().map((p) => {
             const combo = p === "中" ? null : comboFor(chart.mountain[p], chart.water[p]);
             const palTri = p === "中" ? null : (p as Trigram);
             const palStar = ming && palTri ? starFor(ming, palTri) : null;
             return { p, combo, palStar };
         });
-    }, [chart, ming]);
+    }, [chart, ming, grid]);
 
     // 교집합 추천: 팔택 길성 ∩ 향성 왕/생기
     const bestDirs = useMemo(() => {
         if (!chart || !ming) return [];
-        return GRID.flat().filter((p) => {
+        return GRID_S.flat().filter((p) => {
             if (p === "中") return false;
             const mood = starMood(chart.water[p], chart.period);
             const ps = starFor(ming, p as Trigram);
@@ -235,7 +279,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             sitting: chart.sitting, facing: chart.facing, period: chart.period,
             structure: chart.structure, annual_year: annualYear,
             ming_gua: ming ?? "",
-            cells: GRID.flat().filter((p) => p !== "中").map((p) => ({
+            cells: GRID_S.flat().filter((p) => p !== "中").map((p) => ({
                 방위: PALACE_DIR[p], 산성: chart.mountain[p], 향성: chart.water[p], 운반: chart.base[p],
                 연성: annual[p], 조합: comboFor(chart.mountain[p], chart.water[p])?.name ?? "",
                 팔택: ming ? starFor(ming, p as Trigram) : "",
@@ -251,8 +295,42 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     return (
         <div className="space-y-3">
             <div className="glass-card p-4 space-y-3">
+                {/* ① 실측이 1순위 — 좌향은 현장에서 재는 것이 정확하다(아파트는 동마다 배치각이 다름) */}
+                <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
+                    <b>① 좌향 실측이 먼저입니다.</b> 아파트는 동마다 배치각이 달라 도면·지도만으로는 좌향을 알 수 없습니다. 외벽·베란다 유리면에 휴대폰 옆면을 평행하게 대고, 철골·가전에서 떨어져 2~3곳에서 재세요.
+                </div>
+                {/* 회전 나경판 — 센서 heading에 따라 판이 돌고, 위 포인터가 지금 향한 방위(向) */}
+                <RotatingPlate heading={heading} sitting={sitting} facing={chart?.facing ?? ""} />
+                {/* 센서 제어 — 3초 평균 측정으로 좌산 자동 설정 */}
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <span>좌(坐)</span>
+                    {!sensorOn ? (
+                        <Button onClick={startSensor} variant="outline" className="h-8 rounded-full text-xs">🧭 센서로 방위 재기</Button>
+                    ) : heading == null ? (
+                        <span className="text-xs text-slate-400">센서 신호 대기 중… (실제 휴대폰에서만 동작)</span>
+                    ) : (
+                        <>
+                            <span className="text-xs">지금 향한 방위 <b className="text-[#bf953f]">{heading.toFixed(1)}°</b> (<b className="font-noto-serif">{mountainFromDeg(heading)}</b>)</span>
+                            <Button onClick={captureSitting} disabled={capturing} className="h-8 rounded-full text-xs bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                                {capturing ? "측정 중(3초)…" : "집 정면을 향하고 → 좌향 잡기(3초 평균)"}
+                            </Button>
+                        </>
+                    )}
+                    <span className="text-[11px] text-slate-400">휴대폰 위쪽을 집 정면(향)으로 향한 채 3초간 유지하세요</span>
+                </div>
+                {capNote && <p className="text-[11px] text-slate-500 dark:text-slate-400">{capNote}</p>}
+                {/* ② 각도 직접 입력(다른 나경으로 실측한 값 옮겨 적기) */}
+                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                    <span>② 실측 좌향 각도(도)</span>
+                    <input type="number" value={degInput} placeholder="예: 187.5"
+                        onChange={(e) => setDegInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") applyDeg(); }}
+                        className="w-24 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
+                    <Button onClick={applyDeg} variant="outline" className="h-8 rounded-full text-xs">각도 → 좌산</Button>
+                    <span className="text-[11px] text-slate-400">팔택 나경 탭이나 실물 패철로 잰 좌 방위각을 그대로 입력</span>
+                </div>
+                {/* ③ 수동 선택(실측값이 이미 확실할 때) */}
+                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                    <span>③ 좌(坐)</span>
                     <select value={sitting} onChange={(e) => setSitting(e.target.value)}
                         className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
                         {MOUNTAINS_24.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -264,34 +342,6 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         className="w-20 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
                     <span className="text-xs text-slate-400">{period}운 ({py0}~{py1})</span>
                 </div>
-                {/* 회전 나경판 — 센서 heading에 따라 판이 돌고, 위 포인터가 지금 향한 방위(向) */}
-                <RotatingPlate heading={heading} sitting={sitting} facing={chart?.facing ?? ""} />
-                {/* 센서 제어 — 현재 방위를 읽어 좌산 자동 설정 */}
-                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    {!sensorOn ? (
-                        <Button onClick={startSensor} variant="outline" className="h-8 rounded-full text-xs">🧭 센서로 방위 재기</Button>
-                    ) : heading == null ? (
-                        <span className="text-xs text-slate-400">센서 신호 대기 중… (실제 휴대폰에서만 동작)</span>
-                    ) : (
-                        <>
-                            <span className="text-xs">지금 향한 방위 <b className="text-[#bf953f]">{heading.toFixed(1)}°</b> (<b className="font-noto-serif">{mountainFromDeg(heading)}</b>)</span>
-                            <Button onClick={captureSitting} className="h-8 rounded-full text-xs bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                                집 정면을 향하고 → 좌향 잡기
-                            </Button>
-                        </>
-                    )}
-                    <span className="text-[11px] text-slate-400">휴대폰 위쪽을 집 정면(향)으로 향한 뒤 누르면 좌(坐)가 자동 설정됩니다</span>
-                </div>
-                {/* 각도 직접 입력(팔택 나경 측정값 옮겨 적기) */}
-                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <span>좌향 각도(도)</span>
-                    <input type="number" value={degInput} placeholder="예: 187.5"
-                        onChange={(e) => setDegInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") applyDeg(); }}
-                        className="w-24 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
-                    <Button onClick={applyDeg} variant="outline" className="h-8 rounded-full text-xs">각도 → 좌산</Button>
-                    <span className="text-[11px] text-slate-400">팔택 나경 탭에서 잰 좌 방위각을 그대로 입력해도 됩니다</span>
-                </div>
                 <p className="text-[11px] text-slate-400">
                     건물이 지어진(입주한) 시기의 운(運)과 좌향으로 비성반을 세웁니다. 좌(坐)는 건물이 등지는 방위, 향(向)은 정면이 바라보는 방위입니다.
                 </p>
@@ -302,6 +352,18 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     <div className="text-center">
                         <span className="text-sm text-slate-500">{chart.period}운 <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
+                    </div>
+                    {/* 배치 토글 — 남상(전통 서적·필기와 동일) / 북상(지도·도면과 동일) */}
+                    <div className="flex items-center justify-center gap-1.5 text-xs">
+                        <button onClick={() => setMapView(false)}
+                            className={"px-3 py-1 rounded-full font-semibold " + (!mapView ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                            남상(전통)
+                        </button>
+                        <button onClick={() => setMapView(true)}
+                            className={"px-3 py-1 rounded-full font-semibold " + (mapView ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                            북상(지도식)
+                        </button>
+                        <span className="text-[10px] text-slate-400">{mapView ? "위=북 · 동=오른쪽 (도면과 같은 방향)" : "위=남 · 동=왼쪽 (전통 반 표기)"}</span>
                     </div>
                     {/* 9궁 비성반 (+연자백·조합·팔택) */}
                     <div className="grid grid-cols-3 gap-1.5 max-w-sm mx-auto">
