@@ -1,0 +1,294 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-noto-serif: var(--font-noto-serif);
+  --font-noto: var(--font-noto-serif);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 1rem;
+  --background: oklch(0.99 0.005 240);
+  --foreground: oklch(0.2 0.02 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 240);
+  /* 팝오버(드롭다운/셀렉트/툴팁) — 라이트 모드 불투명 흰 배경 (미정의 시 투명 겹침 버그) */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 240);
+  --muted: oklch(0.96 0.01 240);
+  --muted-foreground: oklch(0.5 0.02 240);
+  --primary: oklch(0.45 0.15 45);
+  /* Goldish */
+  --primary-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.02 240);
+
+  /* Saju Element Colors (Modernized) */
+  --saju-wood: #2D5A27;
+  /* Deep Green */
+  --saju-fire: #C0392B;
+  /* Deep Red */
+  --saju-earth: #D4AF37;
+  /* Royal Gold */
+  --saju-metal: #7F8C8D;
+  /* Silver Gray */
+  --saju-water: #2C3E50;
+  /* Midnight Blue */
+}
+
+.dark {
+  /* 짙은 남색 베이스 + 골드 유지 (Destiny Code 다크 테마) */
+  --background: oklch(0.18 0.03 250);
+  --foreground: oklch(0.95 0.01 240);
+  --card: oklch(0.24 0.03 250);
+  --card-foreground: oklch(0.95 0.01 240);
+  --primary: oklch(0.78 0.13 80);
+  --primary-foreground: oklch(0.2 0.02 250);
+  --border: oklch(0.4 0.03 250);
+  --popover: oklch(0.22 0.03 250);
+  --popover-foreground: oklch(0.95 0.01 240);
+  --muted: oklch(0.3 0.02 250);
+  --muted-foreground: oklch(0.72 0.02 250);
+
+  /* 오행 색을 다크 배경에서 가독성 있게 보정 */
+  --saju-wood: #4CAF7D;
+  --saju-fire: #E57373;
+  --saju-earth: #E6C35C;
+  --saju-metal: #B0BEC5;
+  --saju-water: #64B5F6;
+}
+
+@layer base {
+  /* 라이트 = 시안 A '골드·한지': 따뜻한 종이결 바탕 */
+  body {
+    @apply text-foreground antialiased;
+    font-family: var(--font-noto-serif), serif;
+    background-color: #faf7f0;
+    background-image:
+      radial-gradient(circle at 85% -5%, #f3e9d2 0%, transparent 55%),
+      radial-gradient(at 0% 100%, hsla(45, 45%, 94%, 1) 0, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* 나이트 = 시안 D '한지 + 밤하늘': 밝은 종이 바탕, 상단에만 별이 뜬 황혼 띠 */
+  .night body {
+    background-color: #faf7f0;
+    background-image:
+      radial-gradient(ellipse 160% 230px at 50% -70px, #1c2150 0%, rgba(28, 33, 80, 0.55) 55%, transparent 100%),
+      radial-gradient(1.4px 1.4px at 18% 38px, rgba(230, 195, 92, 0.95) 50%, transparent 51%),
+      radial-gradient(1px 1px at 36% 72px, rgba(255, 255, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 62% 30px, rgba(255, 255, 255, 0.85) 50%, transparent 51%),
+      radial-gradient(1.2px 1.2px at 81% 64px, rgba(183, 165, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 92% 24px, rgba(255, 255, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(circle at 85% 10%, #f3e9d2 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+
+  /* 다크 = 시안 E '다크 모던': 별이 뜬 밤하늘 */
+  .dark body {
+    background-color: #070918;
+    background-image:
+      radial-gradient(circle at 80% -5%, rgba(43, 42, 94, 0.85) 0%, transparent 50%),
+      radial-gradient(1px 1px at 12% 28%, rgba(207, 212, 255, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 38% 64%, rgba(207, 212, 255, 0.7) 50%, transparent 51%),
+      radial-gradient(1.6px 1.6px at 71% 18%, rgba(230, 195, 92, 0.9) 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 52%, rgba(207, 212, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(1.2px 1.2px at 55% 86%, rgba(183, 165, 255, 0.8) 50%, transparent 51%),
+      radial-gradient(1px 1px at 25% 80%, rgba(207, 212, 255, 0.6) 50%, transparent 51%),
+      radial-gradient(1px 1px at 5% 55%, rgba(207, 212, 255, 0.5) 50%, transparent 51%);
+    background-attachment: fixed;
+  }
+
+  /* 모션 최소화 선호 시 애니메이션 비활성화 */
+  @media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* 라이트(A): 한지 위의 흰 카드 — 옅은 종이색 테두리 + 절제된 그림자 */
+  .glass-card {
+    @apply backdrop-blur-md rounded-3xl overflow-hidden;
+    background: rgba(255, 253, 248, 0.88);
+    border: 1px solid #e9e1cf;
+    box-shadow: 0 2px 14px rgba(43, 39, 34, 0.06);
+  }
+
+  /* 나이트(D): 카드 테두리에 라벤더 기운 */
+  .night .glass-card {
+    border-color: #ded6ee;
+  }
+
+  /* 시안 공통: 섹션 타이틀 — 제목 오른쪽으로 금색 라인이 뻗는다 */
+  .section-title {
+    @apply flex items-center gap-3 font-bold font-noto-serif text-slate-900 dark:text-slate-100;
+  }
+
+  .section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.55), rgba(212, 175, 55, 0.08));
+  }
+
+  /* 다크(E): 밤하늘 위의 네이비 카드 — 두툼한 테두리 + 바닥 그림자(게임 버튼감) */
+  .dark .glass-card {
+    background: rgba(26, 31, 68, 0.88);
+    border: 2px solid #323a6e;
+    box-shadow: 0 4px 0 #0a0d22;
+  }
+
+  /* 다크(E): 앱 전역 slate 계열 박스를 밤하늘 네이비로 통일 (퀴즈 선택지·해설·팝오버 등) */
+  .dark [class*="dark:bg-slate-900"] {
+    background-color: rgba(22, 26, 58, 0.72) !important;
+  }
+
+  .dark [class*="dark:bg-slate-800"] {
+    background-color: rgba(30, 35, 76, 0.62) !important;
+  }
+
+  .dark [class*="dark:bg-slate-950"] {
+    background-color: rgba(14, 17, 38, 0.75) !important;
+  }
+
+  .dark [class*="dark:border-slate-700"] {
+    border-color: #323a6e !important;
+  }
+
+  .dark [class*="dark:border-slate-800"] {
+    border-color: #2a2f55 !important;
+  }
+
+  /* 나이트(D): 홈 히어로를 별이 뜬 밤하늘 카드로 — '한지 위의 밤하늘 엽서' */
+  .night .hero-sky {
+    margin: 6px 0 14px;
+    padding: 30px 18px;
+    border-radius: 24px;
+    background-color: #171b3f;
+    background-image:
+      radial-gradient(circle at 80% 0%, #2b2a5e 0%, transparent 55%),
+      radial-gradient(1px 1px at 12% 30%, #cfd4ff 50%, transparent 51%),
+      radial-gradient(1px 1px at 36% 70%, #cfd4ff 50%, transparent 51%),
+      radial-gradient(1.6px 1.6px at 70% 22%, #e6c35c 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 55%, #cfd4ff 50%, transparent 51%),
+      radial-gradient(1.2px 1.2px at 52% 12%, #b7a5ff 50%, transparent 51%);
+    box-shadow: 0 14px 34px rgba(20, 24, 56, 0.35);
+  }
+
+  .night .hero-sky h2 {
+    color: #faf6ea !important;
+  }
+
+  .night .hero-sky p {
+    color: #c3c8e8 !important;
+  }
+
+  .night .hero-sky p:first-child {
+    color: #e6c35c !important;
+  }
+
+  /* 다크(E): 골드 그라데이션 버튼에 바닥 그림자 — 눌리는 듯한 입체감 */
+  .dark [class*="from-[#d4af37]"] {
+    box-shadow: 0 4px 0 #8a6f2a;
+  }
+
+  .dark [class*="from-[#d4af37]"]:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #8a6f2a;
+  }
+
+  .premium-report {
+    @apply leading-relaxed text-slate-800 dark:text-slate-200 font-sans;
+  }
+
+  .premium-report p {
+    @apply mb-6;
+  }
+
+  .premium-report h1,
+  .premium-report h2,
+  .premium-report h3 {
+    @apply font-bold text-slate-900 dark:text-slate-100 mt-10 mb-6 border-b-2 border-[#d4af37]/30 pb-2 font-noto-serif;
+  }
+
+  .saju-pillar-box {
+    @apply flex flex-col items-center justify-center p-4 rounded-2xl transition-all hover:scale-105 shadow-sm;
+  }
+
+  /* Custom Animations */
+  .fade-up {
+    animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* 숫자 입력창의 증감 스피너 숨김 — 모바일에서 4자리 년도가 잘리지 않도록 입력폭 확보 */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

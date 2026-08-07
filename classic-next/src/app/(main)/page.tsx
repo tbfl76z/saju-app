@@ -131,7 +131,7 @@ export default function ClassicPage() {
             {profiles.length === 0 ? (
                 <div className="glass-card p-10 text-center space-y-4">
                     <p className="text-slate-600 dark:text-slate-300">저장된 명식이 없습니다.</p>
-                    <Link href="/"><Button>명식 만들러 가기</Button></Link>
+                    <Link href="/myeongsik"><Button>명식 만들러 가기</Button></Link>
                 </div>
             ) : (
                 <>
