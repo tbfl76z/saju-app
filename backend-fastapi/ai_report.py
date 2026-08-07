@@ -316,6 +316,23 @@ def _compat_summary(partner: Optional[dict]) -> str:
     )
 
 
+def now_context() -> str:
+    """AI가 연도·간지를 임의 추정하지 않도록 기준 시점을 강제 주입한다.
+
+    (모델이 학습 시점 기준으로 '올해=乙巳年' 같은 오답을 내는 문제 방지.
+     올해 간지는 입춘 기준으로 귀속한다.)
+    """
+    t = datetime.date.today()
+    y = t.year if (t.month, t.day) >= (2, 4) else t.year - 1
+    hs = "甲乙丙丁戊己庚辛壬癸"
+    hb = "子丑寅卯辰巳午未申酉戌亥"
+    gz = hs[(y - 4) % 10] + hb[(y - 4) % 12]
+    nxt = hs[(y + 1 - 4) % 10] + hb[(y + 1 - 4) % 12]
+    return (f"[기준 시점 — 반드시 준수] 오늘은 {t.year}년 {t.month}월 {t.day}일. "
+            f"올해(세운)는 {y}년 {gz}년이고 내년은 {y + 1}년 {nxt}년입니다. "
+            f"연도와 그 해의 간지는 반드시 이 값을 기준으로 해석하고, 절대 다른 연도·간지로 추정하지 마세요.\n")
+
+
 def build_prompt(req: Any) -> str:
     """analysis_type에 맞춰 최종 프롬프트를 구성한다."""
     data = req.saju_data
@@ -328,7 +345,7 @@ def build_prompt(req: Any) -> str:
     else:
         report_header = HEADERS.get(atype, HEADERS["total"])
     knowledge_context = build_knowledge_context(atype)
-    query = build_query(req)
+    query = now_context() + build_query(req)
     name = sanitize(data.get("name", "사용자")) or "사용자"
 
     fortune_line = ""
@@ -751,7 +768,7 @@ def build_jami_prompt(jami: dict, focus: str = "종합") -> str:
                     f" · 올해({yun_year}) 유년궁 {yun or '?'} (유년궁은 그 해 태세 지지궁)"
                     f" (반드시 이 값으로 해석하고 다시 계산하지 마세요)\n")
     q = "\n".join(f"        {i}. {x}" for i, x in enumerate(fc["q"], 1))
-    return (
+    return now_context() + (
         f"\n        [자미두수 명반 — {fc['scope']}]\n"
         f"        - 五行局: {jami.get('五行局')} / 명궁: {jami.get('명궁')}궁 (주성: {'·'.join(jami.get('명궁주성', [])) or '무주성'}) / 음력 {jami.get('음력', '')}\n"
         f"        - 命主 {jami.get('명주', '')} · 身主 {jami.get('신주', '')} · 身宮 {jami.get('신궁', '')}\n"
@@ -797,7 +814,7 @@ def _jami_brief(j: dict, label: str) -> str:
 
 
 def build_jami_compat_prompt(ja: dict, jb: dict) -> str:
-    return (
+    return now_context() + (
         f"\n        [자미두수 궁합 — 두 명반 비교]\n"
         f"        {_jami_brief(ja, 'A(본인)')}\n"
         f"        {_jami_brief(jb, 'B(상대)')}\n\n"
@@ -826,7 +843,7 @@ FOLLOWUP_SYSTEM = (
 
 def build_followup_prompt(prev: str, question: str) -> str:
     prev = (prev or "")[:2000]
-    return (f"[앞서 제공한 해석]\n{prev}\n\n"
+    return now_context() + (f"[앞서 제공한 해석]\n{prev}\n\n"
             f"[사용자의 추가 질문]\n{sanitize(question)}\n\n"
             f"위 해석의 맥락에 이어 이 질문에 답해 주세요.")
 
@@ -854,7 +871,7 @@ def build_raejeong_prompt(data: dict, gender: str = "남", focus: str = "") -> s
     dist_txt = ", ".join(f"{k} {val}" for k, val in dist.items()) or "정보 없음"
     rank_txt = ", ".join(f"{r['목적']}({r['pct']}%)" for r in rank) or "정보 없음"
     feat_txt = ", ".join(data.get("방문특징", [])) or "특이사항 없음"
-    base = (
+    base = now_context() + (
         f"[내담자] 일간 {data.get('내담자일간', '')} · 띠(년지) {data.get('내담자띠', '')}, 성별 {gender}\n"
         f"[방문 시각 사주] 연 {v.get('연', '')} · 월 {v.get('월', '')} · 일 {v.get('일', '')} · 시 {v.get('시', '')} "
         f"(방문 일진 {data.get('방문일진', '')})\n"
@@ -907,7 +924,7 @@ def build_iljin_prompt(data: dict, gender: str = "남") -> str:
     wj_txt = ", ".join(f"{w['주']}({w['해석']})" for w in wj) or "원국에 걸린 주 없음"
     won = data.get("원국", [])
     won_txt = ", ".join(f"{w['주']} {w['지지']}={w['상징']}" for w in won)
-    return (
+    return now_context() + (
         f"[내방자] 일간 {data.get('내담자일간', '')}, 성별 {gender}\n"
         f"[내방일 일진] {data.get('내방일진', '')}\n"
         f"[진(辰) 배열] {jin_txt}\n"
@@ -948,7 +965,7 @@ def build_hyeongong_prompt(data: dict) -> str:
         for c in cells
     ) or "정보 없음"
     ming = data.get("ming_gua") or ""
-    return (
+    return now_context() + (
         f"[비성반] {data.get('period', '')}운 {data.get('sitting', '')}山{data.get('facing', '')}向 · 격국 {data.get('structure', '')}\n"
         f"[궁별 성요] {cell_txt}\n"
         f"[연자백 기준 연도] {data.get('annual_year', '')}\n"
