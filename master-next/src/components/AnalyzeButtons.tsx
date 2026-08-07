@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { BookOpen, Sparkles, Share2, Download } from "lucide-react";
+import { Sparkles, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { FollowupChat } from "@/components/FollowupChat";
@@ -92,23 +92,15 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
 
     return (
         <div className={className}>
+            {/* 전문가용 앱 — 쉬운 설명 없이 전문 풀이만 제공 */}
             <div className="flex flex-wrap justify-center gap-3">
-                <Button
-                    onClick={() => run("easy")}
-                    disabled={running !== null}
-                    variant="outline"
-                    className="rounded-full px-6 border-[#d4af37]/40 hover:bg-[#d4af37]/10"
-                >
-                    <BookOpen className="h-4 w-4 mr-1.5" />
-                    {running === "easy" ? "풀이 중..." : "쉬운 설명"}
-                </Button>
                 <Button
                     onClick={() => run("advanced")}
                     disabled={running !== null}
                     className="rounded-full px-6 bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900 dark:hover:bg-[#e6c35c]"
                 >
                     <Sparkles className="h-4 w-4 mr-1.5" />
-                    {running === "advanced" ? "풀이 중..." : "고급 풀이"}
+                    {running === "advanced" ? "풀이 중..." : "전문 풀이"}
                 </Button>
             </div>
 
@@ -118,7 +110,7 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
                         <div className="flex items-center gap-2 mb-5">
                             <span className="text-lg">{shownLevel === "easy" ? "📖" : "✨"}</span>
                             <h4 className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-100">
-                                {title} · {shownLevel === "easy" ? "쉬운 설명" : "고급 풀이"}
+                                {title} · 전문 풀이
                             </h4>
                         </div>
                         <ReportRenderer text={result} streaming={running !== null} />

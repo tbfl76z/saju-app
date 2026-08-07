@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { BookOpen, Sparkles, Share2, Download } from "lucide-react";
+import { BookOpen, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { FollowupChat } from "@/components/FollowupChat";
@@ -93,7 +93,7 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
     return (
         <div className={className}>
             <div className="flex flex-wrap justify-center gap-3">
-                {/* 일반(입문자) 앱: 쉬운 설명이 기본(primary), 자세한 풀이는 보조 */}
+                {/* 일반(입문자) 앱 — 쉬운 설명 하나만 제공 (전문 풀이는 Destiny Master에서) */}
                 <Button
                     onClick={() => run("easy")}
                     disabled={running !== null}
@@ -101,15 +101,6 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
                 >
                     <BookOpen className="h-4 w-4 mr-1.5" />
                     {running === "easy" ? "풀이 중..." : "✨ 쉽게 풀어보기"}
-                </Button>
-                <Button
-                    onClick={() => run("advanced")}
-                    disabled={running !== null}
-                    variant="outline"
-                    className="rounded-full px-6 border-[#d4af37]/40 hover:bg-[#d4af37]/10"
-                >
-                    <Sparkles className="h-4 w-4 mr-1.5" />
-                    {running === "advanced" ? "풀이 중..." : "자세한 풀이"}
                 </Button>
             </div>
 
@@ -119,7 +110,7 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
                         <div className="flex items-center gap-2 mb-5">
                             <span className="text-lg">{shownLevel === "easy" ? "📖" : "✨"}</span>
                             <h4 className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-100">
-                                {title} · {shownLevel === "easy" ? "쉬운 설명" : "고급 풀이"}
+                                {title} · 쉬운 풀이
                             </h4>
                         </div>
                         <ReportRenderer text={result} streaming={running !== null} />

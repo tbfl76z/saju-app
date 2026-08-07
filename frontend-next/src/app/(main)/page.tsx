@@ -4,11 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { SajuForm } from "@/components/SajuForm";
 import { SajuPillars } from "@/components/SajuPillars";
 import { FiveElements } from "@/components/FiveElements";
-import { AnalysisTable } from "@/components/AnalysisTable";
-import { LuckSection } from "@/components/LuckSection";
 import { DailyFortune } from "@/components/DailyFortune";
-import { NewYearSection } from "@/components/NewYearSection";
-import { ImagePromptCard } from "@/components/ImagePromptCard";
 import SaveShareBar from "@/components/SaveShareBar";
 import SavedProfilesModal from "@/components/SavedProfilesModal";
 import { Button } from "@/components/ui/button";
@@ -274,53 +270,8 @@ export default function Home() {
               <DailyFortune sajuData={sajuData} apiBase={API_BASE} />
 
               <FiveElements elements={sajuData.five_elements} />
-
-              <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
-                <ImagePromptCard sajuData={sajuData} apiBase={API_BASE} />
-              </div>
-
-              <AnalysisTable
-                title="사주 4주 명식 상세"
-                description="당신의 타고난 기운인 사주(4주 8자) 명식입니다. 각 항목을 클릭하여 상세한 풀이를 확인해보세요."
-                headers={["시주(時)", "일주(Day)", "월주(Month)", "연주(Year)"]}
-                rowLabels={["천간(Stem)", "지지(Branch)", "해당 기둥 십성", "기둥별 12운성"]}
-                terms={terms}
-                data={[
-                  ['hour', 'day', 'month', 'year'].map(k => sajuData?.pillars?.[k]?.stem || "-"),
-                  ['hour', 'day', 'month', 'year'].map(k => sajuData?.pillars?.[k]?.branch || "-"),
-                  ['hour', 'day', 'month', 'year'].map(k => `${sajuData?.ten_gods?.[k] || (k === 'day' ? '본인' : '-')} | ${sajuData?.jiji_ten_gods?.[k] || '-'}`),
-                  ['hour', 'day', 'month', 'year'].map(k => sajuData?.twelve_growth?.[k] || "-"),
-                ]}
-              />
-
-              {/* 공망·핵심 지지 관계 — 명식 상세표 바로 아래 배치 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-amber-50/70 dark:bg-amber-950/30 border-2 border-amber-200/50 dark:border-amber-800/40 rounded-2xl p-5 text-sm flex items-center gap-4 shadow-sm">
-                  <span className="text-3xl">🕳️</span>
-                  <div>
-                    <div className="font-bold text-amber-900 dark:text-amber-300 text-base">공망 (Void)</div>
-                    <div className="text-amber-800 dark:text-amber-400/90 font-medium">연주: {sajuData?.gongmang?.year || "-"} / 일주: {sajuData?.gongmang?.day || "-"}</div>
-                  </div>
-                </div>
-                {sajuData?.relations?.length > 0 && (
-                  <div className="bg-purple-50/70 dark:bg-purple-950/30 border-2 border-purple-200/50 dark:border-purple-800/40 rounded-2xl p-5 text-sm flex items-center gap-4 shadow-sm">
-                    <span className="text-3xl">💡</span>
-                    <div>
-                      <div className="font-bold text-purple-900 dark:text-purple-300 text-base">핵심 지지 관계</div>
-                      <div className="text-purple-800 dark:text-purple-400/90 font-medium">{sajuData.relations.join(", ")}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
-                <LuckSection sajuData={sajuData} terms={terms} apiBase={API_BASE} />
-              </div>
-
-              <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
-                <NewYearSection sajuData={sajuData} terms={terms} apiBase={API_BASE} />
-              </div>
-
+              {/* 일반(입문자) 앱 — 명식 이미지·상세표·공망·대운·신년 등 전문 상세는 제외
+                  (전문 정보는 Destiny Master에서 제공) */}
             </div>
           </div>
         )}

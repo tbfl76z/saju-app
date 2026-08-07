@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { LayoutGrid, Sun, BookOpenText, ScrollText, Compass, Check } from "lucide-react";
 import { APP_LINKS } from "@/lib/appLinks";
 
 // 형제 앱 스위처 — 버튼을 누르면 앱 리스트가 드롭다운으로 뜬다.
+// 헤더(glass-card)가 overflow-hidden이라 안쪽 absolute는 잘리므로,
+// Portal로 body에 fixed 렌더한다(버튼 위치 기준).
 const APPS = [
     { key: "daily", href: APP_LINKS.daily, name: "사주 · Destiny Daily", desc: "누구나 쉽게 — 명식·오늘운세·궁합", icon: Sun },
     { key: "master", href: APP_LINKS.master, name: "전문 · Destiny Master", desc: "전문 풀이·명리 공부", icon: BookOpenText },
@@ -15,22 +18,41 @@ const CURRENT = "classic";
 
 export function AppSwitcher() {
     const [open, setOpen] = useState(false);
-    const boxRef = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    // 바깥 클릭 시 닫기
+    // 버튼 위치 기준으로 드롭다운 좌표 계산
+    const toggle = () => {
+        if (!open && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+        }
+        setOpen((v) => !v);
+    };
+
+    // 바깥 클릭·스크롤 시 닫기
     useEffect(() => {
         if (!open) return;
         const onDown = (e: MouseEvent) => {
-            if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+            const t = e.target as Node;
+            if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+            setOpen(false);
         };
+        const onScroll = () => setOpen(false);
         document.addEventListener("mousedown", onDown);
-        return () => document.removeEventListener("mousedown", onDown);
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => {
+            document.removeEventListener("mousedown", onDown);
+            window.removeEventListener("scroll", onScroll);
+        };
     }, [open]);
 
     return (
-        <div ref={boxRef} className="relative">
+        <>
             <button
-                onClick={() => setOpen(!open)}
+                ref={btnRef}
+                onClick={toggle}
                 aria-label="다른 앱 보기"
                 aria-expanded={open}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-sm font-semibold text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 whitespace-nowrap"
@@ -38,8 +60,12 @@ export function AppSwitcher() {
                 <LayoutGrid className="h-4 w-4" />
                 <span className="hidden sm:inline">앱</span>
             </button>
-            {open && (
-                <div className="absolute right-0 top-11 z-[70] w-72 glass-card !rounded-2xl p-2 shadow-2xl bg-white/95 dark:bg-slate-900/95 animate-in fade-in slide-in-from-top-2 duration-200">
+            {open && pos && typeof document !== "undefined" && createPortal(
+                <div
+                    ref={menuRef}
+                    style={{ position: "fixed", top: pos.top, right: pos.right }}
+                    className="z-[9999] w-72 glass-card !rounded-2xl p-2 shadow-2xl bg-white/95 dark:bg-slate-900/95 animate-in fade-in slide-in-from-top-2 duration-200"
+                >
                     {APPS.map(({ key, href, name, desc, icon: Icon }) => {
                         const isCur = key === CURRENT;
                         const inner = (
@@ -56,8 +82,9 @@ export function AppSwitcher() {
                             ? <div key={key}>{inner}</div>
                             : <a key={key} href={href} className="block">{inner}</a>;
                     })}
-                </div>
+                </div>,
+                document.body
             )}
-        </div>
+        </>
     );
 }

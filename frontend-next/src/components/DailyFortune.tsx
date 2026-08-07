@@ -25,16 +25,6 @@ interface DailyFortuneProps {
 }
 
 type PeriodKey = "total" | "daeun" | "year" | "month" | "today";
-type CategoryKey = "love" | "wealth" | "career" | "health";
-
-// 올해(세운) 분야별 운세 칩
-const CATEGORIES: { key: CategoryKey | null; label: string; icon: string }[] = [
-    { key: null, label: "종합", icon: "🎍" },
-    { key: "love", label: "연애운", icon: "💕" },
-    { key: "wealth", label: "금전운", icon: "💰" },
-    { key: "career", label: "진로운", icon: "🧭" },
-    { key: "health", label: "건강운", icon: "🌿" },
-];
 
 function getTodayISO(): string {
     return new Date().toISOString().slice(0, 10);
@@ -63,8 +53,7 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
     const [month, setMonth] = useState<FortuneCard | null>(null);
     const [year, setYear] = useState<FortuneCard | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [selected, setSelected] = useState<PeriodKey>("year");
-    const [category, setCategory] = useState<CategoryKey | null>(null);
+    const [selected, setSelected] = useState<PeriodKey>("total");
 
     const lastDateRef = useRef<string>("");
 
@@ -152,17 +141,14 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         }
         : null;
 
-    // 기간별 메타 (위계순: 전체 → 대운 → 올해 → 이달 → 오늘)
+    // 기간별 메타 — 박스 5개: 내 사주(전체) → 올해 → 이달 → 오늘 → 대운
+    // 분야별(연애·금전 등) 세부 질문은 풀이 후 '더 궁금한 점 물어보기'로 대체한다.
     const periods: { key: PeriodKey; label: string; chip: string; data: FortuneCard | null; title: string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         body: any }[] = [
         {
-            key: "total", label: "전체", chip: "전체", data: totalCard, title: "나의 전체 운세",
+            key: "total", label: "나의 사주", chip: "내 사주", data: totalCard, title: "나의 사주 풀이",
             body: { saju_data: sajuData, analysis_type: "total", query: "타고난 사주 전체를 깊이 있게 풀이" },
-        },
-        {
-            key: "daeun", label: daeun ? `${daeun.age}세 대운` : "대운", chip: "대운", data: daeunCard, title: "대운 흐름",
-            body: { saju_data: sajuData, analysis_type: "daeun", query: `${daeun?.age ?? ""}세 대운 분석`, period_ganzhi: daeun?.ganzhi, period_label: daeun ? `${daeun.age}세 대운` : undefined },
         },
         {
             key: "year", label: `${curYear}년`, chip: "올해", data: year, title: "올해의 운세",
@@ -176,22 +162,20 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
             key: "today", label: "오늘", chip: "오늘", data: today, title: "오늘의 운세",
             body: { saju_data: sajuData, analysis_type: "today", query: `${getTodayISO()} 일진 분석` },
         },
+        {
+            key: "daeun", label: daeun ? `${daeun.age}세 대운` : "대운", chip: "대운", data: daeunCard, title: "대운 흐름",
+            body: { saju_data: sajuData, analysis_type: "daeun", query: `${daeun?.age ?? ""}세 대운 분석`, period_ganzhi: daeun?.ganzhi, period_label: daeun ? `${daeun.age}세 대운` : undefined },
+        },
     ];
 
     const active = periods.find((p) => p.key === selected) ?? periods[0];
-
-    // 올해 + 분야 선택 시 category 주입 (그 외엔 종합)
-    const cat = selected === "year" ? category : null;
-    const catMeta = CATEGORIES.find((c) => c.key === cat);
-    const activeBody = cat
-        ? { ...active.body, category: cat, query: `${curYear}년 ${catMeta?.label} 분석` }
-        : active.body;
-    const activeTitle = cat ? `올해의 ${catMeta?.label}` : active.title;
+    const activeBody = active.body;
+    const activeTitle = active.title;
 
     return (
         <section className="fade-up">
             <h3 className="section-title text-lg md:text-xl mb-6">
-                <span>🔮 나의 운세 — 전체 · 대운 · 올해 · 이달 · 오늘</span>
+                <span>🔮 나의 운세 — 내 사주 · 올해 · 이달 · 오늘 · 대운</span>
             </h3>
 
             {isLoading ? (
@@ -246,32 +230,11 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
                 </div>
             )}
 
-            {/* 올해 선택 시: 분야별 운세 칩 (연애/금전/진로/건강) */}
-            {selected === "year" && (
-                <div className="mt-6 flex flex-wrap gap-2 justify-center">
-                    {CATEGORIES.map((c) => (
-                        <button
-                            key={c.label}
-                            type="button"
-                            onClick={() => setCategory(c.key)}
-                            className={cn(
-                                "rounded-full px-4 py-1.5 text-sm font-semibold border transition-all",
-                                cat === c.key
-                                    ? "bg-[#d4af37]/15 ring-1 ring-[#d4af37] text-[#bf953f] dark:text-[#e6c35c] border-[#d4af37]"
-                                    : "bg-white/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-[#d4af37]/30 hover:bg-[#d4af37]/10"
-                            )}
-                        >
-                            {c.icon} {c.label}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {/* 선택한 기간(+분야)의 AI 풀이 */}
+            {/* 선택한 기간의 AI 풀이 — 연애·금전 등 세부 질문은 풀이 후 '더 궁금한 점 물어보기'로 */}
             <p className="mt-6 mb-3 text-center text-sm text-slate-500 dark:text-slate-400">
-                <span className="font-bold text-[#bf953f] dark:text-[#e6c35c]">{activeTitle}</span>를 AI로 풀어보세요
+                <span className="font-bold text-[#bf953f] dark:text-[#e6c35c]">{activeTitle}</span>를 쉽게 풀어드려요
             </p>
-            <AnalyzeButtons key={`${selected}-${cat ?? ""}`} apiBase={apiBase} body={activeBody} title={activeTitle} />
+            <AnalyzeButtons key={selected} apiBase={apiBase} body={activeBody} title={activeTitle} />
         </section>
     );
 }
