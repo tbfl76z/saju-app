@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
-    mountainFromDeg, annualChart, comboFor, type Palace,
+    mountainFromDeg, annualChart, monthlyChart, monthlyCenter, comboFor, type Palace,
 } from "@/lib/flyingStars";
-import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
+import { mingGua, starFor, voidCheck, type Trigram, type Star } from "@/lib/eightMansions";
 import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { Button } from "@/components/ui/button";
+import { exportAsImage } from "@/lib/exportImage";
+import { notify } from "@/lib/useToast";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
 
@@ -39,6 +41,20 @@ const MOOD_COLOR: Record<string, string> = {
 };
 // 팔택 팔성 중 길성
 const GOOD_STARS: Star[] = ["생기", "천의", "연년", "복위"];
+
+// 저장된 집 프로필 — 좌향·입주년을 기억해 매번 실측·입력하지 않게 한다
+interface HomeProfile { name: string; sitting: string; year: number; deg?: number }
+const HOMES_KEY = "destiny-hyeongong-homes";
+function loadHomes(): HomeProfile[] {
+    try {
+        const raw = window.localStorage.getItem(HOMES_KEY);
+        const p = raw ? JSON.parse(raw) : [];
+        return Array.isArray(p) ? p : [];
+    } catch { return []; }
+}
+function saveHomes(list: HomeProfile[]) {
+    try { window.localStorage.setItem(HOMES_KEY, JSON.stringify(list.slice(0, 10))); } catch { /* 무시 */ }
+}
 
 interface Props {
     birthYear?: number;            // 입춘 보정 연도(팔택 본명괘 통합용)
@@ -146,6 +162,12 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     const [mapView, setMapView] = useState(false);  // 9궁 배치: false=남상(전통) / true=북상(지도식)
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
+    const [measuredDeg, setMeasuredDeg] = useState<number | null>(null); // 실측 좌향 각도 유지(공망 판정용)
+    const [homes, setHomes] = useState<HomeProfile[]>([]);
+    const [homeName, setHomeName] = useState("");
+    const [saving, setSaving] = useState(false);
+    const chartRef = useRef<HTMLDivElement>(null);   // 비성반 이미지 저장용
+    useEffect(() => { setHomes(loadHomes()); }, []); // 저장된 집 프로필 로드
 
     // 좌산 설정 — 도면 방위 탭이 이어받을 수 있게 저장해 둔다(실측 우선 플로우 연동)
     const setSitting = (m: string) => {
@@ -208,10 +230,12 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             const mean = ((Math.atan2(sx, sy) * 180) / Math.PI + 360) % 360;
             const R = Math.hypot(sx, sy) / samples.length;          // 집중도(1=완전 일치)
             const stdDeg = Math.sqrt(Math.max(0, -2 * Math.log(Math.max(R, 1e-9)))) * (180 / Math.PI);
-            const sit = mountainFromDeg(mean + 180);
+            const sitDeg = (mean + 180) % 360;
+            const sit = mountainFromDeg(sitDeg);
             setSitting(sit);
+            setMeasuredDeg(sitDeg);   // 실측 각도를 유지해 공망(경계) 여부를 함께 판정
             setCapNote(
-                `평균 向 ${mean.toFixed(1)}° (편차 ±${stdDeg.toFixed(1)}°) → 坐 ${sit}`
+                `평균 向 ${mean.toFixed(1)}° (편차 ±${stdDeg.toFixed(1)}°) → 坐 ${sit} ${sitDeg.toFixed(1)}°`
                 + (stdDeg > 8 ? " ⚠ 값이 많이 흔들립니다. 철골·가전에서 떨어져 다른 지점에서 다시 재보세요." : "")
             );
         }, 3000);
@@ -233,7 +257,32 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     // 각도 입력 → 좌산 자동 설정 (팔택 나경 탭에서 잰 값을 옮겨 적는 용도)
     const applyDeg = () => {
         const d = parseFloat(degInput);
-        if (Number.isFinite(d)) setSitting(mountainFromDeg(d));
+        if (Number.isFinite(d)) {
+            const norm = ((d % 360) + 360) % 360;
+            setSitting(mountainFromDeg(norm));
+            setMeasuredDeg(norm);   // 실측 각도 유지 → 공망 판정
+        }
+    };
+
+    // 실측 각도가 있으면 공망(산 경계) 여부 판정 — 경계에 걸치면 좌향 판정 자체가 흔들린다
+    const voidRes = useMemo(() => (measuredDeg != null ? voidCheck(measuredDeg) : null), [measuredDeg]);
+
+    // 집 프로필 저장/불러오기 — 실측을 한 번 해두면 다음부터 원탭
+    const saveHome = () => {
+        const name = homeName.trim() || `${sitting}坐 ${year}`;
+        const next = [{ name, sitting, year, deg: measuredDeg ?? undefined },
+        ...homes.filter((h) => h.name !== name)];
+        setHomes(next); saveHomes(next); setHomeName("");
+        notify.success(`'${name}' 저장 완료`, "다음부터 칩을 누르면 바로 불러옵니다.");
+    };
+    const loadHome = (h: HomeProfile) => {
+        setSitting(h.sitting); setYear(h.year);
+        setMeasuredDeg(h.deg ?? null);
+        setInterp("");
+    };
+    const removeHome = (name: string) => {
+        const next = homes.filter((h) => h.name !== name);
+        setHomes(next); saveHomes(next);
     };
 
     // 9궁 배치(남상/북상 토글 반영)
@@ -261,16 +310,70 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         }).map((p) => `${PALACE_DIR[p]}(향성 ${chart.water[p]}·팔택 ${starFor(ming, p as Trigram)})`);
     }, [chart, ming]);
 
-    // 올해 주의 방위(연자백 오황·이흑)
+    // 월자백(이달의 유월 비성) — 절입일 근사(±1일 오차 가능)
+    const monthly = useMemo(() => monthlyChart(now), [now]);
+    const monthInfo = useMemo(() => monthlyCenter(now), [now]);
+
+    // 주의 방위 — 연·월 오황/이흑을 구분해 표기
     const warnDirs = useMemo(() => {
         const w: string[] = [];
         (Object.entries(annual) as [Palace, number][]).forEach(([p, n]) => {
             if (p === "中") return;
-            if (n === 5) w.push(`${PALACE_DIR[p]}(오황)`);
-            if (n === 2) w.push(`${PALACE_DIR[p]}(이흑)`);
+            if (n === 5) w.push(`${PALACE_DIR[p]}(년오황)`);
+            if (n === 2) w.push(`${PALACE_DIR[p]}(년이흑)`);
+        });
+        (Object.entries(monthly) as [Palace, number][]).forEach(([p, n]) => {
+            if (p === "中") return;
+            if (n === 5) w.push(`${PALACE_DIR[p]}(월오황)`);
+            if (n === 2) w.push(`${PALACE_DIR[p]}(월이흑)`);
         });
         return w;
-    }, [annual]);
+    }, [annual, monthly]);
+
+    // 용도별 배치표 — 산성(정적)·향성(동적)·조합·연월 흉성 기반의 실무 추천
+    const usage = useMemo(() => {
+        if (!chart) return [];
+        const pals = GRID_S.flat().filter((p) => p !== "中");
+        const info = (p: Palace) => ({
+            wm: starMood(chart.water[p], chart.period),   // 향성 기운
+            mm: starMood(chart.mountain[p], chart.period), // 산성 기운
+            combo: comboFor(chart.mountain[p], chart.water[p]),
+            danger: annual[p] === 5 || annual[p] === 2 || monthly[p] === 5, // 연오황·연이흑·월오황
+        });
+        const pick = (score: (p: Palace) => number, min = 1) => {
+            const ranked = pals.map((p) => ({ p, s: score(p) })).sort((a, b) => b.s - a.s);
+            return ranked.filter((r) => r.s >= min).slice(0, 2).map((r) => PALACE_DIR[r.p]);
+        };
+        const moodPt = (m: string) => (m === "왕기" ? 3 : m === "생기" ? 2 : m === "퇴기" ? 0.5 : 0);
+        const comboPt = (p: Palace) => { const c = info(p).combo; return c ? (c.grade === "길" ? 1 : -2) : 0; };
+        return [
+            {
+                use: "현관·출입구", dirs: pick((p) => moodPt(info(p).wm) + comboPt(p) - (info(p).danger ? 2 : 0), 2),
+                why: "향성(재물) 왕·생기가 드나드는 곳",
+            },
+            {
+                use: "침실·안방", dirs: pick((p) => moodPt(info(p).mm) + comboPt(p) - (info(p).danger ? 2 : 0), 2),
+                why: "산성(인정·건강) 왕·생기의 정적인 공간",
+            },
+            {
+                use: "서재·공부방", dirs: pick((p) => (info(p).combo?.name === "문창" ? 4 : 0) + moodPt(info(p).mm) - (info(p).danger ? 2 : 0), 2),
+                why: "1·4 문창 조합 우선, 다음 산성 생기",
+            },
+            {
+                use: "금고·재물 자리", dirs: pick((p) => (info(p).wm === "왕기" ? 4 : info(p).wm === "생기" ? 2 : 0) + comboPt(p), 2),
+                why: "향성 당운 왕기 방위",
+            },
+        ];
+    }, [chart, annual, monthly]);
+
+    // 비성반 카드 이미지 저장
+    const saveImage = async () => {
+        if (!chartRef.current) return;
+        setSaving(true);
+        try { await exportAsImage(chartRef.current, `현공-${sitting}坐-${year}`); notify.success("이미지를 저장했습니다"); }
+        catch { notify.error("저장에 실패했습니다"); }
+        finally { setSaving(false); }
+    };
 
     async function interpret() {
         if (!chart) return;
@@ -281,7 +384,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             ming_gua: ming ?? "",
             cells: GRID_S.flat().filter((p) => p !== "中").map((p) => ({
                 방위: PALACE_DIR[p], 산성: chart.mountain[p], 향성: chart.water[p], 운반: chart.base[p],
-                연성: annual[p], 조합: comboFor(chart.mountain[p], chart.water[p])?.name ?? "",
+                연성: annual[p], 월성: monthly[p], 조합: comboFor(chart.mountain[p], chart.water[p])?.name ?? "",
                 팔택: ming ? starFor(ming, p as Trigram) : "",
             })),
         };
@@ -295,6 +398,20 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     return (
         <div className="space-y-3">
             <div className="glass-card p-4 space-y-3">
+                {/* 저장된 집 — 실측을 한 번 해두면 다음부터 원탭 로드 */}
+                {homes.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                        <span className="text-slate-400">🏠 저장된 집</span>
+                        {homes.map((h) => (
+                            <span key={h.name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#d4af37]/35 bg-white/60 dark:bg-slate-800/60">
+                                <button onClick={() => loadHome(h)} className="font-semibold text-slate-600 dark:text-slate-300 hover:text-[#bf953f]">
+                                    {h.name}
+                                </button>
+                                <button onClick={() => removeHome(h.name)} aria-label="삭제" className="text-slate-400 hover:text-rose-500">×</button>
+                            </span>
+                        ))}
+                    </div>
+                )}
                 {/* ① 실측이 1순위 — 좌향은 현장에서 재는 것이 정확하다(아파트는 동마다 배치각이 다름) */}
                 <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
                     <b>① 좌향 실측이 먼저입니다.</b> 아파트는 동마다 배치각이 달라 도면·지도만으로는 좌향을 알 수 없습니다. 외벽·베란다 유리면에 휴대폰 옆면을 평행하게 대고, 철골·가전에서 떨어져 2~3곳에서 재세요.
@@ -342,13 +459,26 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         className="w-20 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
                     <span className="text-xs text-slate-400">{period}운 ({py0}~{py1})</span>
                 </div>
+                {/* 실측 각도의 공망(산 경계) 경고 — 경계에 걸치면 좌향 판정 자체가 흔들린다 */}
+                {voidRes?.level && (
+                    <div className="rounded-xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-300/60 dark:border-rose-800/50 px-3 py-2 text-[12px] text-rose-700 dark:text-rose-300">
+                        ⚠ <b>{voidRes.level}</b> — 실측 좌향 {measuredDeg?.toFixed(1)}°가 {voidRes.between[0]}·{voidRes.between[1]} 경계(공망 폭 ±{voidRes.halfWidth}°)에 걸쳤습니다.
+                        비성반 판정이 흔들리는 자리이니 측정 위치를 옮기거나 다시 재보세요.
+                    </div>
+                )}
+                {/* 현재 좌향·입주년을 집으로 저장 */}
+                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                    <input value={homeName} onChange={(e) => setHomeName(e.target.value)} placeholder="예: 우리집, 사무실"
+                        className="w-32 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
+                    <Button onClick={saveHome} variant="outline" className="h-7 rounded-full text-xs">🏠 이 좌향을 집으로 저장</Button>
+                </div>
                 <p className="text-[11px] text-slate-400">
                     건물이 지어진(입주한) 시기의 운(運)과 좌향으로 비성반을 세웁니다. 좌(坐)는 건물이 등지는 방위, 향(向)은 정면이 바라보는 방위입니다.
                 </p>
             </div>
 
             {chart && (
-                <div className="glass-card p-4 space-y-3">
+                <div ref={chartRef} className="glass-card p-4 space-y-3">
                     <div className="text-center">
                         <span className="text-sm text-slate-500">{chart.period}운 <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
@@ -378,7 +508,10 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                                         <span className={MOOD_COLOR[starMood(chart.mountain[p], chart.period)]}>{chart.mountain[p]}</span>
                                         <span className={MOOD_COLOR[starMood(chart.water[p], chart.period)]}>{chart.water[p]}</span>
                                     </div>
-                                    <div className="text-[10px] text-slate-400">{chart.base[p]} <span className={an === 5 || an === 2 ? "text-rose-500 font-bold" : ""}>年{an}</span></div>
+                                    <div className="text-[10px] text-slate-400">
+                                        {chart.base[p]} <span className={an === 5 || an === 2 ? "text-rose-500 font-bold" : ""}>年{an}</span>
+                                        {p !== "中" && <span className={monthly[p] === 5 || monthly[p] === 2 ? " text-rose-500 font-bold" : ""}> 月{monthly[p]}</span>}
+                                    </div>
                                     <div className="text-[10px] text-slate-500">{PALACE_DIR[p]}{isSit ? " · 坐" : isFace ? " · 向" : ""}</div>
                                     {combo && <div className={"text-[9px] " + (combo.grade === "길" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>{combo.name}</div>}
                                     {palStar && <div className={"text-[9px] " + (GOOD_STARS.includes(palStar) ? "text-emerald-600/80 dark:text-emerald-400/80" : "text-slate-400")}>택 {palStar}</div>}
@@ -404,13 +537,35 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         </div>
                     )}
 
-                    {/* 올해의 연자백 주의·추천 */}
+                    {/* 연·월 자백 주의·추천 */}
                     <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
-                        <div><b className="text-rose-500">⚠ {annualYear}년 주의 방위</b> — {warnDirs.join(", ") || "없음"} <span className="text-slate-400">(연자백 오황·이흑: 공사·침상 배치 회피)</span></div>
+                        <div>
+                            <b className="text-rose-500">⚠ 주의 방위(연·월 오황/이흑)</b> — {warnDirs.join(", ") || "없음"}
+                            <span className="text-slate-400"> · 공사·이사·침상 배치 회피{monthInfo.nearBoundary ? " · 절기 경계일(±1일)이라 월 판정에 오차 가능" : ""}</span>
+                        </div>
                         {ming && bestDirs.length > 0 && (
                             <div><b className="text-emerald-600 dark:text-emerald-400">✦ 추천 방위(팔택 {ming}명 × 향성 왕·생기)</b> — {bestDirs.join(", ")}</div>
                         )}
                     </div>
+
+                    {/* 용도별 배치표 — 실무용 요약 */}
+                    {usage.length > 0 && (
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40 p-3 space-y-1.5">
+                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200">📋 용도별 추천 배치</div>
+                            {usage.map((u) => (
+                                <div key={u.use} className="flex items-start gap-2 text-xs">
+                                    <span className="w-24 shrink-0 font-semibold text-slate-600 dark:text-slate-300">{u.use}</span>
+                                    <span className="flex-1">
+                                        {u.dirs.length > 0
+                                            ? <b className="text-emerald-600 dark:text-emerald-400">{u.dirs.join(" · ")}</b>
+                                            : <span className="text-slate-400">뚜렷한 적방 없음</span>}
+                                        <span className="text-slate-400"> — {u.why}</span>
+                                    </span>
+                                </div>
+                            ))}
+                            <div className="text-[10px] text-slate-400">※ 연·월 오황/이흑이 든 방위는 자동 감점됐습니다. 실제 배치는 구조·채광과 함께 판단하세요.</div>
+                        </div>
+                    )}
 
                     <div className="text-[11px] text-slate-400 leading-relaxed">
                         <span className={MOOD_COLOR["왕기"]}>{STAR_NAMES[chart.period]}</span>=당운 왕기 ·
@@ -420,9 +575,14 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         향성 왕·생기 방위에 물(도로·출입구), 산성 왕·생기 방위에 산(높은 가구·벽)이 이상적입니다. 현공비성 기준이며 유파에 따라 해석이 다를 수 있습니다.
                     </div>
 
-                    <Button onClick={interpret} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                        {interpreting ? "풀이 중..." : "✨ AI 현공 풀이"}
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={interpret} disabled={interpreting} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                            {interpreting ? "풀이 중..." : "✨ AI 현공 풀이"}
+                        </Button>
+                        <Button onClick={saveImage} disabled={saving} variant="outline" className="rounded-full">
+                            {saving ? "저장 중..." : "📷"}
+                        </Button>
+                    </div>
                 </div>
             )}
 

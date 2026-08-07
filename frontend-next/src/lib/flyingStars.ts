@@ -186,6 +186,50 @@ export function annualChart(year: number): Record<Palace, number> {
   return flyChart(annualCenter(year), true);
 }
 
+/* ── 월자백(月紫白) — 달마다 도는 유월 비성 ── */
+
+// 각 월(寅월=정월 기준)의 절입일 근사 [월, 일] — 입춘 2/4, 경칩 3/6, …
+// 절입 시각은 해마다 ±1일 오차가 있으므로 경계일엔 주의 문구를 띄운다.
+const _JEOLIP: [number, number][] = [
+  [2, 4], [3, 6], [4, 5], [5, 6], [6, 6], [7, 7],
+  [8, 8], [9, 8], [10, 8], [11, 7], [12, 7], [1, 6],
+];
+
+/** 날짜 → (입춘 기준 연도, 월 인덱스 0=寅월, 절기 경계 인접 여부) */
+export function solarMonthIndex(date: Date): { year: number; monthIdx: number; nearBoundary: boolean } {
+  const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
+  // 입춘 이전은 전년 축월 소속
+  const year = m < 2 || (m === 2 && d < _JEOLIP[0][1]) ? y - 1 : y;
+  let monthIdx = 11; // 기본 축월(소한~입춘)
+  for (let i = 0; i < 12; i++) {
+    const [sm, sd] = _JEOLIP[i];
+    const [em, ed] = _JEOLIP[(i + 1) % 12];
+    const afterStart = m > sm || (m === sm && d >= sd);
+    const beforeEnd = em < sm ? (m < em || (m === em && d < ed) || m > sm || (m === sm && d >= sd)) : (m < em || (m === em && d < ed));
+    if (i === 11) { // 축월: 1/6~2/3 (연말 걸침)
+      if ((m === 1 && d >= 6) || (m === 2 && d < _JEOLIP[0][1]) || (m === 12 && d >= 31)) { monthIdx = 11; break; }
+    } else if (afterStart && beforeEnd) { monthIdx = i; break; }
+  }
+  // 절입일 ±1일이면 경계 주의
+  const nearBoundary = _JEOLIP.some(([jm, jd]) => m === jm && Math.abs(d - jd) <= 1);
+  return { year, monthIdx, nearBoundary };
+}
+
+/** 월자백 중궁수 — 년지 삼합군별 정월(寅월) 기점: 子午卯酉=8白, 辰戌丑未=5黃, 寅申巳亥=2黑. 매월 역행. */
+export function monthlyCenter(date: Date): { center: number; year: number; monthIdx: number; nearBoundary: boolean } {
+  const { year, monthIdx, nearBoundary } = solarMonthIndex(date);
+  const branch = ((year - 4) % 12 + 12) % 12; // 0=子
+  const group = branch % 3;                    // 0: 子午卯酉 / 1: 丑辰未戌 / 2: 寅巳申亥
+  const start = group === 0 ? 8 : group === 1 ? 5 : 2;
+  const center = ((start - 1 - monthIdx) % 9 + 9) % 9 + 1;
+  return { center, year, monthIdx, nearBoundary };
+}
+
+/** 월자백 반(盤) */
+export function monthlyChart(date: Date): Record<Palace, number> {
+  return flyChart(monthlyCenter(date).center, true);
+}
+
 /* ── 성요 조합(산성·향성 동궁) 해석 — 심씨현공 계열 통용 조합 ── */
 
 export interface ComboNote { grade: "길" | "흉"; name: string; note: string }

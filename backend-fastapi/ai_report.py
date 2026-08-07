@@ -939,6 +939,7 @@ def build_hyeongong_prompt(data: dict) -> str:
     cell_txt = " / ".join(
         f"{c.get('방위', '')}: 산{c.get('산성', '')} 향{c.get('향성', '')} 운{c.get('운반', '')}"
         + (f" 연{c.get('연성', '')}" if c.get("연성") else "")
+        + (f" 월{c.get('월성', '')}" if c.get("월성") else "")
         + (f" [{c.get('조합', '')}]" if c.get("조합") else "")
         + (f" (팔택 {c.get('팔택', '')})" if c.get("팔택") else "")
         for c in cells
