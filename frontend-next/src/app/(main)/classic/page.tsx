@@ -359,7 +359,12 @@ function JamiView({ profile }: { profile?: any }) {
                         <input type="number" value={liuYear ?? ""} min={1900} max={2100} placeholder="연도"
                             onChange={(e) => setLiuYear(e.target.value ? Number(e.target.value) : null)}
                             className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs text-center" />
-                        <button onClick={() => setLiuYear(new Date().getFullYear())} className="text-[11px] text-[#bf953f] underline">올해</button>
+                        <button onClick={() => {
+                            // 유년은 그 해 태세 기준 — 연초(입춘 전)는 전년 태세로 근사
+                            const t = new Date();
+                            const y = (t.getMonth() + 1 > 2 || (t.getMonth() + 1 === 2 && t.getDate() >= 4)) ? t.getFullYear() : t.getFullYear() - 1;
+                            setLiuYear(y);
+                        }} className="text-[11px] text-[#bf953f] underline">올해</button>
                     </div>
                     <div className="flex gap-1">
                         <button onClick={() => setHangul(false)}

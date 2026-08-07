@@ -213,9 +213,13 @@ def _jami(det: dict) -> dict:
     _t = _dt.date.today()
     _sy, _sm, _sd = det["_solar"]
     age = _t.year - _sy - (1 if (_t.month, _t.day) < (_sm, _sd) else 0)  # 자미는 만 나이 기준
+    # 올해 유년(流年)궁 = 그 해 태세(지지) 궁 — 나이로 찾지 않는다(정석).
+    # 연초(입춘 전)는 전년 태세로 근사(자미 유년은 음력 새해 기준이나 입춘으로 근사).
+    _ty = _t.year if (_t.month, _t.day) >= (2, 4) else _t.year - 1
+    yun_branch = JIJI[(_ty - 4) % 12]
     return {**j, "음력": f"{lun.get('lunar_year', '')}.{lun['lunar_month']}.{lun['lunar_day']}",
             "명궁주성": ju, "명주": myeongju, "신주": sinju, "신궁": JIJI[sin_idx],
-            "현재나이": age, "명반": board}
+            "현재나이": age, "올해유년궁": yun_branch, "유년기준연도": _ty, "명반": board}
 
 
 @router.post("/full")
