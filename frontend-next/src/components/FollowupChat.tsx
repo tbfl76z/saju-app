@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // 해석 후 대화형 후속 질문 — 이전 해석(prev)을 맥락으로 추가 질문에 답한다.
 export function FollowupChat({ prev }: { prev: string }) {

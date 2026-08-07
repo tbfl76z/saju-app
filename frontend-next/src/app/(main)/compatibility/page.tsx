@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CompatibilitySection } from "@/components/CompatibilitySection";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // 두 사람 명식 궁합 분석 라우트
 export default function CompatibilityPage() {

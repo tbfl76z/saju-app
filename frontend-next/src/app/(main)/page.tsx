@@ -16,7 +16,7 @@ import { Bookmark } from "lucide-react";
 import { notify } from "@/lib/useToast";
 import { getProfile, getPrimaryProfile, listProfiles, LOAD_PROFILE_KEY } from "@/lib/storage";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // 히어로 우측 명식 미리보기 — 마지막 저장 명식이 있으면 그걸, 없으면 예시 명식 (시안 A 구성)
 const SAMPLE_PILLARS = [

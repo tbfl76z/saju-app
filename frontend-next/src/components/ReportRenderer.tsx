@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 // AI 리포트 렌더러. '## 헤딩' 단위로 섹션 카드를 구성한다(경량 자체 파서).
 // 스트리밍 중 부분 텍스트도 안전하게 렌더하며, 본문 속 명리 용어는 탭하면 뜻이 뜬다.
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // 용어 사전 모듈 캐시 (앱 수명 동안 1회만 로드)
 let termsCache: Record<string, string> | null = null;

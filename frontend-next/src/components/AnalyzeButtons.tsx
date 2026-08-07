@@ -93,22 +93,23 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
     return (
         <div className={className}>
             <div className="flex flex-wrap justify-center gap-3">
+                {/* 일반(입문자) 앱: 쉬운 설명이 기본(primary), 자세한 풀이는 보조 */}
                 <Button
                     onClick={() => run("easy")}
                     disabled={running !== null}
-                    variant="outline"
-                    className="rounded-full px-6 border-[#d4af37]/40 hover:bg-[#d4af37]/10"
+                    className="rounded-full px-6 bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900 dark:hover:bg-[#e6c35c]"
                 >
                     <BookOpen className="h-4 w-4 mr-1.5" />
-                    {running === "easy" ? "풀이 중..." : "쉬운 설명"}
+                    {running === "easy" ? "풀이 중..." : "✨ 쉽게 풀어보기"}
                 </Button>
                 <Button
                     onClick={() => run("advanced")}
                     disabled={running !== null}
-                    className="rounded-full px-6 bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900 dark:hover:bg-[#e6c35c]"
+                    variant="outline"
+                    className="rounded-full px-6 border-[#d4af37]/40 hover:bg-[#d4af37]/10"
                 >
                     <Sparkles className="h-4 w-4 mr-1.5" />
-                    {running === "advanced" ? "풀이 중..." : "고급 풀이"}
+                    {running === "advanced" ? "풀이 중..." : "자세한 풀이"}
                 </Button>
             </div>
 

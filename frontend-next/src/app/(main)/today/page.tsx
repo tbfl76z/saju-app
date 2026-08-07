@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { listProfilesPrimaryFirst, type SavedProfile } from "@/lib/storage";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // 저장된 명식 기준으로 오늘의 운세를 보여주는 독립 라우트
 export default function TodayPage() {

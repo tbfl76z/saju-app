@@ -23,8 +23,8 @@ const notoSerif = Noto_Serif_KR({
 });
 
 export const metadata: Metadata = {
-  title: "Destiny Code - AI 사주 풀이",
-  description: "Your Life, Written in Code.",
+  title: "Destiny Daily - 누구나 쉬운 사주",
+  description: "클릭만 하면 쉽게 풀어주는 사주 — 명식·오늘의 운세·궁합",
 };
 
 export default function RootLayout({

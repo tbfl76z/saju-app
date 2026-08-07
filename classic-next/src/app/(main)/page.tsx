@@ -55,7 +55,7 @@ const JAMI_DIR: Record<string, string> = {
     "午": "정남", "未": "남서", "申": "서남", "酉": "정서", "戌": "서북", "亥": "북서",
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // /calculate 저장응답에서 생년월일시 파싱 → /classic 입력
 function toBirth(s: any) {

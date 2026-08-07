@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { NavBarDesktop } from "@/components/NavBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppSwitcher } from "@/components/AppSwitcher";
 import { FontSizeToggle } from "@/components/FontSizeToggle";
 
 // 모든 라우트가 공유하는 상단 헤더. 로고 + 네비 + 다크토글을 한 곳에 통합한다.
@@ -17,14 +18,15 @@ export function AppHeader() {
                         alt="Destiny Code 로고"
                         className="w-10 h-10 md:w-12 md:h-12 group-hover:rotate-12 transition-transform duration-500 drop-shadow"
                     />
-                    <div className="hidden sm:block">
-                        <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight font-noto-serif">Destiny Code</h1>
-                        <p className="text-[10px] text-[#d4af37] uppercase tracking-[0.3em] font-semibold mt-0.5">Your Life, Written in Code</p>
+                    <div className="hidden lg:block">
+                        <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight font-noto-serif">Destiny Daily</h1>
+                        <p className="text-[10px] text-[#d4af37] uppercase tracking-[0.3em] font-semibold mt-0.5">EASY SAJU FOR EVERYONE</p>
                     </div>
                 </Link>
 
                 <div className="flex items-center gap-2">
                     <NavBarDesktop />
+                    <AppSwitcher />
                     <FontSizeToggle />
                     <ThemeToggle />
                 </div>

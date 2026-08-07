@@ -3,7 +3,7 @@
 // 학습 모드 공용 유틸 — API 타입/호출 + 진도·XP·스트릭 + SM-2 복습(SRS) 저장소.
 // 기존 앱 관례(storage.ts)에 맞춰 localStorage 기반으로 관리한다.
 
-export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").replace(/\/$/, "");
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // ---------- API 타입 ----------
 export interface ChapterSummary {
