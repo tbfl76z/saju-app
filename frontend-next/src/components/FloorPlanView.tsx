@@ -14,7 +14,6 @@ import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
 type OverlayMode = "24산" | "팔택" | "현공";
 const GOOD_STARS: Star[] = ["생기", "천의", "연년", "복위"];
 const GUA8: Trigram[] = ["坎", "艮", "震", "巽", "離", "坤", "兌", "乾"];
-const GUA_KO: Record<Trigram, string> = { 坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서" };
 
 // 방위각(0=북, 시계방향) → 이미지 좌표 방향벡터
 function dir(deg: number): [number, number] {
