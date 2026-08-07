@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { SajuForm } from "@/components/SajuForm";
 import { SajuPillars } from "@/components/SajuPillars";
 import { FiveElements } from "@/components/FiveElements";
@@ -53,15 +54,16 @@ function TodayWidget() {
   }, []);
   if (!d?.ganzhi) return null;
   const ment = SIPSIN_MENT[(d.stem_ten_god || "").replace(/\(.*\)/, "")] || "오늘의 기운을 차분히 살펴보세요.";
+  // 일반인용 첫 화면 — 십성·12운성 원어 대신 오늘의 간지 + 쉬운 한 줄만 보여준다
   return (
     <div className="glass-card p-4 flex items-center gap-3">
       <div className="text-3xl shrink-0">🌅</div>
       <div className="flex-1 min-w-0">
         <div className="text-[11px] text-slate-400">{label} · 오늘의 운세 {d.date || ""}</div>
-        <div className="text-sm"><b className="font-noto-serif text-[#bf953f]">{d.ganzhi}</b> · {d.stem_ten_god}/{d.branch_ten_god} · {d.twelve_growth}</div>
+        <div className="text-sm">오늘의 간지 <b className="font-noto-serif text-[#bf953f]">{d.ganzhi}</b></div>
         <div className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{ment}</div>
       </div>
-      <a href="/today" className="text-xs text-[#bf953f] underline shrink-0">자세히</a>
+      <Link href="/today" className="text-xs text-[#bf953f] underline shrink-0">자세히</Link>
     </div>
   );
 }
@@ -108,7 +110,6 @@ function HeroPillarsPreview({ onLoad, mounted }: { onLoad: (d: any) => void; mou
               <br />
               <span className="text-[#8a6a24] dark:text-[#b7a5ff]">{c.branch}</span>
             </p>
-            <p className="text-[9px] md:text-[10px] text-slate-500 dark:text-slate-400 truncate px-0.5">{c.ss}</p>
           </div>
         ))}
       </div>

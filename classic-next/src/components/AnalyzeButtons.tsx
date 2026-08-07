@@ -61,10 +61,10 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
 
     // 풀이 내용 공유: Web Share API 우선, 미지원 시 클립보드 복사
     const handleShare = async () => {
-        const text = `[Destiny Code · ${title}]\n\n${result}`;
+        const text = `[Destiny Classic · ${title}]\n\n${result}`;
         try {
             if (navigator.share) {
-                await navigator.share({ title: `Destiny Code · ${title}`, text });
+                await navigator.share({ title: `Destiny Classic · ${title}`, text });
             } else {
                 await navigator.clipboard.writeText(text);
                 notify.success("풀이 내용을 복사했습니다", "원하는 곳에 붙여넣기 하세요.");

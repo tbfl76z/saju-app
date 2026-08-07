@@ -58,7 +58,7 @@ export default function SavedPage() {
         setPrimaryId(next);
         setPrimary(next);
         notify.success(next ? "내 명식으로 지정했습니다" : "내 명식 지정을 해제했습니다",
-            next ? "오늘의 운세·학습 메뉴가 이 명식을 기본으로 사용해요." : undefined);
+            next ? "오늘의 운세가 이 명식을 기본으로 사용해요." : undefined);
     };
 
     // 리포트 즐겨찾기(핀) 토글 — 핀 항목은 보관함 맨 위에 고정된다

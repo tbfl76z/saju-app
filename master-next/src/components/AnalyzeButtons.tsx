@@ -19,18 +19,16 @@ interface AnalyzeButtonsProps {
     title?: string;
 }
 
-// 쉬운 설명 / 고급 풀이 두 가지 수준으로 AI 운세를 풀어주는 공용 버튼+결과 블록
+// 전문 풀이(advanced) 단일 수준으로 AI 운세를 풀어주는 공용 버튼+결과 블록
 export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀이" }: AnalyzeButtonsProps) {
     const [result, setResult] = useState("");
-    const [running, setRunning] = useState<null | "easy" | "advanced">(null);
-    const [shownLevel, setShownLevel] = useState<"easy" | "advanced">("advanced");
+    const [running, setRunning] = useState<null | "advanced">(null);
     const [downloading, setDownloading] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
     const resultRef = useRef<HTMLDivElement>(null); // 결과 생성 시 이 위치로 자동 스크롤
 
-    const run = async (level: "easy" | "advanced") => {
+    const run = async (level: "advanced") => {
         setRunning(level);
-        setShownLevel(level);
         setResult("");
         try {
             // 첫 응답이 도착하면 결과 영역으로 한 번 부드럽게 스크롤한다
@@ -61,10 +59,10 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
 
     // 풀이 내용 공유: Web Share API 우선, 미지원 시 클립보드 복사
     const handleShare = async () => {
-        const text = `[Destiny Code · ${title}]\n\n${result}`;
+        const text = `[Destiny Master · ${title}]\n\n${result}`;
         try {
             if (navigator.share) {
-                await navigator.share({ title: `Destiny Code · ${title}`, text });
+                await navigator.share({ title: `Destiny Master · ${title}`, text });
             } else {
                 await navigator.clipboard.writeText(text);
                 notify.success("풀이 내용을 복사했습니다", "원하는 곳에 붙여넣기 하세요.");
@@ -108,7 +106,7 @@ export function AnalyzeButtons({ apiBase, body, className, title = "운세 풀�
                 <div className="mt-6 scroll-mt-24" ref={resultRef}>
                     <div ref={reportRef} className="glass-card p-6 md:p-8 animate-in fade-in zoom-in-95 duration-500">
                         <div className="flex items-center gap-2 mb-5">
-                            <span className="text-lg">{shownLevel === "easy" ? "📖" : "✨"}</span>
+                            <span className="text-lg">✨</span>
                             <h4 className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-100">
                                 {title} · 전문 풀이
                             </h4>

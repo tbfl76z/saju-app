@@ -135,7 +135,7 @@ export function NewYearSection({ sajuData, apiBase }: NewYearSectionProps) {
                 </div>
             ) : null}
 
-            {/* AI 신년운세 — 쉬운 설명 / 고급 풀이 */}
+            {/* AI 신년운세 — 전문 풀이 */}
             {result && (
                 <AnalyzeButtons
                     apiBase={apiBase}

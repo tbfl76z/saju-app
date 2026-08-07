@@ -49,9 +49,9 @@ export default function SharedPage() {
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <Link href="/" className="flex items-center gap-3 group">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/logo.svg" alt="Destiny Code 로고" className="w-12 h-12 drop-shadow" />
+                        <img src="/logo.svg" alt="Destiny Daily 로고" className="w-12 h-12 drop-shadow" />
                         <div>
-                            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight font-noto-serif">Destiny Code</h1>
+                            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight font-noto-serif">Destiny Daily</h1>
                             <p className="text-[10px] text-[#d4af37] uppercase tracking-[0.3em] font-semibold mt-0.5">공유된 명식</p>
                         </div>
                     </Link>

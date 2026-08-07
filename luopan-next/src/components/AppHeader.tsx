@@ -15,7 +15,7 @@ export function AppHeader() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src="/logo.svg"
-                        alt="Destiny Code 로고"
+                        alt="Destiny Compass 로고"
                         className="w-10 h-10 md:w-12 md:h-12 group-hover:rotate-12 transition-transform duration-500 drop-shadow"
                     />
                     <div className="hidden lg:block">

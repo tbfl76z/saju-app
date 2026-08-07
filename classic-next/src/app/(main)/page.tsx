@@ -146,6 +146,13 @@ export default function ClassicPage() {
                         </Select>
                     </div>
 
+                    {/* 시간 모름 명식 경고 — 자미 명궁·신궁은 시(時)에 좌우되므로 명시한다 */}
+                    {profile?.sajuData?.unknown_time && (
+                        <div className="mb-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
+                            ⏱️ 이 명식은 <b>태어난 시간 모름</b>으로 저장되어 12:00 기준으로 계산됩니다. 자미두수 명궁·신궁 등 시(時) 기반 결과는 참고용으로만 보세요.
+                        </div>
+                    )}
+
                     {/* 탭 */}
                     <div className="flex gap-1.5 mb-4 flex-wrap">
                         {(["자미", "자미궁합", "주역", "기문", "택일", "래정"] as Tab[]).map((t) => (
@@ -255,6 +262,7 @@ function JamiBoard({ jami, hangul, selZi, onCell, liuYear }: { jami: any; hangul
     const juseong = (jami["명궁주성"] || []).map((s: string) => (hangul ? ko(s) : s)).join("·") || (hangul ? "무주성" : "無主星");
     return (
         <div className="glass-card p-2 overflow-x-auto">
+                <div className="md:hidden text-center text-[10px] text-slate-400 pb-1">← 명반을 좌우로 밀어 보세요 →</div>
             <div className="grid grid-cols-4 grid-rows-4 gap-1 min-w-[600px]">
                 <div style={{ gridRow: "2 / 4", gridColumn: "2 / 4" }}
                     className="flex flex-col items-center justify-center text-center gap-1 rounded-lg bg-[#d4af37]/8 border border-[#d4af37]/30 font-noto-serif">
@@ -441,7 +449,7 @@ function JuyeokView() {
             </div>
             {r && <>
                 <div className="glass-card p-5 space-y-4">
-                    <div className="flex justify-center gap-8 items-start">
+                    <div className="flex justify-center gap-3 sm:gap-8 items-start">
                         <GuaImage yos={r["효"] || []} label={r["괘명"]} />
                         {r["변괘"] && <>
                             <div className="self-center text-2xl text-slate-300">→</div>
@@ -561,16 +569,16 @@ function TaegilView({ profile }: { profile?: any }) {
             {loading ? <div className="glass-card p-8 text-center text-slate-500">…</div> : data && (
                 <div className="glass-card p-4">
                     <div className="text-sm text-slate-500 mb-1">
-                        {data.year}년 {data.month}월 <b className="text-[#bf953f]">{data.purpose}</b> 길일 {data["길일"].length}일
+                        {data.year}년 {data.month}월 <b className="text-[#bf953f]">{data.purpose}</b> 길일 {(data["길일"]?.length ?? 0)}일
                         {data["본인띠"] && <span> · 본인 <b className="text-slate-600 dark:text-slate-300">{data["본인띠명"]}띠({data["본인띠"]})</b> 기준</span>}
                     </div>
                     {data["본명충제외"] > 0 && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-3">※ 본명충일(본인 띠와 충하는 날) {data["본명충제외"]}일을 길일에서 제외했습니다.</p>
                     )}
-                    {data["길일"].length === 0
+                    {(data["길일"]?.length ?? 0) === 0
                         ? <p className="text-slate-400 text-sm">이 달에는 추천 길일이 없습니다. 다른 달을 조회해 보세요.</p>
                         : <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {data["길일"].map((x: any, i: number) => (
+                            {(data["길일"] ?? []).map((x: any, i: number) => (
                                 <div key={i} className={"rounded-lg border p-2 " + (x.score >= 4 ? "border-[#d4af37] bg-[#d4af37]/8" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
                                     <div className="font-bold text-[#bf953f]">{x.day}일 <span className="text-xs text-slate-400">({x.요일})</span>{x.score >= 4 && " ★"}</div>
                                     <div className="text-sm font-noto-serif text-slate-700 dark:text-slate-200">{x["간지"]}</div>
@@ -658,15 +666,15 @@ function RaejeongView({ profile }: { profile?: any }) {
                         <div className="text-sm text-slate-500">내방자 일간 <b className="text-[#bf953f]">{data["내담자일간"]}</b> · 내방일진 <b className="text-[#bf953f] font-noto-serif">{data["내방일진"]}</b></div>
                         {/* 진(辰) 배열 — 일진 기준 순행, 4진(實)이 방문 목적 */}
                         <div className="space-y-1">
-                            {data["진배열"].map((j: any) => {
+                            {(data["진배열"] ?? []).map((j: any) => {
                                 const is4 = j["자리"] === "4진";
                                 return (
-                                    <div key={j["자리"]} className={"flex items-center gap-2 rounded-lg px-2 py-1.5 " + (is4 ? "bg-[#d4af37]/15 ring-1 ring-[#d4af37]/40" : (j["자리"] === "일진" ? "bg-slate-100/70 dark:bg-slate-800/50" : ""))}>
+                                    <div key={j["자리"]} className={"flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg px-2 py-1.5 " + (is4 ? "bg-[#d4af37]/15 ring-1 ring-[#d4af37]/40" : (j["자리"] === "일진" ? "bg-slate-100/70 dark:bg-slate-800/50" : ""))}>
                                         <span className="w-12 shrink-0 text-[11px] text-slate-400">{j["자리"]}</span>
                                         <span className="w-6 shrink-0 font-noto-serif text-lg text-slate-800 dark:text-slate-100">{j["지지"]}</span>
-                                        <span className="w-16 shrink-0 text-xs font-semibold text-[#bf953f]">{j["성"]}</span>
-                                        <span className="w-10 shrink-0 text-xs text-slate-500">{j["십성"]}</span>
-                                        <span className="flex-1 min-w-0 text-xs text-slate-500 truncate">{j["의미"]}</span>
+                                        <span className="shrink-0 text-xs font-semibold text-[#bf953f] whitespace-nowrap">{j["성"]}</span>
+                                        <span className="shrink-0 text-xs text-slate-500">{j["십성"]}</span>
+                                        <span className="text-xs text-slate-500">{j["의미"]}</span>
                                         {j["원국주"]?.length > 0 && <span className="shrink-0 text-[10px] text-purple-500 dark:text-purple-400">원국 {j["원국주"].join("·")}</span>}
                                     </div>
                                 );

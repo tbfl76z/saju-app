@@ -39,7 +39,10 @@ export default function FloorPlanView({ birthYear, gender }: Props) {
             return saved && MOUNTAIN_INFO[saved] ? saved : "子";
         } catch { return "子"; }
     });
-    const [year, setYear] = useState(new Date().getFullYear());
+    const [year, setYear] = useState(() => {
+        // 현공비성 탭에서 쓰던 입주년을 이어받는다(운이 어긋나지 않게)
+        try { const v = parseInt(window.localStorage.getItem("destiny-luopan-year") || "", 10); return v >= 1864 && v <= 2100 ? v : new Date().getFullYear(); } catch { return new Date().getFullYear(); }
+    });
     const [saving, setSaving] = useState(false);
     const boxRef = useRef<HTMLDivElement>(null);
 
@@ -134,7 +137,7 @@ export default function FloorPlanView({ birthYear, gender }: Props) {
                 {mode === "현공" && (
                     <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                         <span>좌(坐)</span>
-                        <select value={sitting} onChange={(e) => setSitting(e.target.value)}
+                        <select value={sitting} onChange={(e) => { setSitting(e.target.value); try { window.localStorage.setItem("destiny-luopan-sitting", e.target.value); } catch { /* 무시 */ } }}
                             className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
                             {Object.keys(MOUNTAIN_INFO).map((m) => <option key={m} value={m}>{m}</option>)}
                         </select>

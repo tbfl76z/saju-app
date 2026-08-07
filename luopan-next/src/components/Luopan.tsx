@@ -7,6 +7,7 @@ import {
   HOUSE_INFO, MOUNTAINS, STAR_INFO, VOID_NOTE,
   type Gender, type Star, type Trigram,
 } from "@/lib/eightMansions";
+import { mountainFromDeg } from "@/lib/flyingStars";
 
 /** 두 기준 종합: 0 둘 다 흉 / 1 한쪽만 길 / 2 둘 다 길 */
 const SCORE_COLOR = ["#8C2F26", "#8A7443", "#1F7A57"];
@@ -227,7 +228,14 @@ export default function Luopan({
   const placements = useMemo(() => placementAdvice(ming, houseGua), [ming, houseGua]);
 
   const captureHouse = useCallback(() => {
-    setHouseGua(houseGuaFromFacing(smoothRef.current + (trueNorthRef.current ? DECLINATION : 0)));
+    const facingDeg = smoothRef.current + (trueNorthRef.current ? DECLINATION : 0);
+    setHouseGua(houseGuaFromFacing(facingDeg));
+    // 실측 좌향을 형제 탭(현공·도면)이 이어받도록 저장
+    try {
+      const sitDeg = ((facingDeg + 180) % 360 + 360) % 360;
+      window.localStorage.setItem("destiny-luopan-sitting", mountainFromDeg(sitDeg));
+      window.localStorage.setItem("destiny-luopan-deg", String(sitDeg));
+    } catch { /* 무시 */ }
   }, []);
 
   /* ── 정적 눈금 ── */
@@ -337,7 +345,7 @@ export default function Luopan({
         aria-pressed={held}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setHeld((v) => !v); } }}
         title={held ? "탭하면 다시 회전합니다" : "탭하면 현재 방위로 고정됩니다"}
-        style={{ position: "relative", width: "min(94vw, 420px)", aspectRatio: "1", cursor: "pointer" }}
+        style={{ position: "relative", width: "min(100%, 420px)", aspectRatio: "1", cursor: "pointer" }}
       >
         <svg viewBox="0 0 400 400" style={{ width: "100%", display: "block", pointerEvents: "none" }}
           role="img" aria-label={`나경 방위판, 현재 ${heading.toFixed(0)}도${held ? " (고정됨)" : ""}`}>
@@ -396,7 +404,7 @@ export default function Luopan({
 
       {voided.level && (
         <div role="status" style={{
-          width: "min(94vw, 420px)", marginTop: 12, padding: "11px 14px", borderRadius: 2,
+          width: "min(100%, 420px)", marginTop: 12, padding: "11px 14px", borderRadius: 2,
           border: `1px solid ${voided.level === "대공망" ? "#8C2F26" : "#C08A5A"}`,
           background: voided.level === "대공망" ? "#8C2F2618" : "#C08A5A14",
         }}>
@@ -415,7 +423,7 @@ export default function Luopan({
       )}
 
       <div style={{
-        width: "min(94vw, 420px)", marginTop: 18,
+        width: "min(100%, 420px)", marginTop: 18,
         borderTop: "1px solid #2A3A31", borderBottom: "1px solid #2A3A31",
         display: "grid", gridTemplateColumns: "1fr 1px 1fr",
       }}>
@@ -438,7 +446,7 @@ export default function Luopan({
 
       {/* ── 命 사람 설정 ── */}
       {!ming && (
-        <div style={{ width: "min(94vw, 420px)", marginTop: 18, textAlign: "center" }}>
+        <div style={{ width: "min(100%, 420px)", marginTop: 18, textAlign: "center" }}>
           <div style={cap}>命 · 본명괘</div>
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
             <input value={yearIn} onChange={(e) => setYearIn(e.target.value)}
@@ -456,7 +464,7 @@ export default function Luopan({
       )}
 
       {/* ── 宅 집 설정 ── */}
-      <div style={{ width: "min(94vw, 420px)", marginTop: 18, textAlign: "center" }}>
+      <div style={{ width: "min(100%, 420px)", marginTop: 18, textAlign: "center" }}>
         <div style={cap}>宅 · 택괘</div>
         {houseGua ? (
           <div style={{ fontSize: 14, color: "#DCCEAE", lineHeight: 1.7 }}>
@@ -491,7 +499,7 @@ export default function Luopan({
       {/* ── 배합 판정 ── */}
       {fit && (
         <div style={{
-          width: "min(94vw, 420px)", marginTop: 16, padding: "13px 15px", borderRadius: 2,
+          width: "min(100%, 420px)", marginTop: 16, padding: "13px 15px", borderRadius: 2,
           border: `1px solid ${fit.match ? "#1F7A57" : "#B5734A"}`,
           background: fit.match ? "#1F7A5714" : "#B5734A14",
         }}>
@@ -506,7 +514,7 @@ export default function Luopan({
 
       {/* ── 현재 향하는 방위 판정 ── */}
       {(faceStar || faceHouseStar) && (
-        <div style={{ width: "min(94vw, 420px)", marginTop: 16 }}>
+        <div style={{ width: "min(100%, 420px)", marginTop: 16 }}>
           <div style={{ ...cap, textAlign: "center" }}>
             지금 향한 {faceTrigram} 방위
           </div>
@@ -539,7 +547,7 @@ export default function Luopan({
 
       {/* ── 여덟 방위 종합 ── */}
       {ming && (
-        <div style={{ width: "min(94vw, 420px)", marginTop: 16 }}>
+        <div style={{ width: "min(100%, 420px)", marginTop: 16 }}>
           <div style={{ ...cap, textAlign: "center" }}>여덟 방위 종합</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
             {rows.slice().sort((a, b) => b.score - a.score ||
@@ -571,7 +579,7 @@ export default function Luopan({
 
       {/* ── 용도별 배치 ── */}
       {(ming || houseGua) && (
-        <div style={{ width: "min(94vw, 420px)", marginTop: 20 }}>
+        <div style={{ width: "min(100%, 420px)", marginTop: 20 }}>
           <div style={{ ...cap, textAlign: "center" }}>용도별 배치</div>
           <div style={{ display: "grid", gap: 1, background: "#2A3A31", border: "1px solid #2A3A31" }}>
             {placements.map((p) => {
@@ -616,7 +624,7 @@ export default function Luopan({
       )}
 
       <p style={{
-        maxWidth: "min(94vw, 420px)", marginTop: 16, fontSize: 12,
+        maxWidth: "min(100%, 420px)", marginTop: 16, fontSize: 12,
         lineHeight: 1.75, color: "#CBD4C8", textAlign: "center",
       }}>
         {note}

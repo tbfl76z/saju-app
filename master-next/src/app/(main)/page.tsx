@@ -153,9 +153,9 @@ export default function Home() {
             {/* 시안 A 히어로: 좌측 카피+CTA / 우측 명식 미리보기 2단 구성 */}
             <div className="hero-sky grid md:grid-cols-[1.15fr_1fr] gap-8 md:gap-10 items-center py-8 md:py-14 px-2 md:px-6 animate-in fade-in duration-1000">
               <div className="text-center md:text-left space-y-4">
-                <p className="text-[10px] md:text-[11px] tracking-[0.35em] text-[#bf953f] dark:text-[#e6c35c] font-bold uppercase">Ancient Wisdom · Modern AI</p>
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif leading-snug">당신의 운명을<br className="hidden md:block" /> 코드로 풀어보세요</h2>
-                <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base leading-relaxed">정통 명리학의 깊은 지혜와 인공지능이 만나<br />당신의 삶에 따뜻한 지혜의 지도를 그려드립니다.</p>
+                <p className="text-[10px] md:text-[11px] tracking-[0.35em] text-[#bf953f] dark:text-[#e6c35c] font-bold uppercase">SAJU FOR SCHOLARS · 命理 硏究</p>
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif leading-snug">명식을 깊이,<br className="hidden md:block" /> 체계로 읽다</h2>
+                <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base leading-relaxed">원국·대운·세운·월운을 전문가의 시각으로 분석하고,<br />체계적인 커리큘럼으로 명리를 학습하세요.</p>
                 <div className="pt-1">
                   <Button
                     onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}

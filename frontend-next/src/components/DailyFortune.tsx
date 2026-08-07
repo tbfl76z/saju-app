@@ -30,12 +30,6 @@ function getTodayISO(): string {
     return new Date().toISOString().slice(0, 10);
 }
 
-function relStr(value: unknown): string {
-    if (Array.isArray(value)) return value.length ? value.join(", ") : "-";
-    if (typeof value === "string" && value.trim()) return value;
-    return "-";
-}
-
 // 현재 나이에 해당하는 대운을 고른다 (없으면 첫 대운)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function pickCurrentDaeun(sajuData: any): any | null {
@@ -219,12 +213,8 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
                                 <span className="font-bold text-[#bf953f] dark:text-[#e6c35c]">{active.label}</span>
                                 <span className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-50">{active.data.ganzhi}</span>
                             </div>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-600 dark:text-slate-300">
-                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">십성</b>{active.data.stem_ten_god} · {active.data.branch_ten_god}</span>
-                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">12운성</b>{active.data.twelve_growth}</span>
-                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">신살</b>{active.data.sinsal || "-"}</span>
-                                <span><b className="text-slate-400 dark:text-slate-500 font-semibold mr-1">관계</b>{relStr(active.data.relations)}</span>
-                            </div>
+                            {/* 일반인용 — 십성·12운성 같은 원어 나열 대신 풀이에서 쉽게 설명한다 */}
+                            <div className="text-xs text-slate-400 dark:text-slate-500">아래 버튼을 누르면 이 시기의 흐름을 쉽게 풀어드려요.</div>
                         </div>
                     )}
                 </div>

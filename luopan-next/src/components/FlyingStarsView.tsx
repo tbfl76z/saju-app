@@ -193,13 +193,31 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     // 연자백은 입춘(2/4경) 기준 연도
     const annualYear = now.getMonth() + 1 < 2 || (now.getMonth() + 1 === 2 && now.getDate() < 4) ? nowYear - 1 : nowYear;
 
-    const [sitting, setSittingRaw] = useState("子");
-    const [year, setYear] = useState(nowYear);
+    // 탭 전환(언마운트) 후에도 실측값이 유지되도록 localStorage에서 복원한다
+    const [sitting, setSittingRaw] = useState(() => {
+        try { const v = window.localStorage.getItem("destiny-luopan-sitting"); return v && MOUNTAIN_INFO[v] ? v : "子"; } catch { return "子"; }
+    });
+    const [year, setYearRaw] = useState(() => {
+        try { const v = parseInt(window.localStorage.getItem("destiny-luopan-year") || "", 10); return v >= 1864 && v <= 2100 ? v : nowYear; } catch { return nowYear; }
+    });
+    const setYear = (y: number) => {
+        setYearRaw(y);
+        try { window.localStorage.setItem("destiny-luopan-year", String(y)); } catch { /* 무시 */ }
+    };
     const [degInput, setDegInput] = useState("");   // 좌향 각도(도) 직접 입력
     const [mapView, setMapView] = useState(false);  // 9궁 배치: false=남상(전통) / true=북상(지도식)
     const [interp, setInterp] = useState("");
     const [interpreting, setInterpreting] = useState(false);
-    const [measuredDeg, setMeasuredDeg] = useState<number | null>(null); // 실측 좌향 각도 유지(공망 판정용)
+    const [measuredDeg, setMeasuredDegRaw] = useState<number | null>(() => {
+        try { const v = parseFloat(window.localStorage.getItem("destiny-luopan-deg") || ""); return Number.isFinite(v) ? v : null; } catch { return null; }
+    }); // 실측 좌향 각도 유지(공망 판정용) — 탭 전환에도 보존
+    const setMeasuredDeg = (d: number | null) => {
+        setMeasuredDegRaw(d);
+        try {
+            if (d == null) window.localStorage.removeItem("destiny-luopan-deg");
+            else window.localStorage.setItem("destiny-luopan-deg", String(d));
+        } catch { /* 무시 */ }
+    };
     const [homes, setHomes] = useState<HomeProfile[]>([]);
     const [homeName, setHomeName] = useState("");
     const [saving, setSaving] = useState(false);
