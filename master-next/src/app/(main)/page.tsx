@@ -10,6 +10,7 @@ import { DailyFortune } from "@/components/DailyFortune";
 import { NewYearSection } from "@/components/NewYearSection";
 import { ImagePromptCard } from "@/components/ImagePromptCard";
 import SaveShareBar from "@/components/SaveShareBar";
+import { IljinCalendar } from "@/components/IljinCalendar";
 import SavedProfilesModal from "@/components/SavedProfilesModal";
 import { Button } from "@/components/ui/button";
 import { Bookmark } from "lucide-react";
@@ -216,6 +217,15 @@ export default function Home() {
 
             <SaveShareBar sajuData={sajuData} aiAnalysis={aiAnalysis} captureRef={captureRef as React.RefObject<HTMLElement | null>} apiBase={API_BASE} />
 
+            {/* 내 일주 → 60갑자 일주론 딥링크 (학습 연계) */}
+            {sajuData?.pillars?.day?.pillar && (
+              <a href={`/learn/ilju?card=${encodeURIComponent(sajuData.pillars.day.pillar)}`}
+                className="flex items-center justify-between glass-card px-4 py-3 text-sm hover:!border-[#d4af37] transition-colors">
+                <span className="text-slate-600 dark:text-slate-300">📇 내 일주 <b className="font-noto-serif text-[#bf953f]">{sajuData.pillars.day.pillar}</b> — 일주론에서 성격의 골격 보기</span>
+                <span className="text-[#bf953f]">→</span>
+              </a>
+            )}
+
             {sajuData?.unknown_time && (
               <div className="flex items-center gap-2 text-sm bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-slate-600 dark:text-slate-300">
                 <span>⏱️</span>
@@ -274,6 +284,10 @@ export default function Home() {
 
               <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
                 <NewYearSection sajuData={sajuData} terms={terms} apiBase={API_BASE} />
+              </div>
+
+              <div className="pt-8 border-t border-slate-200 dark:border-slate-800">
+                <IljinCalendar dayGan={sajuData?.pillars?.day?.stem || "甲"} />
               </div>
 
             </div>

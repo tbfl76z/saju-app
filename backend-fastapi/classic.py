@@ -650,6 +650,30 @@ async def raejeong_analyze(req: RaejeongReq):
     return StreamingResponse(ai_report.stream_iljin_naejeong(data, req.gender), media_type="text/event-stream")
 
 
+# ==== 일진 달력 (전문가용 — 달력에서 날짜별 일진·내 일간 대비 십성/운성) ====
+@router.get("/iljin-calendar")
+async def iljin_calendar(year: int, month: int, day_gan: str = ""):
+    """해당 월의 일별 일진(간지). day_gan(일간)을 주면 십성·12운성까지 대조한다."""
+    import calendar as _cal
+    ndays = _cal.monthrange(year, month)[1]
+    first_weekday = _dt.date(year, month, 1).weekday()  # 0=월
+    days = []
+    for day in range(1, ndays + 1):
+        try:
+            res = _calc.calculate_saju(year, month, day, 12, 0, use_solar_time=True, longitude=127.5, early_zi_time=False)
+            P = get_saju_details(res)["pillars"]
+        except Exception:
+            continue
+        gz = P["day"]["pillar"]
+        item = {"day": day, "간지": gz}
+        if day_gan in CHEONGAN:
+            item["십성"] = _SIP_KO[yearun_engine.sipsin(day_gan, gz[0])]
+            item["지지십성"] = _SIP_KO[yearun_engine.sipsin(day_gan, gz[1])]
+            item["운성"] = TWELVE_GROWTH.get(day_gan, {}).get(gz[1], "-")
+        days.append(item)
+    return {"year": year, "month": month, "first_weekday": first_weekday, "days": days}
+
+
 # ==== 현공비성(玄空飛星) AI 해석 ====
 # 비성반 계산은 프론트 lib/flyingStars.ts(문헌·실전 검증 완료)에서 수행하고,
 # 여기서는 그 결과를 받아 해석 프롬프트만 구성한다(재계산 금지 원칙).

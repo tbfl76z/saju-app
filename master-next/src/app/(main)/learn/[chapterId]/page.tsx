@@ -37,6 +37,18 @@ export default function ChapterPage() {
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [profileId, setProfileId] = useState("");
 
+    // 딥링크: ?card=甲子 형태로 들어오면 해당 제목의 카드로 이동
+    useEffect(() => {
+        if (!chapter) return;
+        try {
+            const q = new URLSearchParams(window.location.search).get("card");
+            if (!q) return;
+            const idx = chapter.cards.findIndex((c: { title: string }) => c.title.includes(q));
+            if (idx >= 0) setCardIdx(idx);
+        } catch { /* 무시 */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chapter]);
+
     useEffect(() => {
         if (!chapterId) return;
         fetchChapter(chapterId)

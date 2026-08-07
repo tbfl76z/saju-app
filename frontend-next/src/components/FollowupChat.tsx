@@ -29,9 +29,22 @@ export function FollowupChat({ prev }: { prev: string }) {
         } finally { setRunning(false); }
     }
 
+    // 입문자용 추천 질문 — 분야 칩 대신 대화로 유도한다
+    const SUGGESTS = ["올해 연애운은 어때요?", "돈 관리는 어떻게 할까요?", "직장·진로 조언이 필요해요", "건강에서 조심할 점은?"];
+
     return (
         <div className="glass-card p-4 space-y-3">
             <div className="text-sm font-semibold text-[#bf953f]">💬 더 궁금한 점 물어보기</div>
+            {turns.length === 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                    {SUGGESTS.map((q0) => (
+                        <button key={q0} onClick={() => { if (!running) { setQ(q0); } }}
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold border border-[#d4af37]/30 bg-white/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 hover:border-[#d4af37] hover:text-[#bf953f] transition-colors">
+                            {q0}
+                        </button>
+                    ))}
+                </div>
+            )}
             {turns.map((t, i) => (
                 <div key={i} className="space-y-1">
                     <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Q. {t.q}</div>

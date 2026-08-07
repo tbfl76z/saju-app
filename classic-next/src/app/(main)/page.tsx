@@ -109,7 +109,7 @@ export default function ClassicPage() {
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [sel, setSel] = useState("");
     const [mounted, setMounted] = useState(false);
-    const [tab, setTab] = useState<Tab>("자미");
+    const [tab, setTab] = useState<Tab | null>(null);  // null = 기능 카드 홈
 
     useEffect(() => {
         setMounted(true);
@@ -153,8 +153,31 @@ export default function ClassicPage() {
                         </div>
                     )}
 
+                    {/* 기능 카드 홈 — 탭 미선택 시 6개 기능을 카드로 보여준다(작은 화면 두 줄 꺾임 방지) */}
+                    {tab === null ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {([
+                                ["자미", "🔮", "자미두수", "명반·대한·유년·AI 해석"],
+                                ["자미궁합", "💞", "궁합", "두 명반의 상성"],
+                                ["주역", "🎲", "주역점", "육효 점단"],
+                                ["기문", "🧭", "기문방위", "낙서 9궁 길흉 방위"],
+                                ["택일", "📅", "택일", "건제12신·황도 길일"],
+                                ["래정", "🚪", "래정(방문점)", "일진내정법 방문 목적"],
+                            ] as [Tab, string, string, string][]).map(([key, icon, name, desc]) => (
+                                <button key={key} onClick={() => setTab(key)}
+                                    className="glass-card p-4 text-left hover:!border-[#d4af37] transition-colors">
+                                    <div className="text-2xl mb-1">{icon}</div>
+                                    <div className="font-bold text-slate-800 dark:text-slate-100">{name}</div>
+                                    <div className="text-[11px] text-slate-400 mt-0.5">{desc}</div>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                    <>
                     {/* 탭 */}
                     <div className="flex gap-1.5 mb-4 flex-wrap">
+                        <button onClick={() => setTab(null)}
+                            className="px-3 py-2 rounded-full text-sm font-semibold text-slate-400 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-800/60">⊞</button>
                         {(["자미", "자미궁합", "주역", "기문", "택일", "래정"] as Tab[]).map((t) => (
                             <button key={t} onClick={() => setTab(t)}
                                 className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
@@ -171,6 +194,8 @@ export default function ClassicPage() {
                     {tab === "자미궁합" && <JamiCompatView profile={profile} />}
                     {tab === "택일" && <TaegilView profile={profile} />}
                     {tab === "래정" && <RaejeongView profile={profile} />}
+                    </>
+                    )}
                 </>
             )}
         </div>

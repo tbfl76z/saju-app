@@ -7,7 +7,7 @@ import { Trash2, FolderOpen, Bookmark, Star, ScrollText, Search, Pin } from "luc
 import { Button } from "@/components/ui/button";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import {
-    listProfiles, deleteProfile, LOAD_PROFILE_KEY, type SavedProfile,
+    listProfiles, deleteProfile, updateProfileMemo, LOAD_PROFILE_KEY, type SavedProfile,
     getPrimaryId, setPrimaryId,
     listReports, deleteReport, toggleReportPin, type SavedReport,
 } from "@/lib/storage";
@@ -67,6 +67,49 @@ export default function SavedPage() {
         refresh();
     };
 
+    // 명식·풀이 전체를 JSON 파일로 내보내기(전문가용 백업)
+    const handleExport = () => {
+        try {
+            const data = {
+                profiles: JSON.parse(window.localStorage.getItem("destiny-saved-profiles") || "[]"),
+                reports: JSON.parse(window.localStorage.getItem("destiny-saved-reports") || "[]"),
+                exportedAt: new Date().toISOString(),
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `destiny-master-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            notify.success("백업 파일을 내려받았습니다");
+        } catch { notify.error("백업에 실패했습니다"); }
+    };
+
+    // 백업 JSON 가져오기 — 기존 항목과 병합(id 중복은 기존 유지)
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+            try {
+                const data = JSON.parse(String(rd.result));
+                const merge = (key: string, incoming: { id: string }[]) => {
+                    const cur = JSON.parse(window.localStorage.getItem(key) || "[]") as { id: string }[];
+                    const ids = new Set(cur.map((x) => x.id));
+                    const merged = [...cur, ...(Array.isArray(incoming) ? incoming.filter((x) => x?.id && !ids.has(x.id)) : [])];
+                    window.localStorage.setItem(key, JSON.stringify(merged));
+                    return merged.length - cur.length;
+                };
+                const np = merge("destiny-saved-profiles", data.profiles);
+                const nr = merge("destiny-saved-reports", data.reports);
+                refresh();
+                notify.success(`가져오기 완료`, `명식 ${np}건 · 풀이 ${nr}건을 추가했습니다.`);
+            } catch { notify.error("가져오기 실패", "올바른 백업 파일인지 확인해 주세요."); }
+        };
+        rd.readAsText(f);
+        e.target.value = "";
+    };
+
     // 검색 필터 — 명식은 이름/생일 라벨, 리포트는 제목+명식 라벨 기준
     const q = query.trim().toLowerCase();
     const filteredProfiles = q ? profiles.filter((p) => p.label.toLowerCase().includes(q)) : profiles;
@@ -80,6 +123,15 @@ export default function SavedPage() {
                     <img src="/logo-pouch.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 저장된 명식
                 </h2>
                 <p className="text-slate-600 dark:text-slate-400">★을 누르면 「내 명식」으로 지정되어 모든 메뉴가 자동으로 사용합니다.</p>
+            </div>
+
+            {/* 백업/복원 (전문가용) */}
+            <div className="flex justify-end gap-2 mb-3">
+                <Button onClick={handleExport} variant="outline" size="sm" className="rounded-full text-xs">📤 백업 내보내기</Button>
+                <label className="inline-flex items-center px-3 h-8 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[#d4af37]">
+                    📥 가져오기
+                    <input type="file" accept="application/json" onChange={handleImport} className="hidden" />
+                </label>
             </div>
 
             {/* 검색 — 저장된 명식·풀이가 하나라도 있을 때만 노출 */}
@@ -128,6 +180,12 @@ export default function SavedPage() {
                                 <div className="text-xs text-slate-400 dark:text-slate-500">
                                     {new Date(p.savedAt).toLocaleString("ko-KR")}
                                 </div>
+                                <input
+                                    defaultValue={p.memo ?? ""}
+                                    placeholder="메모 — 상담 노트, 특징 등"
+                                    onBlur={(e) => { updateProfileMemo(p.id, e.target.value); }}
+                                    className="mt-1.5 w-full px-2 py-1 rounded-lg border border-slate-200/70 dark:border-slate-700/70 bg-white/50 dark:bg-slate-800/50 text-xs focus:border-[#d4af37] outline-none"
+                                />
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <Button variant="outline" size="sm" onClick={() => handleLoad(p.id)} className="rounded-full">

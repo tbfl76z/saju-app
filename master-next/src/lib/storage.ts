@@ -8,6 +8,7 @@ export interface SavedProfile {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sajuData: any; // /calculate 응답 전체
     aiAnalysis?: string; // 선택: AI 리포트 본문
+    memo?: string; // 상담 메모(전문가용)
 }
 
 const KEY = "destiny-saved-profiles";
@@ -66,6 +67,11 @@ export function saveProfile(sajuData: any, aiAnalysis?: string): SavedProfile {
     const next = [profile, ...all.filter((p) => p.id !== id)];
     writeAll(next);
     return profile;
+}
+
+// 명식 메모 갱신(전문가용 상담 노트)
+export function updateProfileMemo(id: string, memo: string): void {
+    writeAll(readAll().map((p) => (p.id === id ? { ...p, memo } : p)));
 }
 
 export function deleteProfile(id: string): void {

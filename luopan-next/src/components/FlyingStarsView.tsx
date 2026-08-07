@@ -223,7 +223,10 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     const [saving, setSaving] = useState(false);
     const [guideOpen, setGuideOpen] = useState(false); // 사용 방법 팝업
     const chartRef = useRef<HTMLDivElement>(null);   // 비성반 이미지 저장용
-    useEffect(() => { setHomes(loadHomes()); }, []); // 저장된 집 프로필 로드
+    useEffect(() => {
+        setHomes(loadHomes()); // 저장된 집 프로필 로드
+        try { const raw = window.localStorage.getItem("destiny-luopan-history"); if (raw) setHistory(JSON.parse(raw)); } catch { /* 무시 */ }
+    }, []);
 
     // 좌산 설정 — 도면 방위 탭이 이어받을 수 있게 저장해 둔다(실측 우선 플로우 연동)
     const setSitting = (m: string) => {
@@ -236,6 +239,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     const [heading, setHeading] = useState<number | null>(null);
     const [capturing, setCapturing] = useState(false);   // 3초 평균 측정 중
     const [capNote, setCapNote] = useState("");           // 측정 결과 안내(평균·편차)
+    const [history, setHistory] = useState<{ deg: number; std: number; sit: string; t: string }[]>([]);
     const headingRef = useRef<number | null>(null);
     const cleanupRef = useRef<(() => void) | null>(null);
     useEffect(() => () => { cleanupRef.current?.(); }, []); // 언마운트 시 리스너 해제
@@ -294,6 +298,14 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 `평균 向 ${mean.toFixed(1)}° (편차 ±${stdDeg.toFixed(1)}°) → 坐 ${sit} ${sitDeg.toFixed(1)}°`
                 + (stdDeg > 8 ? " ⚠ 값이 많이 흔들립니다. 철골·가전에서 떨어져 다른 지점에서 다시 재보세요." : "")
             );
+            // 측정 이력(최근 3건) — 여러 지점 실측값 비교용
+            try {
+                const raw = window.localStorage.getItem("destiny-luopan-history");
+                const hist = raw ? JSON.parse(raw) : [];
+                hist.unshift({ deg: Math.round(sitDeg * 10) / 10, std: Math.round(stdDeg * 10) / 10, sit, t: new Date().toISOString().slice(5, 16).replace("T", " ") });
+                window.localStorage.setItem("destiny-luopan-history", JSON.stringify(hist.slice(0, 3)));
+                setHistory(hist.slice(0, 3));
+            } catch { /* 무시 */ }
         }, 3000);
     };
 
@@ -462,6 +474,12 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     </button>
                 </div>
                 {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
+                {/* 이달의 비성 배너 — 월자백 오황·이흑 방위(시점 콘텐츠) */}
+                <div className="rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
+                    🗓 <b>{now.getMonth() + 1}월의 비성</b> — 이달 오황 <b className="text-rose-500">{(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 5)?.[0] ? PALACE_DIR[(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 5)![0]] : "-"}</b>
+                    · 이흑 <b className="text-rose-500">{(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 2)?.[0] ? PALACE_DIR[(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 2)![0]] : "-"}</b>
+                    <span className="text-slate-400"> 방위 — 이달 공사·이사·침상 이동은 피하세요{monthInfo.nearBoundary ? " (절기 경계일 ±1일 오차 가능)" : ""}</span>
+                </div>
                 {/* 저장된 집 — 실측을 한 번 해두면 다음부터 원탭 로드 */}
                 {homes.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-xs">
@@ -499,6 +517,18 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     <span className="text-[11px] text-slate-400">휴대폰 위쪽을 집 정면(향)으로 향한 채 3초간 유지하세요</span>
                 </div>
                 {capNote && <p className="text-[11px] text-slate-500 dark:text-slate-400">{capNote}</p>}
+                {history.length > 1 && (
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-400">
+                        <span>측정 이력</span>
+                        {history.map((h, i) => (
+                            <button key={i} onClick={() => { setSitting(h.sit); setMeasuredDeg(h.deg); }}
+                                className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 hover:border-[#d4af37] hover:text-[#bf953f]">
+                                {h.t} · 坐{h.sit} {h.deg}°(±{h.std}°)
+                            </button>
+                        ))}
+                        <span className="text-slate-300 dark:text-slate-600">— 값이 비슷하면 신뢰해도 좋습니다</span>
+                    </div>
+                )}
                 {/* ② 각도 직접 입력(다른 나경으로 실측한 값 옮겨 적기) */}
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                     <span>② 실측 좌향 각도(도)</span>

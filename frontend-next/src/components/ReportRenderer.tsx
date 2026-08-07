@@ -44,6 +44,7 @@ function escapeRegExp(s: string): string {
 export function ReportRenderer({ text, streaming = false }: ReportRendererProps) {
     const [terms, setTerms] = useState<Record<string, string>>(termsCache ?? {});
     const [selected, setSelected] = useState<SelectedTerm | null>(null);
+    const [expanded, setExpanded] = useState(false); // 레이어드: 요약 먼저, 상세는 펼쳐 보기
 
     useEffect(() => {
         if (!termsCache) loadTerms().then(setTerms);
@@ -106,7 +107,10 @@ export function ReportRenderer({ text, streaming = false }: ReportRendererProps)
                 </div>
             ) : (
                 <div className="space-y-5">
-                    {sections.map((s, idx) => (
+                    {/* 입문자용 레이어드 — 스트리밍이 끝나면 첫 섹션(핵심 요약)만 보여주고 나머지는 펼치기 */}
+                    {sections.map((s, idx) => {
+                        if (!streaming && !expanded && idx > 0) return null;
+                        return (
                         <div
                             key={idx}
                             className="rounded-2xl border border-[#d4af37]/25 bg-white/50 dark:bg-slate-900/40 p-5 shadow-sm"
@@ -124,7 +128,14 @@ export function ReportRenderer({ text, streaming = false }: ReportRendererProps)
                                 )}
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
+                    {!streaming && !expanded && sections.length > 1 && (
+                        <button onClick={() => setExpanded(true)}
+                            className="w-full rounded-2xl border border-[#d4af37]/40 bg-[#d4af37]/8 py-3 text-sm font-bold text-[#bf953f] hover:bg-[#d4af37]/15 transition-colors">
+                            전체 풀이 펼쳐 보기 ({sections.length - 1}개 섹션) ▼
+                        </button>
+                    )}
                 </div>
             )}
 
