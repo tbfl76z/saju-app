@@ -482,6 +482,17 @@ CURRICULUM: list[dict[str, Any]] = [
 ]
 
 
+# ── 확장 챕터 연결: 60갑자 일주론(계산 기반 생성) + 중급(조후·통변 케이스) ──
+from learn_ilju import ILJU_CHAPTER
+from learn_advanced import JOHU_CHAPTER, CASES_CHAPTER
+
+_ganzhi_i = next(i for i, c in enumerate(CURRICULUM) if c["id"] == "ganzhi")
+CURRICULUM.insert(_ganzhi_i + 1, ILJU_CHAPTER)
+_gyeok_i = next(i for i, c in enumerate(CURRICULUM) if c["id"] == "gyeokguk")
+CURRICULUM.insert(_gyeok_i + 1, JOHU_CHAPTER)
+CURRICULUM.insert(_gyeok_i + 2, CASES_CHAPTER)
+
+
 def get_curriculum_summary() -> list[dict[str, Any]]:
     """챕터 목록 요약 (커리큘럼 맵 표시용)."""
     return [

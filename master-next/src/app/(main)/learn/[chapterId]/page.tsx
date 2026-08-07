@@ -193,9 +193,9 @@ export default function ChapterPage() {
                             <ArrowLeft className="h-4 w-4 mr-1" /> 이전
                         </Button>
                         {isLastCard ? (
-                            chapterId === "cheatsheet" ? (
+                            ["cheatsheet", "ilju", "johu", "cases"].includes(chapterId) ? (
                                 <div className="rounded-xl flex-[2] flex items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400 font-semibold px-2">
-                                    📖 아래 &apos;조견표 한눈에보기&apos;에서 원본 표를 확인하세요
+                                    {chapterId === "cheatsheet" ? <>📖 아래 &apos;조견표 한눈에보기&apos;에서 원본 표를 확인하세요</> : <>📖 참고형 챕터 — 카드를 사전처럼 찾아보세요</>}
                                 </div>
                             ) : (
                                 <Button
