@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
     mountainFromDeg, annualChart, monthlyChart, monthlyCenter, comboFor, type Palace,
@@ -59,6 +60,42 @@ function saveHomes(list: HomeProfile[]) {
 interface Props {
     birthYear?: number;            // 입춘 보정 연도(팔택 본명괘 통합용)
     gender?: "male" | "female";
+}
+
+/* ── 사용 방법 가이드(팝업) — Portal로 body에 렌더해 transform에 갇히지 않게 ── */
+const GUIDE_STEPS: [string, string][] = [
+    ["① 준비", "나침반 보정(폰을 8자로 몇 번 돌리기)을 하고, 자석 달린 케이스·거치대는 빼세요."],
+    ["② 좌향 실측", "집 정면(거실 창·베란다) 바깥을 향해 서서 휴대폰 위쪽을 정면으로 향합니다. '센서로 방위 재기' → '좌향 잡기(3초 평균)'를 누르고 3초간 유지하세요. 철골·가전·차량에서 1m 이상 떨어져 2~3곳에서 재고, 편차가 ±8°를 넘으면 자리를 옮겨 다시 잽니다."],
+    ["③ 좌향 확인", "회전판의 위 붉은 포인터가 向(정면), 아래 파랑이 坐(등진 방위)입니다. 공망 경고(산 경계에 걸침)가 뜨면 그 값은 쓰지 말고 재측정하세요."],
+    ["④ 입주년 입력", "건물 완공 또는 입주(이사) 연도를 넣으면 운(運)이 자동 판정됩니다."],
+    ["⑤ 비성반 읽기", "각 궁의 왼쪽 숫자=산성(인정·건강), 오른쪽=향성(재물), 아래 年·月=올해·이달의 기운입니다. 금색=왕기, 초록=생기, 붉은색=쇠살."],
+    ["⑥ 활용", "격국 해설과 '용도별 추천 배치'로 현관·침실·서재·금고 자리를 잡고, 연·월 오황/이흑 방위에서는 공사·이사·침상 배치를 피하세요."],
+    ["⑦ 저장", "'집으로 저장'을 해두면 다음부터 원탭으로 불러옵니다. 📷로 비성반을 이미지로 남기고, ✨ AI 풀이로 해석문을 받을 수 있습니다."],
+];
+
+function GuideModal({ onClose }: { onClose: () => void }) {
+    if (typeof document === "undefined") return null;
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+            <div className="glass-card !rounded-3xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6 space-y-3 bg-white/95 dark:bg-slate-900/95" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-100">📖 현공비성 사용 방법</h4>
+                    <button onClick={onClose} aria-label="닫기" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none">×</button>
+                </div>
+                {GUIDE_STEPS.map(([t, d]) => (
+                    <div key={t} className="flex gap-2.5 text-[13px] leading-relaxed">
+                        <span className="shrink-0 font-bold text-[#bf953f] w-[4.5rem]">{t}</span>
+                        <span className="text-slate-600 dark:text-slate-300">{d}</span>
+                    </div>
+                ))}
+                <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                    좌(坐)=건물이 등지는 방위, 향(向)=정면이 바라보는 방위. 전통 나경은 자북 기준이며, 현공비성 판정은 유파에 따라 다를 수 있습니다.
+                </p>
+                <Button onClick={onClose} className="w-full rounded-full bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">확인</Button>
+            </div>
+        </div>,
+        document.body
+    );
 }
 
 /* ── 회전 나경판(24산+8괘) 그리기 도우미 ── */
@@ -166,6 +203,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     const [homes, setHomes] = useState<HomeProfile[]>([]);
     const [homeName, setHomeName] = useState("");
     const [saving, setSaving] = useState(false);
+    const [guideOpen, setGuideOpen] = useState(false); // 사용 방법 팝업
     const chartRef = useRef<HTMLDivElement>(null);   // 비성반 이미지 저장용
     useEffect(() => { setHomes(loadHomes()); }, []); // 저장된 집 프로필 로드
 
@@ -398,6 +436,14 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     return (
         <div className="space-y-3">
             <div className="glass-card p-4 space-y-3">
+                {/* 사용 방법 팝업 버튼 */}
+                <div className="flex justify-end -mb-1">
+                    <button onClick={() => setGuideOpen(true)}
+                        className="text-xs font-semibold text-[#bf953f] border border-[#d4af37]/40 rounded-full px-3 py-1 hover:bg-[#d4af37]/10">
+                        📖 사용 방법
+                    </button>
+                </div>
+                {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
                 {/* 저장된 집 — 실측을 한 번 해두면 다음부터 원탭 로드 */}
                 {homes.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-xs">
