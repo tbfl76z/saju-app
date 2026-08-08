@@ -132,11 +132,6 @@ export default function ChapterPage() {
     const card = chapter.cards[cardIdx];
     const isLastCard = cardIdx === chapter.cards.length - 1;
     const passed = (result?.score ?? 0) >= PASS_SCORE;
-    // 틀린 문제 요약 — 튜터에게 학습 상황으로 전달
-    const wrongHint = result?.wrong.length
-        ? `방금 퀴즈에서 틀린 문제: ${result.wrong.map((w) => w.question).join(" / ").slice(0, 400)}`
-        : undefined;
-
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-24 space-y-6">
             <div className="flex items-center justify-between pt-4 md:pt-8">

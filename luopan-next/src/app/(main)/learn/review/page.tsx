@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { TutorPanel } from "@/components/learn/TutorPanel";
 import { listDueCards, reviewCard, countSrs, type SrsCard } from "@/lib/learn";
 
 // 복습 — 틀린 문제를 SM-2 간격 반복으로 다시 풀기.
@@ -132,7 +131,6 @@ export default function ReviewPage() {
                 </div>
             )}
 
-            <TutorPanel chapterId={card?.chapterId} placeholder="이 문제가 왜 이렇게 되는지 물어보세요" />
         </div>
     );
 }

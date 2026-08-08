@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Flame, Star, CheckCircle2, RotateCcw, Compass, BarChart3, CloudUpload, CloudDownload } from "lucide-react";
+import { Flame, Star, CheckCircle2, RotateCcw, BarChart3, CloudUpload, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
