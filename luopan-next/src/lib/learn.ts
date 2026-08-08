@@ -78,7 +78,7 @@ async function fetchJsonCached<T>(key: string, url: string): Promise<T> {
 }
 
 export async function fetchCurriculum(): Promise<ChapterSummary[]> {
-    return fetchJsonCached<ChapterSummary[]>("curriculum", `${API_BASE}/learn/curriculum`);
+    return fetchJsonCached<ChapterSummary[]>("curriculum", `${API_BASE}/learn/curriculum?track=fengshui`);
 }
 
 export async function fetchChapter(chapterId: string): Promise<ChapterDetail> {

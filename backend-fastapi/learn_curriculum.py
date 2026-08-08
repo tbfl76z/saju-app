@@ -493,7 +493,15 @@ CURRICULUM.insert(_gyeok_i + 1, JOHU_CHAPTER)
 CURRICULUM.insert(_gyeok_i + 2, CASES_CHAPTER)
 
 
-def get_curriculum_summary() -> list[dict[str, Any]]:
+from learn_fengshui import FENGSHUI_CURRICULUM
+
+
+def _track_list(track: str) -> list[dict[str, Any]]:
+    """track별 커리큘럼 — myeongri(기본)=명리, fengshui=현공비성."""
+    return FENGSHUI_CURRICULUM if track == "fengshui" else CURRICULUM
+
+
+def get_curriculum_summary(track: str = "myeongri") -> list[dict[str, Any]]:
     """챕터 목록 요약 (커리큘럼 맵 표시용)."""
     return [
         {
@@ -504,7 +512,7 @@ def get_curriculum_summary() -> list[dict[str, Any]]:
             "card_count": len(ch["cards"]),
             "order": i,
         }
-        for i, ch in enumerate(CURRICULUM)
+        for i, ch in enumerate(_track_list(track))
     ]
 
 
@@ -520,8 +528,8 @@ def _chapter_images(chapter_id: str) -> list[str]:
 def get_chapter(chapter_id: str) -> dict[str, Any] | None:
     """챕터 상세 (개념 카드 + '자세히 보기' 심화 + 원전 도표 이미지 포함)."""
     from learn_details import get_detail  # 순환 참조 방지를 위해 지연 임포트
-    for i, ch in enumerate(CURRICULUM):
+    for i, ch in enumerate(CURRICULUM + FENGSHUI_CURRICULUM):
         if ch["id"] == chapter_id:
             cards = [{**c, "detail": get_detail(chapter_id, c["title"])} for c in ch["cards"]]
-            return {**ch, "cards": cards, "order": i, "total": len(CURRICULUM), "images": _chapter_images(chapter_id)}
+            return {**ch, "cards": cards, "order": i, "total": len(FENGSHUI_CURRICULUM) if chapter_id.startswith("fs-") else len(CURRICULUM), "images": _chapter_images(chapter_id)}
     return None

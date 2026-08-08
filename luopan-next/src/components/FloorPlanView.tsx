@@ -28,9 +28,11 @@ interface Props {
     sitting?: string;
     year?: number;
     embedded?: boolean;
+    /** 실측 좌향 각도(도) — 있으면 도면 자동 정렬에 사용 */
+    measuredDeg?: number | null;
 }
 
-export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false }: Props) {
+export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false, measuredDeg = null }: Props) {
     const [img, setImg] = useState<string | null>(null);
     const [natural, setNatural] = useState<[number, number]>([1000, 750]);
     const [center, setCenter] = useState<[number, number] | null>(null);
@@ -85,12 +87,27 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         rd.readAsDataURL(f);
     };
 
-    // 이미지 클릭 → 중심점 지정 (렌더 좌표 → 원본 좌표 변환)
+    // 탭 2단계: ① 집 중심 → ② 집 정면(베란다) 방향 — 실측 향각과 매칭해 도면 회전 자동 계산
+    const [pickMode, setPickMode] = useState<"center" | "facing">("center");
+    // 실측 향각: 실측 좌향각 있으면 +180, 없으면 좌산 중심각 +180
+    const facingDeg = measuredDeg != null
+        ? ((measuredDeg + 180) % 360 + 360) % 360
+        : ((MOUNTAIN_INFO[sitting]?.deg ?? 0) + 180) % 360;
     const onPick = (e: React.MouseEvent<HTMLDivElement>) => {
         const el = boxRef.current;
         if (!el) return;
         const r = el.getBoundingClientRect();
-        setCenter([((e.clientX - r.left) / r.width) * natW, ((e.clientY - r.top) / r.height) * natH]);
+        const x = ((e.clientX - r.left) / r.width) * natW;
+        const y = ((e.clientY - r.top) / r.height) * natH;
+        if (pickMode === "center") {
+            setCenter([x, y]);
+            setPickMode("facing");
+        } else {
+            // 화면상 정면 방향(0=위, 시계+) → 실측 향각과 매칭 → 도면 상단의 실제 방위 산출
+            const phi = (Math.atan2(x - cx, -(y - cy)) * 180) / Math.PI;
+            setNorthDeg(Math.round(((facingDeg - phi) % 360 + 360) % 360));
+            setPickMode("center");
+        }
     };
 
     // 방위각 → 화면 각도(도면 상단이 northDeg를 가리키므로 그만큼 보정)
@@ -158,7 +175,10 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                     </div>
                 )}
                 <p className="text-[11px] text-slate-400">
-                    도면을 불러온 뒤 <b>집(터) 중심을 탭</b>하면 방위선이 그 점 기준으로 그려집니다. 이미지는 기기에서만 처리되며 서버로 전송되지 않습니다.
+                    {pickMode === "center"
+                        ? <>도면을 불러온 뒤 ① <b>집(터) 중심을 탭</b>하세요. (이미지는 기기에서만 처리됩니다)</>
+                        : <>② 이제 <b>집 정면(베란다·현관 바깥) 방향을 한 번 더 탭</b>하세요 — 실측 각도({facingDeg.toFixed(0)}°向)에 맞춰 도면이 자동 정렬됩니다.</>}
+                    {" "}슬라이더로 미세 조정도 가능합니다.
                 </p>
             </div>
 

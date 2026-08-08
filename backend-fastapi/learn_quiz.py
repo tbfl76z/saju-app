@@ -473,6 +473,87 @@ def _pool_gyeokguk(rng: random.Random) -> list[dict]:
     return items
 
 
+
+
+# ---------------------------------------------------------------------------
+# 현공비성(track=fengshui) — 검증된 fengshui_engine 계산으로 정답 보장 문제 생성
+# ---------------------------------------------------------------------------
+import fengshui_engine as _fe
+
+_FS_STRUCTS = ["왕산왕향", "상산하수", "쌍성회향", "쌍성회좌"]
+_FS_NUMS = [str(n) for n in range(1, 10)]
+
+
+def _pool_fs_period(rng: random.Random) -> list[dict]:
+    items = []
+    for y in rng.sample(range(1950, 2060), 10):
+        p = _fe.period_of(y)
+        items.append(_make_item(rng, f"fsp:{y}", f"{y}년은 삼원구운으로 몇 운인가?",
+                                f"{p}운", [f"{n}운" for n in range(1, 10)],
+                                f"1864년 상원 1운 기점, 20년 단위 — {y}년은 {p}운입니다."))
+    items.append(_make_item(rng, "fsp:now", "현재 9운의 기간은?", "2024~2043년",
+                            ["2004~2023년", "2024~2043년", "2044~2063년", "1984~2003년"],
+                            "9운은 2024~2043년, 직전 8운은 2004~2023년입니다."))
+    return items
+
+
+def _pool_fs_stars(rng: random.Random) -> list[dict]:
+    items = []
+    # 순역비 판정 문제
+    for m in rng.sample(_fe.MOUNTAINS_24, 8):
+        yy = "양(순비)" if _fe.MOUNTAIN_YINYANG[m] == 1 else "음(역비)"
+        items.append(_make_item(rng, f"fsyy:{m}", f"24산 {m}의 음양(비성 방향)은?",
+                                yy, ["양(순비)", "음(역비)"],
+                                f"{m}은(는) {_fe.MOUNTAIN_INFO[m]['yuan']} — {yy}입니다."))
+    # 좌→향 문제
+    for m in rng.sample(_fe.MOUNTAINS_24, 6):
+        f = _fe.opposite_mountain(m)
+        items.append(_make_item(rng, f"fsop:{m}", f"{m}山의 향(向)은?",
+                                f, rng.sample(_fe.MOUNTAINS_24, 8),
+                                f"좌와 향은 정반대(180°) — {m}山{f}向입니다."))
+    # 향성 위치 문제
+    for m in rng.sample(_fe.MOUNTAINS_24, 4):
+        c = _fe.star_chart(m, 9)
+        face_p = _fe.MOUNTAIN_INFO[c["facing"]]["palace"]
+        ans = str(c["water"][face_p])
+        items.append(_make_item(rng, f"fsws:{m}",
+                                f"9운 {m}山{c['facing']}向에서 향궁({_fe.PALACE_DIR[face_p]})의 향성은?",
+                                ans, _FS_NUMS,
+                                f"향궁 운반수를 입중해 순/역비 — 향궁의 향성은 {ans}입니다. 앱 계산기로 검산해 보세요."))
+    return items
+
+
+def _pool_fs_structure(rng: random.Random) -> list[dict]:
+    items = []
+    for period in (8, 9):
+        for m in rng.sample(_fe.MOUNTAINS_24, 7):
+            c = _fe.star_chart(m, period)
+            items.append(_make_item(rng, f"fsst:{period}{m}",
+                                    f"{period}운 {m}山{c['facing']}向의 격국은?",
+                                    c["structure"], _FS_STRUCTS,
+                                    f"당운수 {period}의 산성·향성 위치로 판정 — {c['structure']}입니다."))
+    items.append(_make_item(rng, "fsst:c1", "산성 당운수가 좌궁에, 향성 당운수가 향궁에 앉은 격국은?",
+                            "왕산왕향", _FS_STRUCTS, "산·향이 모두 득위한 최길국 — 왕산왕향(정재양왕)입니다."))
+    items.append(_make_item(rng, "fsst:c2", "산성·향성의 당운수가 모두 향궁에 모인 격국은?",
+                            "쌍성회향", _FS_STRUCTS, "재물은 왕하나 인정이 부족한 쌍성회향입니다."))
+    return items
+
+
+def _pool_fs_annual(rng: random.Random) -> list[dict]:
+    items = []
+    for y in rng.sample(range(2020, 2040), 8):
+        c = _fe.annual_center(y)
+        items.append(_make_item(rng, f"fsa:{y}", f"{y}년 연자백의 중궁수는?",
+                                str(c), _FS_NUMS,
+                                f"1864년 1白 기점 매년 역행 — {y}년은 {c} 입중입니다."))
+    for y in rng.sample(range(2024, 2036), 4):
+        ch = _fe.annual_chart(y)
+        pal = next(k for k, v in ch.items() if k != "中" and v == 5)
+        items.append(_make_item(rng, f"fsa5:{y}", f"{y}년 연자백 오황(5)이 드는 방위는?",
+                                _fe.PALACE_DIR[pal], list(_fe.PALACE_DIR.values()),
+                                f"{y}년 중궁 {_fe.annual_center(y)} 순비 — 오황은 {_fe.PALACE_DIR[pal]}입니다. 그 방위 공사·이동은 피합니다."))
+    return items
+
 CHAPTER_GENERATORS: dict[str, Callable[[random.Random], list[dict]]] = {
     "elements": _pool_elements,
     "stems": _pool_stems,
@@ -486,6 +567,12 @@ CHAPTER_GENERATORS: dict[str, Callable[[random.Random], list[dict]]] = {
     "practice": _pool_practice,
     "sinkang": _pool_sinkang,
     "gyeokguk": _pool_gyeokguk,
+    # 현공비성(풍수 앱)
+    "fs-period": _pool_fs_period,
+    "fs-coord": _pool_fs_stars,
+    "fs-stars": _pool_fs_stars,
+    "fs-structure": _pool_fs_structure,
+    "fs-annual": _pool_fs_annual,
 }
 
 

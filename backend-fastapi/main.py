@@ -401,9 +401,9 @@ async def analyze_stream(req: AnalysisRequest):
 # 학습 모드 (사주 공부하기)
 # ---------------------------------------------------------------------------
 @app.get("/learn/curriculum")
-async def learn_get_curriculum():
-    """학습 커리큘럼 챕터 목록 (권장 순서 포함)."""
-    return learn_curriculum.get_curriculum_summary()
+async def learn_get_curriculum(track: str = "myeongri"):
+    """학습 커리큘럼 챕터 목록 — track: myeongri(명리) | fengshui(현공비성)."""
+    return learn_curriculum.get_curriculum_summary(track)
 
 
 @app.get("/learn/chapter/{chapter_id}")
