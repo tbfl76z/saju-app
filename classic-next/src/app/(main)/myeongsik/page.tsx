@@ -56,6 +56,44 @@ export default function MyeongsikPage() {
                 <p className="text-slate-600 dark:text-slate-400 text-sm">고전 풀이에 사용할 명식을 입력하고 ★로 기본 명식을 지정하세요.</p>
             </div>
 
+            {/* 백업/가져오기 — 다른 앱(사주·전문)과 명식을 주고받는 연동 고리 */}
+            <div className="flex justify-end gap-2 mb-3">
+                <Button onClick={() => {
+                    try {
+                        const data = {
+                            profiles: JSON.parse(window.localStorage.getItem("destiny-saved-profiles") || "[]"),
+                            exportedAt: new Date().toISOString(),
+                        };
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `destiny-myeongsik-${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click(); URL.revokeObjectURL(a.href);
+                        notify.success("백업 파일을 내려받았습니다");
+                    } catch { notify.error("백업에 실패했습니다"); }
+                }} variant="outline" size="sm" className="rounded-full text-xs">📤 백업</Button>
+                <label className="inline-flex items-center px-3 h-8 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[#d4af37]">
+                    📥 가져오기
+                    <input type="file" accept="application/json" className="hidden" onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const rd = new FileReader();
+                        rd.onload = () => {
+                            try {
+                                const data = JSON.parse(String(rd.result));
+                                const cur = JSON.parse(window.localStorage.getItem("destiny-saved-profiles") || "[]") as { id: string }[];
+                                const ids = new Set(cur.map((x) => x.id));
+                                const inc = Array.isArray(data.profiles) ? data.profiles.filter((x: { id: string }) => x?.id && !ids.has(x.id)) : [];
+                                window.localStorage.setItem("destiny-saved-profiles", JSON.stringify([...cur, ...inc]));
+                                refresh();
+                                notify.success("가져오기 완료", `명식 ${inc.length}건 추가`);
+                            } catch { notify.error("가져오기 실패", "올바른 백업 파일인지 확인해 주세요."); }
+                        };
+                        rd.readAsText(f); e.target.value = "";
+                    }} />
+                </label>
+            </div>
+
             <SajuForm onCalculate={handleCalculate} isLoading={loading} />
 
             <div className="mt-8">

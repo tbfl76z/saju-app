@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -105,11 +106,99 @@ const GIMUN_POS: Record<number, [number, number]> = {
     8: [3, 1], 1: [3, 2], 6: [3, 3],
 };
 
+
+// ── 콘텐츠별 사용법·해석 가이드 (📖 보는 방법 팝업) ──
+const GUIDES: Record<Tab, { title: string; steps: [string, string][] }> = {
+    "자미": {
+        title: "자미두수 보는 방법",
+        steps: [
+            ["① 명식 준비", "위에서 저장된 명식을 고르거나, 생년월일시(양력·분까지)를 직접 입력하고 '명반 보기'를 누르세요. 시간이 정확할수록 명궁·신궁이 정확해집니다."],
+            ["② 명반 구조", "바깥 12칸이 12궁(명궁·형제·부처·자녀·재백·질액·천이·노복·관록·전택·복덕·부모)입니다. 금테 궁이 명궁(나 자신), 중앙에는 五行局·명주·신주 요약이 있습니다."],
+            ["③ 글자 읽기", "큰 글자가 14주성, 첨자가 묘왕(廟旺, 별의 밝기=힘), 작은 글자가 보조성·잡성입니다. 祿權科忌 붉은 표시가 사화(四化) — 그 궁이 강조되거나 주의가 필요하다는 신호입니다. 한자가 어려우면 한글 토글을 누르세요."],
+            ["④ 궁 눌러보기", "궁을 탭하면 삼방사정(본궁+마주보는 궁+삼합 두 궁)이 강조되고, 그 궁 주제로 AI가 집중 해석합니다."],
+            ["⑤ 시기 보기", "각 궁의 대한(10년 구간)·소한·유년 숫자로 시기를 봅니다. 유년 연도를 입력하면 그 해의 流명궁과 流사화가 표시됩니다(자미는 만 나이 기준)."],
+            ["⑥ 해석의 뼈대", "명궁 주성 = 성격의 골격, 묘왕 = 그 힘의 강약, 사화가 든 궁 = 그 해·그 영역의 핵심 이슈, 삼방사정 = 인생의 축. 이 네 가지를 먼저 보면 절반은 읽은 것입니다."],
+            ["⑦ 주제별 풀이", "종합·성격·재물·애정·직업·건강·대한·유년 칩을 눌러 원하는 주제만 깊게 풀 수 있고, 풀이 후 '더 궁금한 점'으로 이어 물으세요."],
+        ],
+    },
+    "자미궁합": {
+        title: "자미 궁합 보는 방법",
+        steps: [
+            ["① 두 사람 입력", "A(본인)는 저장 명식이 자동으로 들어가고, B(상대)의 생년월일시를 입력한 뒤 '궁합 보기'를 누르세요."],
+            ["② 무엇을 보나", "두 사람의 명궁 주성 상성(첫인상·성격 합), 서로의 부처궁(배우자궁) 성요(어떤 인연으로 만나는가), 두 명반의 삼방·대조 관계(조화와 갈등 지점)를 봅니다."],
+            ["③ 읽는 법", "좋은 조합만 찾기보다 '갈등 요인'을 먼저 확인하세요 — 어디서 부딪히는지 알면 관계 조언이 실제로 쓸모 있어집니다."],
+            ["④ 이어 묻기", "풀이 후 '더 궁금한 점 물어보기'로 결혼 시기·갈등 해소법 등 구체 질문을 이어가세요."],
+        ],
+    },
+    "주역": {
+        title: "주역점 보는 방법",
+        steps: [
+            ["① 질문 정하기", "점을 치기 전에 마음속으로 질문을 하나만, 구체적으로 정하세요(예: '이 계약을 진행해도 좋은가'). 하루에 같은 질문을 반복해 묻지 않는 것이 원칙입니다."],
+            ["② 점 치기", "버튼을 누르면 여섯 효가 만들어져 본괘가 섭니다. 변효(○·×)가 있으면 변괘(달라질 모습)가 함께 표시됩니다."],
+            ["③ 읽는 법", "본괘 = 현재 상황, 변괘 = 흘러갈 방향입니다. 변효가 있으면 그 효(爻)의 메시지가 핵심이고, 없으면 괘 전체의 상(象)으로 봅니다."],
+            ["④ 해석 활용", "AI 풀이는 괘사·효사를 질문 맥락에 맞춰 풀어줍니다. 길흉 단정보다 '지금 취할 태도'를 읽는 도구로 쓰세요."],
+        ],
+    },
+    "기문": {
+        title: "기문방위 보는 방법",
+        steps: [
+            ["① 모드 선택", "점단·방위(기본)는 지금 이 시각의 반(盤)으로 길흉 방위를 보고, 출생 명국은 태어난 시각으로 평생 고정 명국을 봅니다."],
+            ["② 시각·목적", "기문 반은 시간마다 바뀝니다 — 중요한 이동·약속 시각을 입력하고, 목적(금전·질병·연애·이사·여가·청탁)을 고르세요."],
+            ["③ 9궁 읽기", "낙서 9궁에서 파란 칸이 길방, 붉은 칸이 흉방입니다. 각 칸의 격(格) 이름과 길흉 표시를 함께 보세요."],
+            ["④ 활용법", "중요한 미팅·계약은 길방 방향으로 이동해서 진행하고, 흉방 방향의 일정은 시간을 바꾸는 식으로 씁니다. 방위는 내 위치 기준 8방향입니다."],
+        ],
+    },
+    "택일": {
+        title: "택일 보는 방법",
+        steps: [
+            ["① 본인 정보", "본인 생년월일시(저장 명식 자동)를 확인하세요 — 본인 띠와 충(沖)하는 본명충일을 길일에서 자동으로 빼줍니다."],
+            ["② 조회", "행사할 달과 목적(결혼·이사·개업·계약·여행)을 고르면 그 달의 길일 목록이 나옵니다."],
+            ["③ 읽는 법", "★ 표시가 최길일(건제 길신+황도 겹침)입니다. 각 날짜의 건제12신·황도 이름이 근거이고, 목적마다 길한 신이 다릅니다."],
+            ["④ 주의", "택일은 참고용 보조 도구입니다 — 최종 결정은 실제 일정·상대방 사정과 함께 판단하세요. 시(時)까지 정하려면 그 날짜의 길한 시간대를 추가로 물어보세요."],
+        ],
+    },
+    "래정": {
+        title: "래정(방문점) 보는 방법",
+        steps: [
+            ["① 개념", "래정법은 '찾아온 시각'의 기운으로 방문 목적을 읽는 점법입니다(박일우 일진내정법). 상담하러 온 사람이 무슨 일로 왔는지 미리 가늠할 때 씁니다."],
+            ["② 입력", "내담자 생년월일시(저장 명식 자동)와 방문 시각(기본: 지금)을 확인하고 '방문 목적 보기'를 누르세요."],
+            ["③ 진(辰) 배열 읽기", "내방일 일진을 0으로 두고 순행 배열합니다. 금색으로 강조된 4진(實)이 방문 목적이고, 그 지지가 내담자에게 어떤 십성인지로 용건을 봅니다(재성=재물·이성, 관성=직장·관재, 인성=문서·계약…)."],
+            ["④ 보조 신호", "공망 = 없어서 애타는 것, 원진 = 부담스럽고 힘든 것입니다. 원국의 어느 주(년=부동산·월=직장·일=배우자·시=사업)에 걸리는지 함께 보세요."],
+            ["⑤ AI 해석", "'AI 일진내정 해석'을 누르면 4진 중심으로 방문 용건과 상담 조언을 풀어줍니다. 단정이 아닌 가능성 순 참고입니다."],
+        ],
+    },
+};
+
+// 가이드 팝업 — Portal로 body에 렌더(카드 overflow에 갇히지 않게)
+function ContentGuide({ tab, onClose }: { tab: Tab; onClose: () => void }) {
+    const g = GUIDES[tab];
+    if (typeof document === "undefined" || !g) return null;
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+            <div className="glass-card !rounded-3xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6 space-y-3 bg-white/95 dark:bg-slate-900/95" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                    <h4 className="text-lg font-bold font-noto-serif text-slate-900 dark:text-slate-100">📖 {g.title}</h4>
+                    <button onClick={onClose} aria-label="닫기" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none">×</button>
+                </div>
+                {g.steps.map(([t, d]) => (
+                    <div key={t} className="flex gap-2.5 text-[13px] leading-relaxed">
+                        <span className="shrink-0 font-bold text-[#bf953f] w-[4.7rem]">{t}</span>
+                        <span className="text-slate-600 dark:text-slate-300">{d}</span>
+                    </div>
+                ))}
+                <Button onClick={onClose} className="w-full rounded-full bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">확인</Button>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
 export default function ClassicPage() {
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [sel, setSel] = useState("");
     const [mounted, setMounted] = useState(false);
     const [tab, setTab] = useState<Tab | null>(null);  // null = 기능 카드 홈
+    const [guideOpen, setGuideOpen] = useState(false); // 현재 탭 사용법 팝업
 
     useEffect(() => {
         setMounted(true);
@@ -186,7 +275,12 @@ export default function ClassicPage() {
                                 {t === "자미" ? "자미두수" : t === "자미궁합" ? "궁합" : t === "주역" ? "주역점" : t === "기문" ? "기문방위" : t === "택일" ? "택일" : "래정(방문점)"}
                             </button>
                         ))}
+                        <button onClick={() => setGuideOpen(true)}
+                            className="ml-auto px-3 py-2 rounded-full text-xs font-semibold text-[#bf953f] border border-[#d4af37]/40 hover:bg-[#d4af37]/10 whitespace-nowrap">
+                            📖 보는 방법
+                        </button>
                     </div>
+                    {guideOpen && tab && <ContentGuide tab={tab} onClose={() => setGuideOpen(false)} />}
 
                     {tab === "자미" && <JamiView profile={profile} />}
                     {tab === "주역" && <JuyeokView />}

@@ -10,7 +10,7 @@ const NAV_ITEMS = [
     { href: "/", label: "명식", icon: Home },
     { href: "/today", label: "오늘의 운세", icon: Sun },
     { href: "/compatibility", label: "궁합", icon: HeartHandshake },
-    { href: "/saved", label: "저장됨", icon: Bookmark },
+    { href: "/saved", label: "명식 관리", icon: Bookmark },
 ] as const;
 
 function useIsActive() {

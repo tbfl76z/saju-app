@@ -6,16 +6,21 @@ import Link from "next/link";
 import { Trash2, FolderOpen, Bookmark, Star, ScrollText, Search, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReportRenderer } from "@/components/ReportRenderer";
+import { SajuForm } from "@/components/SajuForm";
 import {
-    listProfiles, deleteProfile, LOAD_PROFILE_KEY, type SavedProfile,
+    listProfiles, saveProfile, deleteProfile, LOAD_PROFILE_KEY, type SavedProfile,
     getPrimaryId, setPrimaryId,
     listReports, deleteReport, toggleReportPin, type SavedReport,
 } from "@/lib/storage";
 import { notify } from "@/lib/useToast";
 
 // 저장된 명식 + AI 풀이 보관함 관리 라우트
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
+
 export default function SavedPage() {
     const router = useRouter();
+    const [adding, setAdding] = useState(false);      // 새 명식 입력 폼 토글
+    const [calcLoading, setCalcLoading] = useState(false);
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [primaryId, setPrimary] = useState<string | null>(null);
     const [reports, setReports] = useState<SavedReport[]>([]);
@@ -61,6 +66,66 @@ export default function SavedPage() {
             next ? "오늘의 운세가 이 명식을 기본으로 사용해요." : undefined);
     };
 
+    // 새 명식 등록 — 입력 → 계산 → 저장(첫 명식은 자동 '내 명식')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleCalculate = async (formData: any) => {
+        setCalcLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/calculate`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            if (!data?.pillars) throw new Error("invalid");
+            const np = saveProfile(data);
+            if (!getPrimaryId()) setPrimaryId(np.id);
+            refresh(); setAdding(false);
+            notify.success("명식을 등록했습니다");
+        } catch {
+            notify.error("계산 중 오류가 발생했습니다", "잠시 후 다시 시도해 주세요.");
+        } finally { setCalcLoading(false); }
+    };
+
+    // 명식·풀이 백업(JSON) — 다른 앱(고전 등)으로 옮길 때 사용
+    const handleExport = () => {
+        try {
+            const data = {
+                profiles: JSON.parse(window.localStorage.getItem("destiny-saved-profiles") || "[]"),
+                reports: JSON.parse(window.localStorage.getItem("destiny-saved-reports") || "[]"),
+                exportedAt: new Date().toISOString(),
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `destiny-myeongsik-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click(); URL.revokeObjectURL(a.href);
+            notify.success("백업 파일을 내려받았습니다");
+        } catch { notify.error("백업에 실패했습니다"); }
+    };
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => {
+            try {
+                const data = JSON.parse(String(rd.result));
+                const merge = (key: string, incoming: { id: string }[]) => {
+                    const cur = JSON.parse(window.localStorage.getItem(key) || "[]") as { id: string }[];
+                    const ids = new Set(cur.map((x) => x.id));
+                    const merged = [...cur, ...(Array.isArray(incoming) ? incoming.filter((x) => x?.id && !ids.has(x.id)) : [])];
+                    window.localStorage.setItem(key, JSON.stringify(merged));
+                    return merged.length - cur.length;
+                };
+                const np = merge("destiny-saved-profiles", data.profiles);
+                const nr = merge("destiny-saved-reports", data.reports);
+                refresh();
+                notify.success("가져오기 완료", `명식 ${np}건 · 풀이 ${nr}건 추가`);
+            } catch { notify.error("가져오기 실패", "올바른 백업 파일인지 확인해 주세요."); }
+        };
+        rd.readAsText(f); e.target.value = "";
+    };
+
     // 리포트 즐겨찾기(핀) 토글 — 핀 항목은 보관함 맨 위에 고정된다
     const handlePin = (id: string) => {
         toggleReportPin(id);
@@ -77,10 +142,25 @@ export default function SavedPage() {
             <div className="text-center space-y-3 py-5 md:py-10">
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif flex items-center justify-center gap-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo-pouch.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 저장된 명식
+                    <img src="/logo-pouch.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 명식 관리
                 </h2>
-                <p className="text-slate-600 dark:text-slate-400">★을 누르면 「내 명식」으로 지정되어 모든 메뉴가 자동으로 사용합니다.</p>
+                <p className="text-slate-600 dark:text-slate-400">가족·지인의 명식을 등록해 두고 ★로 「내 명식」을 지정하세요.</p>
             </div>
+
+            {/* 새 명식 등록 + 백업 */}
+            <div className="flex justify-between items-center gap-2 mb-4 flex-wrap">
+                <Button onClick={() => setAdding(!adding)} className="rounded-full bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white">
+                    {adding ? "입력 닫기 ▲" : "＋ 새 명식 등록"}
+                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleExport} variant="outline" size="sm" className="rounded-full text-xs">📤 백업</Button>
+                    <label className="inline-flex items-center px-3 h-8 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[#d4af37]">
+                        📥 가져오기
+                        <input type="file" accept="application/json" onChange={handleImport} className="hidden" />
+                    </label>
+                </div>
+            </div>
+            {adding && <div className="mb-6"><SajuForm onCalculate={handleCalculate} isLoading={calcLoading} /></div>}
 
             {/* 검색 — 저장된 명식·풀이가 하나라도 있을 때만 노출 */}
             {(profiles.length > 0 || reports.length > 0) && (

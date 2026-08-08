@@ -6,16 +6,21 @@ import Link from "next/link";
 import { Trash2, FolderOpen, Bookmark, Star, ScrollText, Search, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReportRenderer } from "@/components/ReportRenderer";
+import { SajuForm } from "@/components/SajuForm";
 import {
-    listProfiles, deleteProfile, updateProfileMemo, LOAD_PROFILE_KEY, type SavedProfile,
+    listProfiles, saveProfile, deleteProfile, updateProfileMemo, LOAD_PROFILE_KEY, type SavedProfile,
     getPrimaryId, setPrimaryId,
     listReports, deleteReport, toggleReportPin, type SavedReport,
 } from "@/lib/storage";
 import { notify } from "@/lib/useToast";
 
 // 저장된 명식 + AI 풀이 보관함 관리 라우트
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
+
 export default function SavedPage() {
     const router = useRouter();
+    const [adding, setAdding] = useState(false);
+    const [calcLoading, setCalcLoading] = useState(false);
     const [profiles, setProfiles] = useState<SavedProfile[]>([]);
     const [primaryId, setPrimary] = useState<string | null>(null);
     const [reports, setReports] = useState<SavedReport[]>([]);
@@ -65,6 +70,27 @@ export default function SavedPage() {
     const handlePin = (id: string) => {
         toggleReportPin(id);
         refresh();
+    };
+
+    // 새 명식 등록(내담자·가족) — 입력 → 계산 → 저장
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleCalculate = async (formData: any) => {
+        setCalcLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/calculate`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            if (!data?.pillars) throw new Error("invalid");
+            const np = saveProfile(data);
+            if (!getPrimaryId()) setPrimaryId(np.id);
+            refresh(); setAdding(false);
+            notify.success("명식을 등록했습니다");
+        } catch {
+            notify.error("계산 중 오류가 발생했습니다", "잠시 후 다시 시도해 주세요.");
+        } finally { setCalcLoading(false); }
     };
 
     // 명식·풀이 전체를 JSON 파일로 내보내기(전문가용 백업)
@@ -120,10 +146,17 @@ export default function SavedPage() {
             <div className="text-center space-y-3 py-5 md:py-10">
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif flex items-center justify-center gap-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo-pouch.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 저장된 명식
+                    <img src="/logo-pouch.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 명식 관리
                 </h2>
-                <p className="text-slate-600 dark:text-slate-400">★을 누르면 「내 명식」으로 지정되어 모든 메뉴가 자동으로 사용합니다.</p>
+                <p className="text-slate-600 dark:text-slate-400">내담자·가족 명식을 등록·메모하고 ★로 「내 명식」을 지정하세요.</p>
             </div>
+
+            <div className="mb-4">
+                <Button onClick={() => setAdding(!adding)} className="rounded-full bg-gradient-to-r from-[#d4af37] to-[#bf953f] text-white">
+                    {adding ? "입력 닫기 ▲" : "＋ 새 명식 등록"}
+                </Button>
+            </div>
+            {adding && <div className="mb-6"><SajuForm onCalculate={handleCalculate} isLoading={calcLoading} /></div>}
 
             {/* 백업/복원 (전문가용) */}
             <div className="flex justify-end gap-2 mb-3">

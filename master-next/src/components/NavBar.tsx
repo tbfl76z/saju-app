@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
     { href: "/", label: "명식", icon: Home },
     { href: "/learn", label: "공부", icon: GraduationCap },
-    { href: "/saved", label: "저장됨", icon: Bookmark },
+    { href: "/saved", label: "명식 관리", icon: Bookmark },
 ] as const;
 
 function useIsActive() {
