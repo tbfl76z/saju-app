@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import Luopan from "@/components/Luopan";
 import FlyingStarsView from "@/components/FlyingStarsView";
 import SamhapView from "@/components/SamhapView";
-import FloorPlanView from "@/components/FloorPlanView";
 
-type Mode = "현공" | "팔택" | "삼합" | "도면";
+type Mode = "현공" | "팔택" | "삼합";
 type Gender = "male" | "female";
 const BIRTH_KEY = "destiny-fengshui-birth"; // 풍수 앱 자체 생년 저장(팔택 본명괘용)
 
@@ -67,12 +66,12 @@ export default function LuopanHome() {
 
             {/* 유파 탭: 현공비성(기본) / 팔택 나경(센서) / 삼합수법 / 도면 방위 */}
             <div className="flex gap-1.5 mb-4 flex-wrap justify-center">
-                {(["현공", "팔택", "삼합", "도면"] as Mode[]).map((m) => (
+                {(["현공", "팔택", "삼합"] as Mode[]).map((m) => (
                     <button key={m} onClick={() => setMode(m)}
                         className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
                             (mode === m ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
                                 : "text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
-                        {m === "팔택" ? "팔택 나경" : m === "현공" ? "현공비성" : m === "삼합" ? "삼합수법" : "도면 방위"}
+                        {m === "팔택" ? "팔택 나경" : m === "현공" ? "현공비성" : "삼합수법"}
                     </button>
                 ))}
             </div>
@@ -90,7 +89,6 @@ export default function LuopanHome() {
             )}
             {mode === "현공" && <FlyingStarsView birthYear={birthYear} gender={gender} />}
             {mode === "삼합" && <SamhapView />}
-            {mode === "도면" && <FloorPlanView birthYear={birthYear} gender={gender} />}
         </div>
     );
 }

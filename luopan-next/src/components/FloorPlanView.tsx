@@ -24,26 +24,33 @@ function dir(deg: number): [number, number] {
 interface Props {
     birthYear?: number;
     gender?: "male" | "female";
+    /** 현공 탭 내장용 — 좌산·입주년을 현공 상태와 동기하고 입력 UI를 숨긴다 */
+    sitting?: string;
+    year?: number;
+    embedded?: boolean;
 }
 
-export default function FloorPlanView({ birthYear, gender }: Props) {
+export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false }: Props) {
     const [img, setImg] = useState<string | null>(null);
     const [natural, setNatural] = useState<[number, number]>([1000, 750]);
     const [center, setCenter] = useState<[number, number] | null>(null);
     const [northDeg, setNorthDeg] = useState(0);      // 도면 상단이 가리키는 실제 방위각
-    const [mode, setMode] = useState<OverlayMode>("24산");
+    const [mode, setMode] = useState<OverlayMode>(embedded ? "현공" : "24산");
     // 현공 모드용 좌산 — 현공비성 탭에서 실측한 값이 있으면 이어받는다(실측 우선 플로우)
-    const [sitting, setSitting] = useState(() => {
+    const [sittingIn, setSitting] = useState(() => {
         try {
             const saved = typeof window !== "undefined" ? window.localStorage.getItem("destiny-luopan-sitting") : null;
             return saved && MOUNTAIN_INFO[saved] ? saved : "子";
         } catch { return "子"; }
     });
-    const [year, setYear] = useState(() => {
+    const [yearIn, setYear] = useState(() => {
         // 현공비성 탭에서 쓰던 입주년을 이어받는다(운이 어긋나지 않게)
         try { const v = parseInt(window.localStorage.getItem("destiny-luopan-year") || "", 10); return v >= 1864 && v <= 2100 ? v : new Date().getFullYear(); } catch { return new Date().getFullYear(); }
     });
     const [saving, setSaving] = useState(false);
+    // 내장 모드: 현공 탭의 좌향·입주년을 그대로 사용(실측 → 도면 즉시 적용)
+    const sitting = extSitting ?? sittingIn;
+    const year = extYear ?? yearIn;
     const boxRef = useRef<HTMLDivElement>(null);
 
     const [natW, natH] = natural;
@@ -134,7 +141,10 @@ export default function FloorPlanView({ birthYear, gender }: Props) {
                         className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
                     <span className="text-xs text-slate-400">° (위성지도 캡처는 대개 0=북)</span>
                 </div>
-                {mode === "현공" && (
+                {mode === "현공" && embedded && chart && (
+                    <p className="text-[11px] text-slate-400">위 현공 반의 <b className="text-[#bf953f] font-noto-serif">{chart.sitting}山{chart.facing}向 · {chart.period}운</b>이 그대로 적용됩니다.</p>
+                )}
+                {mode === "현공" && !embedded && (
                     <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                         <span>좌(坐)</span>
                         <select value={sitting} onChange={(e) => { setSitting(e.target.value); try { window.localStorage.setItem("destiny-luopan-sitting", e.target.value); } catch { /* 무시 */ } }}

@@ -10,6 +10,7 @@ import { mingGua, starFor, voidCheck, type Trigram, type Star } from "@/lib/eigh
 import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { Button } from "@/components/ui/button";
+import FloorPlanView from "@/components/FloorPlanView";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
 
@@ -64,13 +65,14 @@ interface Props {
 
 /* ── 사용 방법 가이드(팝업) — Portal로 body에 렌더해 transform에 갇히지 않게 ── */
 const GUIDE_STEPS: [string, string][] = [
-    ["① 준비", "나침반 보정(폰을 8자로 몇 번 돌리기)을 하고, 자석 달린 케이스·거치대는 빼세요."],
-    ["② 좌향 실측", "집 정면(거실 창·베란다) 바깥을 향해 서서 휴대폰 위쪽을 정면으로 향합니다. '센서로 방위 재기' → '좌향 잡기(3초 평균)'를 누르고 3초간 유지하세요. 철골·가전·차량에서 1m 이상 떨어져 2~3곳에서 재고, 편차가 ±8°를 넘으면 자리를 옮겨 다시 잽니다."],
-    ["③ 좌향 확인", "회전판의 위 붉은 포인터가 向(정면), 아래 파랑이 坐(등진 방위)입니다. 공망 경고(산 경계에 걸침)가 뜨면 그 값은 쓰지 말고 재측정하세요."],
-    ["④ 입주년 입력", "건물 완공 또는 입주(이사) 연도를 넣으면 운(運)이 자동 판정됩니다."],
-    ["⑤ 비성반 읽기", "각 궁의 왼쪽 숫자=산성(인정·건강), 오른쪽=향성(재물), 아래 年·月=올해·이달의 기운입니다. 금색=왕기, 초록=생기, 붉은색=쇠살."],
-    ["⑥ 활용", "격국 해설과 '용도별 추천 배치'로 현관·침실·서재·금고 자리를 잡고, 연·월 오황/이흑 방위에서는 공사·이사·침상 배치를 피하세요."],
-    ["⑦ 저장", "'집으로 저장'을 해두면 다음부터 원탭으로 불러옵니다. 📷로 비성반을 이미지로 남기고, ✨ AI 풀이로 해석문을 받을 수 있습니다."],
+    ["STEP 1-준비", "나침반 보정(폰을 8자로 몇 번 돌리기)을 하고, 자석 케이스·거치대는 빼세요. 이전에 저장한 집이 있으면 상단 🏠 칩으로 바로 불러옵니다."],
+    ["STEP 1-실측", "집 정면(거실 창·베란다) 바깥을 향해 서서 '센서로 방위 재기' → '좌향 잡기(3초 평균)'를 누르고 3초간 유지하세요. 철골·가전에서 1m 이상 떨어져 2~3곳에서 재고, 편차 ±8° 초과 시 자리를 옮겨 다시 잽니다. 측정 이력 칩으로 값들을 비교하세요."],
+    ["STEP 1-확인", "회전판 위 붉은 포인터가 向(정면), 아래 파랑이 坐(등진 방위)입니다. 공망 경고(산 경계)가 뜨면 그 값은 쓰지 말고 재측정하세요. 실물 패철로 잰 각도는 '실측 각도 입력'에 그대로 넣으면 됩니다."],
+    ["STEP 1-입주년", "건물 완공 또는 입주(이사) 연도를 넣으면 운(運)이 자동 판정됩니다."],
+    ["STEP 2-읽기", "각 궁의 왼쪽=산성(인정·건강), 오른쪽=향성(재물), 아래 年·月=올해·이달의 기운. 금색=왕기, 초록=생기, 붉은색=쇠살입니다. 도면과 비교할 땐 '북상(지도식)' 토글을 켜세요."],
+    ["STEP 2-활용", "격국 해설·궁별 조합·용도별 추천 배치로 현관·침실·서재·금고 자리를 잡고, 연·월 오황/이흑 방위의 공사·이사·침상 이동은 피하세요. 확인이 끝나면 🏠 집으로 저장(다음부터 원탭) · 📷 이미지로 보관합니다."],
+    ["STEP 3-도면", "도면·위성사진을 불러와 집 중심을 탭하면 위에서 잰 좌향·입주년 그대로 비성반이 얹힙니다. 도면 상단의 실제 방위만 슬라이더로 맞춰 주세요(위성 캡처는 대개 0°=북)."],
+    ["STEP 4-AI", "'AI 현공 풀이'로 격국·방위별 배치·올해 주의 방위를 종합 해석문으로 받습니다."],
 ];
 
 function GuideModal({ onClose }: { onClose: () => void }) {
@@ -84,7 +86,7 @@ function GuideModal({ onClose }: { onClose: () => void }) {
                 </div>
                 {GUIDE_STEPS.map(([t, d]) => (
                     <div key={t} className="flex gap-2.5 text-[13px] leading-relaxed">
-                        <span className="shrink-0 font-bold text-[#bf953f] w-[4.5rem]">{t}</span>
+                        <span className="shrink-0 font-bold text-[#bf953f] w-[5.5rem]">{t}</span>
                         <span className="text-slate-600 dark:text-slate-300">{d}</span>
                     </div>
                 ))}
@@ -465,21 +467,23 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
     return (
         <div className="space-y-3">
-            <div className="glass-card p-4 space-y-3">
-                {/* 사용 방법 팝업 버튼 */}
-                <div className="flex justify-end -mb-1">
-                    <button onClick={() => setGuideOpen(true)}
-                        className="text-xs font-semibold text-[#bf953f] border border-[#d4af37]/40 rounded-full px-3 py-1 hover:bg-[#d4af37]/10">
-                        📖 사용 방법
-                    </button>
-                </div>
-                {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
-                {/* 이달의 비성 배너 — 월자백 오황·이흑 방위(시점 콘텐츠) */}
-                <div className="rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
+            {/* 상단 바 — 이달의 비성(시점 정보) + 사용 방법 */}
+            {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
+            <div className="flex items-start gap-2">
+                <div className="flex-1 rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300">
                     🗓 <b>{now.getMonth() + 1}월의 비성</b> — 이달 오황 <b className="text-rose-500">{(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 5)?.[0] ? PALACE_DIR[(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 5)![0]] : "-"}</b>
                     · 이흑 <b className="text-rose-500">{(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 2)?.[0] ? PALACE_DIR[(Object.entries(monthly) as [Palace, number][]).find(([p2, n]) => p2 !== "中" && n === 2)![0]] : "-"}</b>
                     <span className="text-slate-400"> 방위 — 이달 공사·이사·침상 이동은 피하세요{monthInfo.nearBoundary ? " (절기 경계일 ±1일 오차 가능)" : ""}</span>
                 </div>
+                <button onClick={() => setGuideOpen(true)}
+                    className="shrink-0 text-xs font-semibold text-[#bf953f] border border-[#d4af37]/40 rounded-full px-3 py-2 hover:bg-[#d4af37]/10 whitespace-nowrap">
+                    📖 사용 방법
+                </button>
+            </div>
+
+            {/* ═ STEP 1. 좌향 재기 ═ */}
+            <div className="glass-card p-4 space-y-3">
+                <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 1 · 좌향 재기 <span className="font-normal text-[11px] text-slate-400">— 집이 등진 방위(坐)를 실측합니다</span></div>
                 {/* 저장된 집 — 실측을 한 번 해두면 다음부터 원탭 로드 */}
                 {homes.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-xs">
@@ -496,7 +500,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 )}
                 {/* ① 실측이 1순위 — 좌향은 현장에서 재는 것이 정확하다(아파트는 동마다 배치각이 다름) */}
                 <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
-                    <b>① 좌향 실측이 먼저입니다.</b> 아파트는 동마다 배치각이 달라 도면·지도만으로는 좌향을 알 수 없습니다. 외벽·베란다 유리면에 휴대폰 옆면을 평행하게 대고, 철골·가전에서 떨어져 2~3곳에서 재세요.
+                    <b>좌향 실측이 먼저입니다.</b> 아파트는 동마다 배치각이 달라 도면·지도만으로는 좌향을 알 수 없습니다. 외벽·베란다 유리면에 휴대폰 옆면을 평행하게 대고, 철골·가전에서 떨어져 2~3곳에서 재세요.
                 </div>
                 {/* 회전 나경판 — 센서 heading에 따라 판이 돌고, 위 포인터가 지금 향한 방위(向) */}
                 <RotatingPlate heading={heading} sitting={sitting} facing={chart?.facing ?? ""} />
@@ -531,7 +535,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 )}
                 {/* ② 각도 직접 입력(다른 나경으로 실측한 값 옮겨 적기) */}
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <span>② 실측 좌향 각도(도)</span>
+                    <span>실측 각도 입력(도)</span>
                     <input type="number" value={degInput} placeholder="예: 187.5"
                         onChange={(e) => setDegInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") applyDeg(); }}
@@ -541,7 +545,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 </div>
                 {/* ③ 수동 선택(실측값이 이미 확실할 때) */}
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <span>③ 좌(坐)</span>
+                    <span>좌(坐) 직접 선택</span>
                     <select value={sitting} onChange={(e) => setSitting(e.target.value)}
                         className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
                         {MOUNTAINS_24.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -560,12 +564,6 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         비성반 판정이 흔들리는 자리이니 측정 위치를 옮기거나 다시 재보세요.
                     </div>
                 )}
-                {/* 현재 좌향·입주년을 집으로 저장 */}
-                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <input value={homeName} onChange={(e) => setHomeName(e.target.value)} placeholder="예: 우리집, 사무실"
-                        className="w-32 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
-                    <Button onClick={saveHome} variant="outline" className="h-7 rounded-full text-xs">🏠 이 좌향을 집으로 저장</Button>
-                </div>
                 <p className="text-[11px] text-slate-400">
                     건물이 지어진(입주한) 시기의 운(運)과 좌향으로 비성반을 세웁니다. 좌(坐)는 건물이 등지는 방위, 향(向)은 정면이 바라보는 방위입니다.
                 </p>
@@ -573,6 +571,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
             {chart && (
                 <div ref={chartRef} className="glass-card p-4 space-y-3">
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 2 · 비성반 읽기</div>
                     <div className="text-center">
                         <span className="text-sm text-slate-500">{chart.period}운 <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
@@ -613,8 +612,6 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                             );
                         })}
                     </div>
-                    <div className="text-[11px] text-slate-400 text-center">각 궁: 좌=산성(인정) · 우=향성(재물) · 아래=운반·年연자백{ming ? " · 택=팔택 팔성" : ""}</div>
-
                     <div className="rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                         <b className="text-[#bf953f]">{chart.structure}</b> — {chart.structureNote}
                     </div>
@@ -662,6 +659,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     )}
 
                     <div className="text-[11px] text-slate-400 leading-relaxed">
+                        각 궁: 좌=산성(인정·건강) · 우=향성(재물) · 아래=운반·年연자백·月월자백{ming ? " · 택=팔택 팔성" : ""}.<br />
                         <span className={MOOD_COLOR["왕기"]}>{STAR_NAMES[chart.period]}</span>=당운 왕기 ·
                         <span className={MOOD_COLOR["생기"]}> 생기</span>(다음 운) ·
                         <span className={MOOD_COLOR["퇴기"]}> 퇴기</span> ·
@@ -669,20 +667,34 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         향성 왕·생기 방위에 물(도로·출입구), 산성 왕·생기 방위에 산(높은 가구·벽)이 이상적입니다. 현공비성 기준이며 유파에 따라 해석이 다를 수 있습니다.
                     </div>
 
-                    <div className="flex gap-2">
-                        <Button onClick={interpret} disabled={interpreting} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                            {interpreting ? "풀이 중..." : "✨ AI 현공 풀이"}
-                        </Button>
-                        <Button onClick={saveImage} disabled={saving} variant="outline" className="rounded-full">
-                            {saving ? "저장 중..." : "📷"}
+                    {/* 확인이 끝났으면 집으로 저장(재사용) / 이미지 보관 */}
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                        <input value={homeName} onChange={(e) => setHomeName(e.target.value)} placeholder="예: 우리집, 사무실"
+                            className="w-32 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
+                        <Button onClick={saveHome} variant="outline" className="h-8 rounded-full text-xs">🏠 집으로 저장</Button>
+                        <Button onClick={saveImage} disabled={saving} variant="outline" className="h-8 rounded-full text-xs ml-auto">
+                            {saving ? "저장 중..." : "📷 이미지 저장"}
                         </Button>
                     </div>
                 </div>
             )}
 
-            {interp && (
-                <div className="glass-card p-5">
-                    <ReportRenderer text={interp} streaming={interpreting} />
+            {/* ═ STEP 3. 도면에 적용 — 실측한 좌향·입주년을 그대로 물려받아 오버레이 ═ */}
+            {chart && (
+                <div className="pt-1">
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">STEP 3 · 도면에 적용 <span className="font-normal text-[11px] text-slate-400">— 도면·위성사진을 불러오면 위 비성반이 그대로 얹힙니다</span></div>
+                    <FloorPlanView birthYear={birthYear} gender={gender} sitting={sitting} year={year} embedded />
+                </div>
+            )}
+
+            {/* ═ STEP 4. AI 풀이 ═ */}
+            {chart && (
+                <div className="glass-card p-4 space-y-3">
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 4 · AI 풀이 <span className="font-normal text-[11px] text-slate-400">— 격국·배치·올해 주의 방위를 종합 해석</span></div>
+                    <Button onClick={interpret} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                        {interpreting ? "풀이 중..." : "✨ AI 현공 풀이"}
+                    </Button>
+                    {interp && <ReportRenderer text={interp} streaming={interpreting} />}
                 </div>
             )}
         </div>
