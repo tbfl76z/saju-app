@@ -521,7 +521,7 @@ def _chapter_images(chapter_id: str) -> list[str]:
     img_dir = os.path.join(_STATIC_LEARN_DIR, chapter_id)
     if not os.path.isdir(img_dir):
         return []
-    files = sorted(f for f in os.listdir(img_dir) if f.lower().endswith((".jpg", ".png")))
+    files = sorted(f for f in os.listdir(img_dir) if f.lower().endswith((".jpg", ".png", ".svg")))
     return [f"/static/learn/{chapter_id}/{f}" for f in files]
 
 
