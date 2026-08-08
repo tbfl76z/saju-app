@@ -36,7 +36,6 @@ export default function LearnPage() {
     if (!progress) return null;
 
     const passedCount = chapters.filter((c) => progress.chapters[c.id]?.passed).length;
-    const hasAnyRecord = Object.keys(progress.chapters).length > 0;
     // 이어서 학습: 아직 통과 못 한 첫 챕터
     const nextChapter = chapters.find((c) => !progress.chapters[c.id]?.passed);
     const titleOf = (id: string) => chapters.find((c) => c.id === id)?.title ?? id;
@@ -80,7 +79,7 @@ export default function LearnPage() {
                     <img src="/logo-moon.svg" alt="" className="w-9 h-9 md:w-10 md:h-10" /> 현공비성 공부하기
                 </h2>
                 <p className="text-slate-600 dark:text-slate-400">
-                    음양오행부터 실전 명식 읽기까지 — 내 사주로 배우는 명리학
+                    낙서 9궁부터 실전 감정까지 — 우리 집으로 배우는 현공비성
                 </p>
             </div>
 
@@ -103,13 +102,6 @@ export default function LearnPage() {
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-1">완료 챕터</p>
                 </div>
             </div>
-
-            {/* 레벨 테스트 배너 (학습 기록이 없을 때 크게, 있으면 작게) */}
-            {!hasAnyRecord ? (
-            ) : (
-                <div className="text-right mb-2">
-                </div>
-            )}
 
             {/* 오늘의 학습 루틴 */}
             <div className="glass-card p-5 mb-8 space-y-3">
