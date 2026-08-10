@@ -50,6 +50,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         try { const v = parseInt(window.localStorage.getItem("destiny-luopan-year") || "", 10); return v >= 1864 && v <= 2100 ? v : new Date().getFullYear(); } catch { return new Date().getFullYear(); }
     });
     const [saving, setSaving] = useState(false);
+    // 탭 2단계 상태: ① 집 중심 → ② 집 정면(베란다) 방향
+    const [pickMode, setPickMode] = useState<"center" | "facing">("center");
+    const [aligned, setAligned] = useState(false);   // ②까지 완료(자동 정렬 적용) 여부
     // 내장 모드: 현공 탭의 좌향·입주년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
     const year = extYear ?? yearIn;
@@ -81,34 +84,49 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         rd.onload = () => {
             const url = String(rd.result);
             const im = new Image();
-            im.onload = () => { setNatural([im.naturalWidth, im.naturalHeight]); setCenter(null); setImg(url); };
+            im.onload = () => {
+                setNatural([im.naturalWidth, im.naturalHeight]);
+                setCenter(null); setAligned(false); setPickMode("center");
+                setImg(url);
+                notify.success("도면을 불러왔습니다", "① 사진 속 집(터)의 한가운데를 탭하세요.");
+            };
             im.src = url;
         };
         rd.readAsDataURL(f);
     };
 
     // 탭 2단계: ① 집 중심 → ② 집 정면(베란다) 방향 — 실측 향각과 매칭해 도면 회전 자동 계산
-    const [pickMode, setPickMode] = useState<"center" | "facing">("center");
     // 실측 향각: 실측 좌향각 있으면 +180, 없으면 좌산 중심각 +180
     const facingDeg = measuredDeg != null
         ? ((measuredDeg + 180) % 360 + 360) % 360
         : ((MOUNTAIN_INFO[sitting]?.deg ?? 0) + 180) % 360;
     const onPick = (e: React.MouseEvent<HTMLDivElement>) => {
         const el = boxRef.current;
-        if (!el) return;
+        if (!el || !img) return;
         const r = el.getBoundingClientRect();
         const x = ((e.clientX - r.left) / r.width) * natW;
         const y = ((e.clientY - r.top) / r.height) * natH;
         if (pickMode === "center") {
             setCenter([x, y]);
+            setAligned(false);
             setPickMode("facing");
+            notify.success("① 중심 설정 완료", "이제 창(베란다)·정면 방향을 한 번 더 탭하세요.");
         } else {
+            // 중심과 너무 가까우면 각도가 불안정 — 다시 탭 유도
+            if (Math.hypot(x - cx, y - cy) < Math.min(natW, natH) * 0.04) {
+                notify.error("중심과 너무 가깝습니다", "중심에서 창(정면) 쪽으로 더 떨어진 지점을 탭해 주세요.");
+                return;
+            }
             // 화면상 정면 방향(0=위, 시계+) → 실측 향각과 매칭 → 도면 상단의 실제 방위 산출
             const phi = (Math.atan2(x - cx, -(y - cy)) * 180) / Math.PI;
-            setNorthDeg(Math.round(((facingDeg - phi) % 360 + 360) % 360));
+            const nd = Math.round(((facingDeg - phi) % 360 + 360) % 360);
+            setNorthDeg(nd);
+            setAligned(true);
             setPickMode("center");
+            notify.success("✅ 도면 정렬 완료", `실측 향 ${facingDeg.toFixed(0)}°에 맞춰 도면 상단 방위를 ${nd}°로 설정했습니다.`);
         }
     };
+    const resetPick = () => { setCenter(null); setAligned(false); setPickMode("center"); };
 
     // 방위각 → 화면 각도(도면 상단이 northDeg를 가리키므로 그만큼 보정)
     const screenDeg = (d: number) => d - northDeg;
@@ -131,12 +149,20 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
 
     return (
         <div className="space-y-3">
-            {/* 실측 우선 경고 — 도면 오버레이는 실측 좌향이 있어야 의미가 있다 */}
-            <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
-                <b>도면 오버레이는 참고용입니다.</b> 아파트는 동마다 배치각이 달라 도면이 얼마나 틀어져 있는지 실측 없이는 알 수 없습니다.
-                먼저 <b>현공비성 탭에서 좌향을 실측</b>(또는 실물 패철로 측정)한 뒤, 그 값에 맞춰 아래 &lsquo;도면 상단의 실제 방위&rsquo;를 조정하세요.
-                위성지도 캡처는 대개 위=북(0°)이라 그대로 쓸 수 있습니다.
-            </div>
+            {/* 내장 모드: STEP 1 연동 상태를 분명히 / 단독 모드: 실측 우선 경고 */}
+            {embedded ? (
+                <div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 px-3 py-2 text-[12px] text-emerald-800 dark:text-emerald-300">
+                    🔗 <b>STEP 1 값이 연동되어 있습니다</b> — 坐 <b className="font-noto-serif">{sitting}</b>
+                    {measuredDeg != null ? ` (실측 ${measuredDeg.toFixed(1)}°)` : " (직접 선택값)"} · 입주년 {year}.
+                    도면에서 <b>① 중심 → ② 창(정면)</b>을 차례로 탭하면 이 각도에 맞춰 도면이 자동 정렬됩니다.
+                </div>
+            ) : (
+                <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
+                    <b>도면 오버레이는 참고용입니다.</b> 아파트는 동마다 배치각이 달라 도면이 얼마나 틀어져 있는지 실측 없이는 알 수 없습니다.
+                    먼저 <b>현공비성 탭에서 좌향을 실측</b>(또는 실물 패철로 측정)한 뒤, 그 값에 맞춰 아래 &lsquo;도면 상단의 실제 방위&rsquo;를 조정하세요.
+                    위성지도 캡처는 대개 위=북(0°)이라 그대로 쓸 수 있습니다.
+                </div>
+            )}
             <div className="glass-card p-4 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                     <label className="inline-flex items-center px-3 py-1.5 rounded-full border border-[#d4af37]/40 text-[#bf953f] text-xs font-bold cursor-pointer hover:bg-[#d4af37]/10">
@@ -174,11 +200,36 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         {chart && <span className="text-xs text-[#bf953f] font-semibold">{chart.period}운 {chart.sitting}山{chart.facing}向 · {chart.structure}</span>}
                     </div>
                 )}
+                {/* 2탭 정렬 진행 표시 — 지금 어느 단계인지, 적용됐는지를 분명하게 */}
+                <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
+                    <span className={"px-2.5 py-1 rounded-full border " + (!img
+                        ? "opacity-40 border-slate-200 dark:border-slate-700 text-slate-400"
+                        : center ? "border-emerald-400/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                            : "border-[#d4af37] bg-[#d4af37]/15 text-[#bf953f] animate-pulse")}>
+                        ① 집 중심 탭{center ? " ✓" : ""}
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">→</span>
+                    <span className={"px-2.5 py-1 rounded-full border " + (aligned
+                        ? "border-emerald-400/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                        : center ? "border-[#d4af37] bg-[#d4af37]/15 text-[#bf953f] animate-pulse"
+                            : "opacity-40 border-slate-200 dark:border-slate-700 text-slate-400")}>
+                        ② 창(정면) 방향 탭{aligned ? " ✓" : ""}
+                    </span>
+                    {center && (
+                        <button onClick={resetPick}
+                            className="ml-1 px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 hover:text-rose-500 hover:border-rose-300">
+                            ↺ 다시 찍기
+                        </button>
+                    )}
+                </div>
                 <p className="text-[11px] text-slate-400">
-                    {pickMode === "center"
-                        ? <>도면을 불러온 뒤 ① <b>집(터) 중심을 탭</b>하세요. (이미지는 기기에서만 처리됩니다)</>
-                        : <>② 이제 <b>집 정면(베란다·현관 바깥) 방향을 한 번 더 탭</b>하세요 — 실측 각도({facingDeg.toFixed(0)}°向)에 맞춰 도면이 자동 정렬됩니다.</>}
-                    {" "}슬라이더로 미세 조정도 가능합니다.
+                    {!img
+                        ? <>도면을 불러오면 시작합니다. (이미지는 기기에서만 처리됩니다)</>
+                        : !center
+                            ? <>① 사진 속 우리 집(터)의 <b>한가운데를 탭</b>하세요.</>
+                            : !aligned
+                                ? <>② 이제 <b>창(베란다)·정면 방향을 한 번 더 탭</b>하세요 — 실측 향({facingDeg.toFixed(0)}°)에 맞춰 도면이 자동 회전됩니다.</>
+                                : <>✅ <b className="text-emerald-600 dark:text-emerald-400">정렬 완료</b> — 파란 선이 창(정면=向) 방향입니다. 어긋나 보이면 슬라이더로 미세 조정하거나 &lsquo;다시 찍기&rsquo;를 누르세요.</>}
                 </p>
             </div>
 
@@ -255,9 +306,28 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     </text>
                                 );
                             })}
+                            {/* 정렬 완료 후: 창(정면=向) 방향 표시선 — 두 번째 탭이 어디에 적용됐는지 보여준다 */}
+                            {aligned && center && (() => {
+                                const [fdx, fdy] = dir(screenDeg(facingDeg));
+                                const fs = Math.min(natW, natH) / 26;
+                                return (
+                                    <g>
+                                        <line x1={cx} y1={cy} x2={cx + fdx * L} y2={cy + fdy * L}
+                                            stroke="rgba(29,79,143,0.85)" strokeWidth={natW / 350} />
+                                        <text x={cx + fdx * rLabel * 0.78} y={cy + fdy * rLabel * 0.78} fontSize={fs} fontWeight={700}
+                                            textAnchor="middle" fill="#1d4f8f" stroke="#fff" strokeWidth={fs / 7} paintOrder="stroke">向 정면</text>
+                                    </g>
+                                );
+                            })()}
                             {/* 중심점 */}
                             <circle cx={cx} cy={cy} r={Math.min(natW, natH) / 90} fill="#c0392b" stroke="#fff" strokeWidth={natW / 500} />
                         </svg>
+                        {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지) */}
+                        {!aligned && (
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-slate-900/85 text-white text-[11px] font-bold pointer-events-none whitespace-nowrap">
+                                {pickMode === "center" ? "👆 ① 집 중심을 탭하세요" : "👆 ② 창(정면) 방향을 탭하세요"}
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-[11px] text-slate-400">

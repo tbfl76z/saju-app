@@ -11,6 +11,7 @@ import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { Button } from "@/components/ui/button";
 import FloorPlanView from "@/components/FloorPlanView";
+import MoveCheckView from "@/components/MoveCheckView";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
 
@@ -75,6 +76,7 @@ const GUIDE_STEPS: [string, string][] = [
     ["STEP 2 활용", "복잡하게 계산할 필요 없이 아래 '📋 용도별 추천 배치'를 보세요 — 현관·침실·공부방·금고를 어느 방향에 두면 좋은지 정리돼 있습니다. ⚠ 주의 방위에서는 올해/이달 공사·이사·침대 옮기기를 피하세요. 다 확인했으면 🏠 집으로 저장(다음부터 원탭), 📷 로 이미지 보관."],
     ["STEP 3 도면", "우리 집 평면도나 위성지도 캡처를 불러온 뒤, ① 사진 속 집 가운데를 콕 → ② 집 정면(베란다) 방향을 한 번 더 콕 찍으세요. 방금 잰 각도에 맞춰 도면이 자동으로 정렬되고 기운 지도가 얹힙니다. 도면을 먼저 올리고 나중에 각도를 재도 됩니다. 어긋나 보이면 슬라이더로 미세 조정하세요."],
     ["STEP 4 AI 풀이", "마지막으로 'AI 현공 풀이' 버튼을 누르면 지금까지의 결과를 사람 말로 풀어줍니다 — 어느 방에서 자고, 어디에 책상과 금고를 두면 좋은지, 올해 조심할 방향은 어디인지."],
+    ["이사 진단", "이사를 고민 중이라면 맨 아래 '🏡 이사할 집 진단'에 후보 집의 좌향과 입주 예정 해를 넣어 보세요. 격국과 그 해의 흉성 방위를 따져 좋은 집인지(🟢~🔴) 바로 판정해 주고, 여러 후보를 저장해 나란히 비교할 수 있습니다."],
 ];
 
 function GuideModal({ onClose }: { onClose: () => void }) {
@@ -299,9 +301,10 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             setSitting(sit);
             setMeasuredDeg(sitDeg);   // 실측 각도를 유지해 공망(경계) 여부를 함께 판정
             setCapNote(
-                `평균 向 ${mean.toFixed(1)}° (편차 ±${stdDeg.toFixed(1)}°) → 坐 ${sit} ${sitDeg.toFixed(1)}°`
+                `✅ 측정값 적용 완료 — 평균 向 ${mean.toFixed(1)}° (편차 ±${stdDeg.toFixed(1)}°) → 坐 ${sit} ${sitDeg.toFixed(1)}°. 아래 STEP 2 비성반과 STEP 3 도면에 자동 반영되었습니다.`
                 + (stdDeg > 8 ? " ⚠ 값이 많이 흔들립니다. 철골·가전에서 떨어져 다른 지점에서 다시 재보세요." : "")
             );
+            notify.success(`좌향 적용: ${sit}坐 (${sitDeg.toFixed(1)}°)`, "STEP 2 비성반과 STEP 3 도면에 자동 반영되었습니다.");
             // 측정 이력(최근 3건) — 여러 지점 실측값 비교용
             try {
                 const raw = window.localStorage.getItem("destiny-luopan-history");
@@ -331,8 +334,10 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         const d = parseFloat(degInput);
         if (Number.isFinite(d)) {
             const norm = ((d % 360) + 360) % 360;
-            setSitting(mountainFromDeg(norm));
+            const sit = mountainFromDeg(norm);
+            setSitting(sit);
             setMeasuredDeg(norm);   // 실측 각도 유지 → 공망 판정
+            notify.success(`좌향 적용: ${sit}坐 (${norm.toFixed(1)}°)`, "STEP 2 비성반과 STEP 3 도면에 자동 반영되었습니다.");
         }
     };
 
@@ -502,7 +507,13 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 )}
                 {/* ① 실측이 1순위 — 좌향은 현장에서 재는 것이 정확하다(아파트는 동마다 배치각이 다름) */}
                 <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
-                    <b>좌향 실측이 먼저입니다.</b> 아파트는 동마다 배치각이 달라 도면·지도만으로는 좌향을 알 수 없습니다. 외벽·베란다 유리면에 휴대폰 옆면을 평행하게 대고, 철골·가전에서 떨어져 2~3곳에서 재세요.
+                    <b>좌향 실측이 먼저입니다.</b> 아파트는 동마다 배치각이 달라 도면·지도만으로는 좌향을 알 수 없습니다. 철골·가전에서 떨어져 2~3곳에서 재세요.
+                </div>
+                {/* 서는 위치·자세 — "내가 어디 서서 어디를 보고 재는지"를 측정 버튼 바로 위에서 안내 */}
+                <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40 px-3 py-2 text-[12px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                    🧍 <b>서는 위치와 자세</b> — ① 거실의 가장 큰 창(베란다) <b>바로 앞에 서서 창밖을 정면으로</b> 바라봅니다.
+                    ② 휴대폰은 손바닥에 <b>수평으로 눕혀</b> 화면 위쪽이 창밖을 향하게 듭니다.
+                    ③ 아래 버튼을 누르고 3초만 유지하면 <b>내가 바라보는 쪽=향(向), 등 뒤=좌(坐)</b>로 자동 입력됩니다.
                 </div>
                 {/* 회전 나경판 — 센서 heading에 따라 판이 돌고, 위 포인터가 지금 향한 방위(向) */}
                 <RotatingPlate heading={heading} sitting={sitting} facing={chart?.facing ?? ""} />
@@ -522,7 +533,11 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     )}
                     <span className="text-[11px] text-slate-400">휴대폰 위쪽을 집 정면(향)으로 향한 채 3초간 유지하세요</span>
                 </div>
-                {capNote && <p className="text-[11px] text-slate-500 dark:text-slate-400">{capNote}</p>}
+                {capNote && (
+                    capNote.startsWith("✅")
+                        ? <div className="rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-300/60 dark:border-emerald-800/50 px-3 py-2 text-[12px] text-emerald-700 dark:text-emerald-300">{capNote}</div>
+                        : <p className="text-[11px] text-rose-500">{capNote}</p>
+                )}
                 {history.length > 1 && (
                     <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-400">
                         <span>측정 이력</span>
@@ -573,7 +588,12 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
             {chart && (
                 <div ref={chartRef} className="glass-card p-4 space-y-3">
-                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 2 · 비성반 읽기</div>
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                        STEP 2 · 비성반 읽기
+                        {measuredDeg != null && (
+                            <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300/60 dark:border-emerald-800/50 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">실측 {measuredDeg.toFixed(1)}° 적용됨</span>
+                        )}
+                    </div>
                     <div className="text-center">
                         <span className="text-sm text-slate-500">{chart.period}운 <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
@@ -699,6 +719,9 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     {interp && <ReportRenderer text={interp} streaming={interpreting} />}
                 </div>
             )}
+
+            {/* ═ 이사할 집 진단 — 후보 집 좌향·입주 예정 해로 계약 전 미리 판정 ═ */}
+            <MoveCheckView birthYear={birthYear} gender={gender} currentSitting={sitting} currentDeg={measuredDeg} />
         </div>
     );
 }
