@@ -199,7 +199,9 @@ export default function ChapterPage() {
                             <ArrowLeft className="h-4 w-4 mr-1" /> 이전
                         </Button>
                         {isLastCard ? (
-                            ["cheatsheet", "ilju", "johu", "cases", "fs-intro", "fs-unban", "fs-stars", "fs-mood", "fs-combo", "fs-void", "fs-practice", "fs-table"].includes(chapterId) ? (
+                            // 참고형 챕터는 퀴즈를 숨긴다. fs-adv*(심화 이기)는 계산 생성기가 없어 전부 참고형.
+                            ["cheatsheet", "ilju", "johu", "cases", "fs-intro", "fs-unban", "fs-stars", "fs-mood", "fs-combo", "fs-void", "fs-practice", "fs-table"].includes(chapterId)
+                                || chapterId.startsWith("fs-adv") ? (
                                 <div className="rounded-xl flex-[2] flex items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400 font-semibold px-2">
                                     {chapterId === "cheatsheet" ? <>📖 아래 &apos;조견표 한눈에보기&apos;에서 원본 표를 확인하세요</> : <>📖 참고형 챕터 — 카드를 사전처럼 찾아보세요</>}
                                 </div>

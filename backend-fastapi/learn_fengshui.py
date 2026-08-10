@@ -204,3 +204,7 @@ FENGSHUI_CURRICULUM: list[dict] = [
         ],
     },
 ]
+
+# 심화 커리큘럼(제화 원리 + 고급 이기 9챕터) 이어붙이기 — 현공비성 순수 내용만
+from learn_fengshui_adv import ADV_CHAPTERS as _ADV  # noqa: E402
+FENGSHUI_CURRICULUM.extend(_ADV)
