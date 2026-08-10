@@ -176,7 +176,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
 
     const addCand = () => {
         if (builtYear == null) { notify.error("준공 연도를 먼저 입력하세요", "반(운)을 세우는 기준이라 꼭 필요합니다."); return; }
-        const nm = name.trim() || `${sitting}坐 ${builtYear}년생`;
+        const nm = name.trim() || `${sitting}坐 ${builtYear}년 준공`;
         const next = [{ name: nm, sitting, built: builtYear, year: moveYear }, ...cands.filter((c) => c.name !== nm)].slice(0, 8);
         setCands(next); saveCands(next); setName("");
         notify.success(`'${nm}' 비교 목록에 담았습니다`);

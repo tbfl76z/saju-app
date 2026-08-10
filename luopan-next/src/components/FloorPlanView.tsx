@@ -24,7 +24,7 @@ function dir(deg: number): [number, number] {
 interface Props {
     birthYear?: number;
     gender?: "male" | "female";
-    /** 현공 탭 내장용 — 좌산·입주년을 현공 상태와 동기하고 입력 UI를 숨긴다 */
+    /** 현공 탭 내장용 — 좌산·준공년을 현공 상태와 동기하고 입력 UI를 숨긴다 */
     sitting?: string;
     year?: number;
     embedded?: boolean;
@@ -46,14 +46,14 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         } catch { return "子"; }
     });
     const [yearIn, setYear] = useState(() => {
-        // 현공비성 탭에서 쓰던 입주년을 이어받는다(운이 어긋나지 않게)
+        // 현공비성 탭에서 쓰던 준공년을 이어받는다(운이 어긋나지 않게)
         try { const v = parseInt(window.localStorage.getItem("destiny-luopan-year") || "", 10); return v >= 1864 && v <= 2100 ? v : new Date().getFullYear(); } catch { return new Date().getFullYear(); }
     });
     const [saving, setSaving] = useState(false);
     // 탭 2단계 상태: ① 집 중심 → ② 집 정면(베란다) 방향
     const [pickMode, setPickMode] = useState<"center" | "facing">("center");
     const [aligned, setAligned] = useState(false);   // ②까지 완료(자동 정렬 적용) 여부
-    // 내장 모드: 현공 탭의 좌향·입주년을 그대로 사용(실측 → 도면 즉시 적용)
+    // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
     const year = extYear ?? yearIn;
     const boxRef = useRef<HTMLDivElement>(null);

@@ -17,7 +17,7 @@ import { notify } from "@/lib/useToast";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
-// 현공비성(玄空飛星) 뷰 — 좌산·조성(입주)년도로 비성반을 산출해 9궁으로 보여준다.
+// 현공비성(玄空飛星) 뷰 — 좌산·준공(건축)년도로 비성반을 산출해 9궁으로 보여준다.
 // 계산은 lib/flyingStars.ts(문헌 표준 + 실전 감정 사례 대조 검증 완료)만 사용한다.
 
 // 9궁 3×3 배치 — 남상(전통: 위=남, 동=왼쪽) / 북상(지도식: 위=북, 동=오른쪽)
@@ -45,7 +45,7 @@ const MOOD_COLOR: Record<string, string> = {
 // 팔택 팔성 중 길성
 const GOOD_STARS: Star[] = ["생기", "천의", "연년", "복위"];
 
-// 저장된 집 프로필 — 좌향·입주년을 기억해 매번 실측·입력하지 않게 한다
+// 저장된 집 프로필 — 좌향·준공년을 기억해 매번 실측·입력하지 않게 한다
 interface HomeProfile { name: string; sitting: string; year: number; deg?: number }
 const HOMES_KEY = "destiny-hyeongong-homes";
 function loadHomes(): HomeProfile[] {
@@ -458,6 +458,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         setInterpreting(true); setInterp("");
         const body = {
             sitting: chart.sitting, facing: chart.facing, period: chart.period,
+            cur_period: curPeriod,   // 당운 — AI가 원운 숫자를 현재 왕기로 착각하지 않게
             structure: chart.structure, annual_year: annualYear,
             ming_gua: ming ?? "",
             cells: GRID_S.flat().filter((p) => p !== "中").map((p) => ({
@@ -702,7 +703,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 </div>
             )}
 
-            {/* ═ STEP 3. 도면에 적용 — 실측한 좌향·입주년을 그대로 물려받아 오버레이 ═ */}
+            {/* ═ STEP 3. 도면에 적용 — 실측한 좌향·준공년을 그대로 물려받아 오버레이 ═ */}
             {chart && (
                 <div className="pt-1">
                     <div className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">STEP 3 · 도면에 적용 <span className="font-normal text-[11px] text-slate-400">— 도면을 먼저 올려도 됩니다. 중심 탭 → 정면 탭이면 잰 각도에 자동 정렬</span></div>

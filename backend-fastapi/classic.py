@@ -680,7 +680,8 @@ async def iljin_calendar(year: int, month: int, day_gan: str = ""):
 class HyeongongReq(BaseModel):
     sitting: str = "子"
     facing: str = "午"
-    period: int = 9
+    period: int = 9       # 원운 — 준공(건축) 시기 기준으로 세운 반의 운
+    cur_period: int = 0   # 당운 — 감정(입주) 시점의 운. 왕쇠 판정 기준(0=미전달)
     structure: str = ""
     annual_year: int = 0
     cells: list = []      # [{방위,산성,향성,운반,연성,조합,팔택}]
