@@ -75,6 +75,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const now = new Date();
     const annualYear = now.getMonth() + 1 < 2 || (now.getMonth() + 1 === 2 && now.getDate() < 4) ? now.getFullYear() - 1 : now.getFullYear();
     const annual = useMemo(() => annualChart(annualYear), [annualYear]);
+    const curPeriod = periodOf(now.getFullYear());   // 당운 — 왕쇠 색칠 기준(반은 준공년 원운으로 세움)
 
     // 파일 업로드 → dataURL (서버 전송 없음)
     const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,7 +154,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
             {embedded ? (
                 <div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 px-3 py-2 text-[12px] text-emerald-800 dark:text-emerald-300">
                     🔗 <b>STEP 1 값이 연동되어 있습니다</b> — 坐 <b className="font-noto-serif">{sitting}</b>
-                    {measuredDeg != null ? ` (실측 ${measuredDeg.toFixed(1)}°)` : " (직접 선택값)"} · 입주년 {year}.
+                    {measuredDeg != null ? ` (실측 ${measuredDeg.toFixed(1)}°)` : " (직접 선택값)"} · 준공년 {year}.
                     도면에서 <b>① 중심 → ② 창(정면)</b>을 차례로 탭하면 이 각도에 맞춰 도면이 자동 정렬됩니다.
                 </div>
             ) : (
@@ -194,7 +195,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
                             {Object.keys(MOUNTAIN_INFO).map((m) => <option key={m} value={m}>{m}</option>)}
                         </select>
-                        <span>입주년</span>
+                        <span>준공년</span>
                         <input type="number" value={year} min={1864} max={2100} onChange={(e) => setYear(Number(e.target.value))}
                             className="w-20 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
                         {chart && <span className="text-xs text-[#bf953f] font-semibold">{chart.period}운 {chart.sitting}山{chart.facing}向 · {chart.structure}</span>}
@@ -247,7 +248,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     const st = starFor(ming, g);
                                     fill = GOOD_STARS.includes(st) ? "rgba(46,139,107,0.16)" : "rgba(165,48,60,0.14)";
                                 } else if (mode === "현공" && chart) {
-                                    const mood = starMood(chart.water[g as Palace], chart.period);
+                                    const mood = starMood(chart.water[g as Palace], curPeriod);
                                     fill = mood === "왕기" ? "rgba(212,175,55,0.22)" : mood === "생기" ? "rgba(46,139,107,0.16)"
                                         : mood === "쇠살" ? "rgba(165,48,60,0.10)" : "rgba(120,120,120,0.06)";
                                 }

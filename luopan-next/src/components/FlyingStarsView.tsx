@@ -71,12 +71,12 @@ const GUIDE_STEPS: [string, string][] = [
     ["STEP 1 자리 잡기", "거실의 가장 큰 창(베란다) 앞에 서서 창밖을 정면으로 바라보세요. 휴대폰은 손바닥 위에 눕혀 들고, 화면 위쪽이 창밖(정면)을 가리키게 합니다."],
     ["STEP 1 재기", "'센서로 방위 재기'를 누르면 판이 돌기 시작합니다. 그 자세 그대로 '좌향 잡기(3초 평균)'를 누르고 3초만 가만히 계세요 — 방향이 자동으로 입력됩니다."],
     ["STEP 1 정확하게", "냉장고·TV·철문 근처에서는 나침반이 흔들립니다. 한두 걸음 떨어져 두세 번 재 보세요. 결과에 뜨는 편차(±숫자)가 8보다 크면 자리를 옮겨 다시 재고, '측정 이력' 칩으로 값들이 서로 비슷한지 확인하면 됩니다. ⚠ 공망 경고가 뜨면 그 값은 쓰지 말고 다시 재세요."],
-    ["STEP 1 입주년", "이 집에 \"이사 온 해\"를 넣으세요(실무에서 가장 많이 쓰는 기준). 신축에 바로 입주했다면 완공년과 같고, 큰 리모델링을 했다면 공사 마친 해를 넣습니다. 시기에 따라 기운의 판이 달라지기 때문입니다."],
+    ["STEP 1 준공년", "이 집이 \"지어진 해(준공 연도)\"를 넣으세요. 건물이 완성되어 지붕이 덮이는 순간 그 시기의 운(기운)이 집에 고착되기 때문입니다. 뼈대만 남기고 크게 리모델링한 집은 공사가 끝난 해가 새 준공년입니다. 준공 연도는 등기부등본·건축물대장·부동산 앱에서 확인할 수 있습니다."],
     ["STEP 2 표 읽기", "9칸 표에서 각 칸의 왼쪽 숫자는 사람 운(건강·인간관계), 오른쪽 숫자는 재물 운입니다. 금색 숫자가 지금 가장 좋은 기운, 붉은 숫자는 힘 빠진 기운. 작은 年·月은 올해·이번 달의 기운입니다. 도면·지도와 비교할 땐 '북상(지도식)' 버튼을 켜면 방향이 지도와 같아집니다."],
     ["STEP 2 활용", "복잡하게 계산할 필요 없이 아래 '📋 용도별 추천 배치'를 보세요 — 현관·침실·공부방·금고를 어느 방향에 두면 좋은지 정리돼 있습니다. ⚠ 주의 방위에서는 올해/이달 공사·이사·침대 옮기기를 피하세요. 다 확인했으면 🏠 집으로 저장(다음부터 원탭), 📷 로 이미지 보관."],
     ["STEP 3 도면", "우리 집 평면도나 위성지도 캡처를 불러온 뒤, ① 사진 속 집 가운데를 콕 → ② 집 정면(베란다) 방향을 한 번 더 콕 찍으세요. 방금 잰 각도에 맞춰 도면이 자동으로 정렬되고 기운 지도가 얹힙니다. 도면을 먼저 올리고 나중에 각도를 재도 됩니다. 어긋나 보이면 슬라이더로 미세 조정하세요."],
     ["STEP 4 AI 풀이", "마지막으로 'AI 현공 풀이' 버튼을 누르면 지금까지의 결과를 사람 말로 풀어줍니다 — 어느 방에서 자고, 어디에 책상과 금고를 두면 좋은지, 올해 조심할 방향은 어디인지."],
-    ["이사 진단", "이사를 고민 중이라면 맨 아래 '🏡 이사할 집 진단'에 후보 집의 좌향과 입주 예정 해를 넣어 보세요. 격국과 그 해의 흉성 방위를 따져 좋은 집인지(🟢~🔴) 바로 판정해 주고, 여러 후보를 저장해 나란히 비교할 수 있습니다."],
+    ["이사 진단", "이사를 고민 중이라면 맨 아래 '🏡 이사할 집 진단'에 후보 집의 좌향과 준공(건축) 연도를 넣어 보세요. 그 집에 고착된 운의 격국으로 좋은 집인지(🟢~🔴) 바로 판정해 주며, 입주 예정 해까지 넣으면 그 해의 흉성 방위(이사 시기)도 함께 점검합니다. 여러 후보를 저장해 나란히 비교할 수 있습니다."],
 ];
 
 function GuideModal({ onClose }: { onClose: () => void }) {
@@ -320,8 +320,9 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         try { return starChart(sitting, periodOf(year)); } catch { return null; }
     }, [sitting, year]);
     const annual = useMemo(() => annualChart(annualYear), [annualYear]);
-    const period = periodOf(year);
+    const period = periodOf(year);          // 원운 — 반의 골조(준공년 기준)
     const [py0, py1] = periodYears(period);
+    const curPeriod = periodOf(nowYear);    // 당운 — 왕쇠(왕기·생기·쇠살) 판정 기준
 
     // 팔택 본명괘(있으면 궁별 팔성 표시 + 교집합 추천)
     const ming: Trigram | null = useMemo(() => {
@@ -381,7 +382,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         if (!chart || !ming) return [];
         return GRID_S.flat().filter((p) => {
             if (p === "中") return false;
-            const mood = starMood(chart.water[p], chart.period);
+            const mood = starMood(chart.water[p], curPeriod);
             const ps = starFor(ming, p as Trigram);
             return (mood === "왕기" || mood === "생기") && GOOD_STARS.includes(ps);
         }).map((p) => `${PALACE_DIR[p]}(향성 ${chart.water[p]}·팔택 ${starFor(ming, p as Trigram)})`);
@@ -412,8 +413,8 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         if (!chart) return [];
         const pals = GRID_S.flat().filter((p) => p !== "中");
         const info = (p: Palace) => ({
-            wm: starMood(chart.water[p], chart.period),   // 향성 기운
-            mm: starMood(chart.mountain[p], chart.period), // 산성 기운
+            wm: starMood(chart.water[p], curPeriod),   // 향성 기운(당운 기준)
+            mm: starMood(chart.mountain[p], curPeriod), // 산성 기운(당운 기준)
             combo: comboFor(chart.mountain[p], chart.water[p]),
             danger: annual[p] === 5 || annual[p] === 2 || monthly[p] === 5, // 연오황·연이흑·월오황
         });
@@ -568,7 +569,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         {MOUNTAINS_24.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                     <span className="text-slate-400">→ 향(向) <b className="font-noto-serif text-[#bf953f]">{chart?.facing}</b></span>
-                    <span className="ml-2">조성·입주년</span>
+                    <span className="ml-2">준공(건축)년</span>
                     <input type="number" value={year} min={1864} max={2100}
                         onChange={(e) => setYear(Number(e.target.value))}
                         className="w-20 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
@@ -582,7 +583,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     </div>
                 )}
                 <p className="text-[11px] text-slate-400">
-                    건물이 지어진(입주한) 시기의 운(運)과 좌향으로 비성반을 세웁니다. 좌(坐)는 건물이 등지는 방위, 향(向)은 정면이 바라보는 방위입니다.
+                    건물이 지어진(준공) 시기의 운(運)과 좌향으로 비성반을 세웁니다. 뼈대만 남긴 대수선을 했다면 공사 완료 해가 새 준공년입니다. 좌(坐)는 건물이 등지는 방위, 향(向)은 정면이 바라보는 방위입니다.
                 </p>
             </div>
 
@@ -595,7 +596,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         )}
                     </div>
                     <div className="text-center">
-                        <span className="text-sm text-slate-500">{chart.period}운 <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
+                        <span className="text-sm text-slate-500">{chart.period}운 반{chart.period !== curPeriod ? ` (현재 ${curPeriod}운)` : ""} <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
                     </div>
                     {/* 배치 토글 — 남상(전통 서적·필기와 동일) / 북상(지도·도면과 동일) */}
@@ -620,8 +621,8 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                                 <div key={p} className={"rounded-xl border p-2 text-center " +
                                     (isSit ? "border-[#d4af37] bg-[#d4af37]/10" : isFace ? "border-sky-400 bg-sky-50/60 dark:bg-sky-900/20" : "border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40")}>
                                     <div className="flex justify-between text-base font-noto-serif px-1">
-                                        <span className={MOOD_COLOR[starMood(chart.mountain[p], chart.period)]}>{chart.mountain[p]}</span>
-                                        <span className={MOOD_COLOR[starMood(chart.water[p], chart.period)]}>{chart.water[p]}</span>
+                                        <span className={MOOD_COLOR[starMood(chart.mountain[p], curPeriod)]}>{chart.mountain[p]}</span>
+                                        <span className={MOOD_COLOR[starMood(chart.water[p], curPeriod)]}>{chart.water[p]}</span>
                                     </div>
                                     <div className="text-[10px] text-slate-400">
                                         {chart.base[p]} <span className={an === 5 || an === 2 ? "text-rose-500 font-bold" : ""}>年{an}</span>
@@ -682,7 +683,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
                     <div className="text-[11px] text-slate-400 leading-relaxed">
                         각 궁: 좌=산성(인정·건강) · 우=향성(재물) · 아래=운반·年연자백·月월자백{ming ? " · 택=팔택 팔성" : ""}.<br />
-                        <span className={MOOD_COLOR["왕기"]}>{STAR_NAMES[chart.period]}</span>=당운 왕기 ·
+                        <span className={MOOD_COLOR["왕기"]}>{STAR_NAMES[curPeriod]}</span>=당운({curPeriod}운) 왕기 ·
                         <span className={MOOD_COLOR["생기"]}> 생기</span>(다음 운) ·
                         <span className={MOOD_COLOR["퇴기"]}> 퇴기</span> ·
                         <span className={MOOD_COLOR["쇠살"]}> 쇠살</span>.
