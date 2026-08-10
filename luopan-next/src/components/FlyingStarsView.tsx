@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
-    mountainFromDeg, annualChart, monthlyChart, monthlyCenter, comboFor, type Palace,
+    mountainFromDeg, annualChart, monthlyChart, monthlyCenter, comboFor,
+    fanFuYin, earthLuck, samBanGwa, chilseongTagyeop, cityGate, hapsip, type Palace,
 } from "@/lib/flyingStars";
 import { mingGua, starFor, voidCheck, type Trigram, type Star } from "@/lib/eightMansions";
 import { streamSSE } from "@/lib/analyzeStream";
@@ -443,6 +444,20 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         ];
     }, [chart, annual, monthly]);
 
+    // 고급 이기(理氣) 판정 — 반음복음·지운입수·삼반괘·칠성타겁·성문결·합십
+    // 전부 216국 전수 검산 + 외부 정본 성반 대조를 마친 계산만 노출한다.
+    const adv = useMemo(() => {
+        if (!chart) return null;
+        return {
+            ff: fanFuYin(chart),
+            el: earthLuck(chart, nowYear),
+            sam: samBanGwa(chart),
+            tag: chilseongTagyeop(chart),
+            gate: cityGate(chart),
+            hap: hapsip(chart),
+        };
+    }, [chart, nowYear]);
+
     // 비성반 카드 이미지 저장
     const saveImage = async () => {
         if (!chartRef.current) return;
@@ -661,6 +676,60 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                             <div><b className="text-emerald-600 dark:text-emerald-400">✦ 추천 방위(팔택 {ming}명 × 향성 왕·생기)</b> — {bestDirs.join(", ")}</div>
                         )}
                     </div>
+
+                    {/* 고급 이기 판정 — 반음복음·입수·삼반괘·타겁·성문·합십 */}
+                    {adv && (
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40 p-3 space-y-1.5">
+                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200">🔬 이 판의 특수 격국 <span className="font-normal text-[10px] text-slate-400">(현공비성 고급 판정)</span></div>
+                            {/* 입수 — 지금 가장 실무적인 항목 */}
+                            <div className="flex items-start gap-2 text-xs">
+                                <span className="w-20 shrink-0 font-semibold text-slate-600 dark:text-slate-300">지운·입수</span>
+                                <span className={"flex-1 " + (adv.el.imprisoned ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-slate-600 dark:text-slate-300")}>
+                                    지운 {adv.el.years}년 · {adv.el.note}
+                                </span>
+                            </div>
+                            {(adv.ff.mountain || adv.ff.water) && (
+                                <div className="flex items-start gap-2 text-xs">
+                                    <span className="w-20 shrink-0 font-semibold text-rose-600 dark:text-rose-400">반음·복음</span>
+                                    <span className="flex-1 text-rose-600 dark:text-rose-400">{adv.ff.note}</span>
+                                </div>
+                            )}
+                            {adv.hap && (
+                                <div className="flex items-start gap-2 text-xs">
+                                    <span className="w-20 shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">전국 합십</span>
+                                    <span className="flex-1 text-emerald-600 dark:text-emerald-400">
+                                        운반과 {adv.hap === "왕정" ? "산성" : "향성"}이 전 궁에서 합 10 — <b>{adv.hap === "왕정" ? "사람이 왕성한 판(왕정)" : "재물이 왕성한 판(왕재)"}</b>입니다.
+                                    </span>
+                                </div>
+                            )}
+                            {adv.sam && (
+                                <div className="flex items-start gap-2 text-xs">
+                                    <span className="w-20 shrink-0 font-semibold text-emerald-600 dark:text-emerald-400">삼반괘</span>
+                                    <span className="flex-1 text-slate-600 dark:text-slate-300">
+                                        <b className="text-emerald-600 dark:text-emerald-400">{adv.sam}</b> — 운이 바뀌어도 기운이 끊기지 않습니다(삼원불패). 단 뒤가 낮고 앞이 높은 지형(좌공조만)이라야 제 힘을 냅니다.
+                                    </span>
+                                </div>
+                            )}
+                            {adv.tag && (
+                                <div className="flex items-start gap-2 text-xs">
+                                    <span className="w-20 shrink-0 font-semibold text-slate-600 dark:text-slate-300">칠성타겁</span>
+                                    <span className="flex-1 text-slate-600 dark:text-slate-300">
+                                        <b className={adv.tag.usable ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}>{adv.tag.kind}</b> — {adv.tag.note}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex items-start gap-2 text-xs">
+                                <span className="w-20 shrink-0 font-semibold text-slate-600 dark:text-slate-300">성문결</span>
+                                <span className="flex-1 text-slate-600 dark:text-slate-300">
+                                    {adv.gate.filter((g) => g.ok).length > 0
+                                        ? <>물·출입구를 두면 좋은 방위 — <b className="text-emerald-600 dark:text-emerald-400">{adv.gate.filter((g) => g.ok).map((g) => `${PALACE_DIR[g.palace]}(${g.kind})`).join(" · ")}</b></>
+                                        : <span className="text-slate-400">성립하는 성문 없음</span>}
+                                    {adv.gate.some((g) => g.ok === null) && <span className="text-slate-400"> · 일부는 운반 오황이라 판단 보류</span>}
+                                </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">※ 전부 현공비성 계산이며 216국 전수 검산을 마친 항목입니다. 유파에 따라 판정이 다를 수 있습니다.</div>
+                        </div>
+                    )}
 
                     {/* 용도별 배치표 — 실무용 요약 */}
                     {usage.length > 0 && (

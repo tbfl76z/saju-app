@@ -254,3 +254,142 @@ export function comboFor(a: number, b: number): ComboNote | null {
   const key = a <= b ? `${a},${b}` : `${b},${a}`;
   return _COMBOS[key] ?? null;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   고급 이기(理氣) — 원본자료 02(고급이기 계산규칙) 기반
+   엔진 216국 전수 검산 + 외부 정본 성반 대조 완료 항목만 구현한다.
+   조신·최신·현공대괘(선천64괘)는 정설 부재로 제외.
+   ═══════════════════════════════════════════════════════════════ */
+
+/** 낙서 원단반(元旦盤) — 각 궁의 후천 정위수 */
+const LUOSHU: Record<Palace, number> = PALACE_NUM;
+const GUA8_ORDER: Exclude<Palace, "中">[] = ["坎", "坤", "震", "巽", "乾", "兌", "艮", "離"];
+
+/** 반음(反吟)·복음(伏吟) 판정 — 5 입중 순비=전국복음 / 역비=전국반음 */
+export interface FanFuYin {
+  mountain: "복음" | "반음" | null;   // 산성반
+  water: "복음" | "반음" | null;      // 향성반
+  note: string;
+}
+export function fanFuYin(chart: StarChart): FanFuYin {
+  const judge = (b: Record<Palace, number>): "복음" | "반음" | null => {
+    if (GUA8_ORDER.every((g) => b[g] === LUOSHU[g])) return "복음";
+    if (GUA8_ORDER.every((g) => b[g] + LUOSHU[g] === 10)) return "반음";
+    return null;
+  };
+  const m = judge(chart.mountain), w = judge(chart.water);
+  let note = "";
+  if (m === "반음" || w === "반음")
+    note = `${m === "반음" ? "산성" : "향성"}이 전국 반음입니다. 당운에는 크게 발복하나 운이 바뀌면 급격히 무너지는 판이라, 다음 운을 대비해야 합니다.`;
+  else if (m === "복음" || w === "복음")
+    note = `${m === "복음" ? "산성" : "향성"}이 전국 복음입니다. 기운이 엎드려 정체되는 판으로, 서서히 힘이 빠지는 흐름입니다.`;
+  return { mountain: m, water: w, note };
+}
+
+/** 지운(地運)·입수(入囚) — 향이 놓인 궁만으로 결정된다(전수 검산 완료) */
+export interface EarthLuck {
+  years: number;          // 지운(당운 포함 기산)
+  waterPeriod: number;    // 향성 입수 운
+  waterYear: number;      // 향성 입수 연도
+  mountainPeriod: number; // 산성 입수 운
+  mountainYear: number;
+  imprisoned: boolean;    // 지금 이미 입수했는가
+  note: string;
+}
+const PERIOD_START = (p: number) => 1864 + (p - 1) * 20;   // 1운 1864 기점
+export function earthLuck(chart: StarChart, nowYear: number): EarthLuck {
+  const facePal = MOUNTAIN_INFO[chart.facing].palace;
+  const off = (p: Palace) => FLY_ORDER.indexOf(p);
+  const years = 20 * off(facePal);
+  const wP = chart.water["中"], mP = chart.mountain["中"];
+  // 입수 연도: 해당 운의 시작 연도(현 삼원 주기 기준으로 건축 이후 첫 도래)
+  const nextStart = (p: number, from: number) => {
+    let y = PERIOD_START(p);
+    while (y < from) y += 180;
+    return y;
+  };
+  const built = PERIOD_START(chart.period);
+  const waterYear = nextStart(wP, built + 1);
+  const mountainYear = nextStart(mP, built + 1);
+  const imprisoned = nowYear >= waterYear || nowYear >= mountainYear;
+  let note = "";
+  if (nowYear >= waterYear && nowYear >= mountainYear) note = "산성·향성이 모두 중궁에 갇혀(입수) 사람과 재물이 함께 눌린 상태입니다.";
+  else if (nowYear >= waterYear) note = `${waterYear}년부터 향성이 중궁에 갇혔습니다(입수) — 재물 흐름이 막히는 시기입니다.`;
+  else if (nowYear >= mountainYear) note = `${mountainYear}년부터 산성이 중궁에 갇혔습니다(입수) — 사람·건강 쪽이 눌리는 시기입니다.`;
+  else note = `향성 입수는 ${waterYear}년, 산성 입수는 ${mountainYear}년입니다.`;
+  return { years, waterPeriod: wP, waterYear, mountainPeriod: mP, mountainYear, imprisoned, note };
+}
+
+/** 삼반괘(三般卦) — 9궁 전부에서 (운·산·향)이 한 조를 이룰 때 */
+export function samBanGwa(chart: StarChart): "부모삼반괘" | "연주삼반괘" | null {
+  const all: Palace[] = [...GUA8_ORDER, "中"];
+  const trio = (g: Palace) => [chart.base[g], chart.mountain[g], chart.water[g]];
+  const isParent = all.every((g) => {
+    const s = new Set(trio(g));
+    return s.size === 3 && new Set([...s].map((x) => x % 3)).size === 1;
+  });
+  if (isParent) return "부모삼반괘";
+  const isSerial = all.every((g) => {
+    const v = [...new Set(trio(g))].sort((a, b) => a - b);
+    if (v.length !== 3) return false;
+    for (let s = 1; s <= 9; s++) {
+      const cand = [0, 1, 2].map((i) => ((s + i - 1) % 9) + 1).sort((a, b) => a - b);
+      if (cand.every((x, i) => x === v[i])) return true;
+    }
+    return false;
+  });
+  return isSerial ? "연주삼반괘" : null;
+}
+
+/** 칠성타겁(七星打劫) — 향이 리궁(진타겁)/감궁(가타겁) + 쌍성회향 + 복음 아님 */
+export function chilseongTagyeop(chart: StarChart): { kind: "진타겁" | "가타겁"; usable: boolean; note: string } | null {
+  if (chart.structure !== "쌍성회향") return null;
+  const facePal = MOUNTAIN_INFO[chart.facing].palace;
+  const kind = facePal === "離" ? "진타겁" : facePal === "坎" ? "가타겁" : null;
+  if (!kind) return null;
+  const ff = fanFuYin(chart);
+  const usable = ff.mountain !== "복음" && ff.water !== "복음";
+  const trio = kind === "진타겁" ? ["離", "乾", "震"] : ["坎", "巽", "兌"];
+  return {
+    kind, usable,
+    note: usable
+      ? `${trio.map((p) => PALACE_DIR_KO[p as Palace]).join("·")} 세 방위를 트고 문·창·통로를 두면 다음 운의 왕기를 미리 당겨 쓸 수 있습니다.`
+      : "복음을 범해 타겁을 쓸 수 없습니다.",
+  };
+}
+
+/** 성문결(城門訣) — 향궁 좌우 인접궁. 정성문=하도 생성수 짝 */
+const ZHENG_GATE: Record<Exclude<Palace, "中">, Exclude<Palace, "中">> = {
+  坎: "乾", 艮: "震", 震: "艮", 巽: "離", 離: "巽", 坤: "兌", 兌: "坤", 乾: "坎",
+};
+const ADJ_GATE: Record<Exclude<Palace, "中">, [Exclude<Palace, "中">, Exclude<Palace, "中">]> = {
+  坎: ["乾", "艮"], 艮: ["坎", "震"], 震: ["艮", "巽"], 巽: ["震", "離"],
+  離: ["巽", "坤"], 坤: ["離", "兌"], 兌: ["坤", "乾"], 乾: ["兌", "坎"],
+};
+export interface CityGate { palace: Exclude<Palace, "中">; kind: "정성문" | "부성문"; ok: boolean | null }
+export function cityGate(chart: StarChart): CityGate[] {
+  const facePal = MOUNTAIN_INFO[chart.facing].palace;
+  const yuan = MOUNTAIN_INFO[chart.facing].yuan;
+  const idx = yuan === "지원룡" ? 0 : yuan === "천원룡" ? 1 : 2;
+  return ADJ_GATE[facePal].map((g) => {
+    const X = chart.base[g];
+    let ok: boolean | null = null;
+    if (X !== 5) {
+      // 성립 ⟺ 운반성 대응궁에서 향과 같은 원룡인 산이 음(역비)
+      const pal = NUM_PALACE[X] as Exclude<Palace, "中">;
+      ok = MOUNTAIN_YINYANG[PALACE_MOUNTAINS[pal][idx]] === -1;
+    }
+    return { palace: g, kind: ZHENG_GATE[facePal] === g ? "정성문" : "부성문", ok } as CityGate;
+  });
+}
+
+/** 전국 합십(合十) — 운반과 산성/향성이 전 궁에서 합 10 */
+export function hapsip(chart: StarChart): "왕정" | "왕재" | null {
+  if (GUA8_ORDER.every((g) => chart.base[g] + chart.mountain[g] === 10)) return "왕정";
+  if (GUA8_ORDER.every((g) => chart.base[g] + chart.water[g] === 10)) return "왕재";
+  return null;
+}
+
+const PALACE_DIR_KO: Record<Palace, string> = {
+  坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서", 中: "중궁",
+};
