@@ -18,7 +18,7 @@ const PALACE_DIR: Record<string, string> = {
     坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서",
 };
 
-interface Candidate { name: string; sitting: string; built: number; year: number | null }
+interface Candidate { name: string; sitting: string; built: number; year: number | null; ent?: string | null }
 const CAND_KEY = "destiny-hyeongong-candidates";
 function loadCands(): Candidate[] {
     try {
@@ -26,7 +26,7 @@ function loadCands(): Candidate[] {
         const p = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(p)) return [];
         // 구버전(준공년 없이 저장) 호환 — 당시 판정에 쓰인 연도를 준공년으로 승계
-        return p.map((c) => ({ ...c, built: Number(c.built ?? c.year), year: c.year ?? null }));
+        return p.map((c) => ({ ...c, built: Number(c.built ?? c.year), year: c.year ?? null, ent: c.ent ?? null }));
     } catch { return []; }
 }
 function saveCands(list: Candidate[]) {
@@ -37,9 +37,13 @@ interface Note { good: boolean; text: string }
 interface Verdict {
     grade: string; label: string; emoji: string; cls: string;
     structure: string; builtPeriod: number; curPeriod: number; facing: string; notes: Note[];
+    /** 방위 배치 힌트 — 당운 기준 향성·산성 왕/생 방위와 5·2 회피 방위 */
+    goodWater: string[]; goodMountain: string[]; avoidDirs: string[];
 }
 
-function diagnose(sitting: string, builtYear: number, moveYear: number | null, nowYear: number, ming: Trigram | null): Verdict | null {
+const GUA8: Palace[] = ["坎", "艮", "震", "巽", "離", "坤", "兌", "乾"];
+
+function diagnose(sitting: string, builtYear: number, moveYear: number | null, nowYear: number, entrance: Palace | null, ming: Trigram | null): Verdict | null {
     const builtPeriod = periodOf(builtYear);            // 원운 — 반의 골조를 결정
     const curPeriod = periodOf(moveYear ?? nowYear);    // 당운(입주 시점, 미입력 시 올해) — 왕쇠 판정 기준
     let chart: StarChart;
@@ -68,6 +72,7 @@ function diagnose(sitting: string, builtYear: number, moveYear: number | null, n
 
     const sitPal = MOUNTAIN_INFO[sitting].palace;
     const facePal = MOUNTAIN_INFO[chart.facing].palace;
+    const vital = (n: number) => { const m = starMood(n, curPeriod); return m === "왕기" || m === "생기"; };
 
     // ② 당운 기준 왕쇠 재평가 — 반의 숫자는 원운 것이지만, 어느 숫자가 왕한지는 지금 운이 정한다
     if (inPeriod) {
@@ -95,18 +100,37 @@ function diagnose(sitting: string, builtYear: number, moveYear: number | null, n
         }
     }
 
-    // ③ (선택) 입주 예정 해의 연자백 — 좌·향 방위에 오황/이흑이 들면 감점(이사 시기 조정 신호)
+    // ③ (선택) 현관 방위 — 기운의 입구(氣口). 향성 왕/생이면 재물 길, 5·2가 들면 흉
+    if (entrance) {
+        const ew = chart.water[entrance];
+        if ([5, 2].includes(ew) || [5, 2].includes(chart.mountain[entrance])) {
+            score -= 1;
+            notes.push({ good: false, text: `현관(${PALACE_DIR[entrance]}) 방위의 성요에 오황(5)·이흑(2)이 들어 있습니다. 기운의 입구가 흉방이라 재물 누수·질병이 우려됩니다(부득이하면 현관 비보 필요).` });
+        } else if (vital(ew)) {
+            score += 1;
+            notes.push({ good: true, text: `현관(${PALACE_DIR[entrance]})에 재물 기운(향성 ${ew}·${starMood(ew, curPeriod)})이 임했습니다 — 기운의 입구(氣口)가 길방입니다.` });
+        } else {
+            notes.push({ good: true, text: `현관(${PALACE_DIR[entrance]}) 방위는 뚜렷한 길흉 없이 무난합니다.` });
+        }
+    }
+
+    // ④ (선택) 입주 예정 해의 연자백 — 좌·향·현관 방위에 오황/이흑이 들면 감점(이사 시기 조정 신호)
     if (moveYear != null) {
         const annual = annualChart(moveYear);
         const bad = (n: number) => n === 5 || n === 2;
         const hitFace = bad(annual[facePal as Palace]);
         const hitSit = bad(annual[sitPal as Palace]);
-        if (hitFace || hitSit) {
+        const hitEnt = entrance != null && bad(annual[entrance]);
+        if (hitFace || hitSit || hitEnt) {
             score -= 1;
-            const where = [hitFace ? `정면(向·${PALACE_DIR[facePal]})` : "", hitSit ? `뒤(坐·${PALACE_DIR[sitPal]})` : ""].filter(Boolean).join("과 ");
+            const where = [
+                hitFace ? `정면(向·${PALACE_DIR[facePal]})` : "",
+                hitSit ? `뒤(坐·${PALACE_DIR[sitPal]})` : "",
+                hitEnt ? `현관(${PALACE_DIR[entrance!]})` : "",
+            ].filter(Boolean).join("과 ");
             notes.push({ good: false, text: `입주 예정 해(${moveYear})의 연자백 흉성(오황·이흑)이 집의 ${where} 방위에 듭니다. 입주 시기를 한 해 조정하거나, 그 해 해당 방위의 공사·현관 교체를 피하세요.` });
         } else {
-            notes.push({ good: true, text: `입주 예정 해(${moveYear})의 연자백 흉성(오황·이흑)이 좌·향 방위를 비켜갑니다.` });
+            notes.push({ good: true, text: `입주 예정 해(${moveYear})의 연자백 흉성(오황·이흑)이 좌·향${entrance ? "·현관" : ""} 방위를 비켜갑니다.` });
         }
     }
 
@@ -122,11 +146,17 @@ function diagnose(sitting: string, builtYear: number, moveYear: number | null, n
         }
     }
 
+    // ⑥ 방위 배치 힌트 — 현관·거실 창은 향성(재물) 왕/생 방위, 침실은 산성(건강) 왕/생 방위,
+    //    향성·산성에 5(오황)·2(이흑)가 든 방위는 현관·침실로 피한다
+    const goodWater = GUA8.filter((p) => vital(chart.water[p])).map((p) => `${PALACE_DIR[p]}(향성 ${chart.water[p]})`);
+    const goodMountain = GUA8.filter((p) => vital(chart.mountain[p])).map((p) => `${PALACE_DIR[p]}(산성 ${chart.mountain[p]})`);
+    const avoidDirs = GUA8.filter((p) => [5, 2].includes(chart.water[p]) || [5, 2].includes(chart.mountain[p])).map((p) => PALACE_DIR[p]);
+
     const g = score >= 2 ? { grade: "추천", label: "좋은 집입니다", emoji: "🟢", cls: "text-emerald-600 dark:text-emerald-400" }
         : score >= 1 ? { grade: "무난", label: "괜찮은 집입니다 — 아래 확인 사항을 보세요", emoji: "🟡", cls: "text-[#bf953f]" }
             : score >= 0 ? { grade: "보통", label: "무난하지만 배치로 보완이 필요합니다", emoji: "🟠", cls: "text-orange-500" }
                 : { grade: "재고", label: "권하지 않는 집입니다", emoji: "🔴", cls: "text-rose-500" };
-    return { ...g, structure: st, builtPeriod, curPeriod, facing: chart.facing, notes };
+    return { ...g, structure: st, builtPeriod, curPeriod, facing: chart.facing, notes, goodWater, goodMountain, avoidDirs };
 }
 
 interface Props {
@@ -142,6 +172,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
     const [sitting, setSitting] = useState("子");
     const [builtIn, setBuiltIn] = useState("");   // 준공 연도 — 기본값 없이 직접 입력(임의 추정 방지)
     const [yearIn, setYearIn] = useState("");     // 입주 예정 해(선택)
+    const [ent, setEnt] = useState<Palace | "">("");   // 현관 방위(선택) — 집 중심에서 본 8방위
     const [name, setName] = useState("");
     const [cands, setCands] = useState<Candidate[]>([]);
     useEffect(() => { setCands(loadCands()); }, []);
@@ -161,8 +192,8 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
     }, [yearIn]);
 
     const res = useMemo(
-        () => (builtYear != null ? diagnose(sitting, builtYear, moveYear, nowYear, ming) : null),
-        [sitting, builtYear, moveYear, nowYear, ming]
+        () => (builtYear != null ? diagnose(sitting, builtYear, moveYear, nowYear, ent || null, ming) : null),
+        [sitting, builtYear, moveYear, nowYear, ent, ming]
     );
 
     const useMeasured = () => {
@@ -190,7 +221,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
     const addCand = () => {
         if (builtYear == null) { notify.error("준공 연도를 먼저 입력하세요", "반(운)을 세우는 기준이라 꼭 필요합니다."); return; }
         const nm = name.trim() || `${sitting}坐 ${builtYear}년 준공`;
-        const next = [{ name: nm, sitting, built: builtYear, year: moveYear }, ...cands.filter((c) => c.name !== nm)].slice(0, 8);
+        const next = [{ name: nm, sitting, built: builtYear, year: moveYear, ent: ent || null }, ...cands.filter((c) => c.name !== nm)].slice(0, 8);
         setCands(next); saveCands(next); setName("");
         notify.success(`'${nm}' 비교 목록에 담았습니다`);
     };
@@ -206,7 +237,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
             </div>
             <p className="text-[12px] text-slate-500 dark:text-slate-400">
                 후보 집의 <b>좌향</b>과 <b>준공(건축) 연도</b>만 넣으면 그 집에 고착된 운의 반을 세워 판정합니다.
-                <b> 입주 예정 해</b>는 선택 — 넣으면 그 해의 흉성 방위(이사 시기)까지 함께 점검합니다.
+                <b> 현관 방위</b>와 <b>입주 예정 해</b>는 선택 — 넣으면 기운의 입구(현관) 길흉과 그 해의 흉성 방위(이사 시기)까지 함께 점검합니다.
                 후보 집에 방문했다면 &lsquo;우리집 진단&rsquo; 메뉴의 STEP 1로 좌향을 실측한 뒤 아래 &lsquo;실측값 가져오기&rsquo;를 누르는 것이 가장 정확합니다.
             </p>
 
@@ -232,6 +263,15 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                 {moveYear != null
                     ? <span className="text-xs text-slate-400">그 해 흉성 방위까지 점검</span>
                     : <span className="text-xs text-slate-400">비우면 올해({nowYear}) 운 기준</span>}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                <span>현관 방위<span className="text-[10px] text-slate-400">(선택)</span></span>
+                <select value={ent} onChange={(e) => setEnt(e.target.value as Palace | "")}
+                    className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
+                    <option value="">모름·선택 안 함</option>
+                    {GUA8.map((p) => <option key={p} value={p}>{PALACE_DIR[p]}</option>)}
+                </select>
+                <span className="text-xs text-slate-400">집 중심에서 봤을 때 현관문이 있는 방위 — 기운의 입구(氣口)라 재물운 판정에 중요합니다</span>
             </div>
             <p className="text-[11px] text-slate-400">
                 준공 연도 = 건물이 완성된(지붕이 덮인) 해. 뼈대만 남기고 대수리(리모델링)한 집은 공사가 끝난 해가 새 준공년입니다.
@@ -261,6 +301,23 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                             </li>
                         ))}
                     </ul>
+                    {/* 방위 배치 힌트 — 현관·거실 창(향성 재물)과 침실(산성 건강), 5·2 회피 방위 */}
+                    <div className="rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 p-2.5 space-y-1 text-xs">
+                        <div className="font-bold text-slate-700 dark:text-slate-200">📋 이 집에서의 방위 체크 <span className="font-normal text-[10px] text-slate-400">(당운 {res.curPeriod}운 기준)</span></div>
+                        <div className="flex items-start gap-1.5">
+                            <span className="shrink-0 w-32 font-semibold text-slate-600 dark:text-slate-300">현관·거실 창 좋은 곳</span>
+                            <span className="flex-1">{res.goodWater.length > 0 ? <b className="text-emerald-600 dark:text-emerald-400">{res.goodWater.join(" · ")}</b> : <span className="text-slate-400">뚜렷한 적방 없음</span>}<span className="text-slate-400"> — 재물 기운이 드나드는 방위</span></span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                            <span className="shrink-0 w-32 font-semibold text-slate-600 dark:text-slate-300">침실·안방 좋은 곳</span>
+                            <span className="flex-1">{res.goodMountain.length > 0 ? <b className="text-emerald-600 dark:text-emerald-400">{res.goodMountain.join(" · ")}</b> : <span className="text-slate-400">뚜렷한 적방 없음</span>}<span className="text-slate-400"> — 건강·화목의 방위</span></span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                            <span className="shrink-0 w-32 font-semibold text-rose-600 dark:text-rose-400">현관·침실 피할 곳</span>
+                            <span className="flex-1">{res.avoidDirs.length > 0 ? <b className="text-rose-600 dark:text-rose-400">{res.avoidDirs.join(" · ")}</b> : <span className="text-slate-400">없음</span>}<span className="text-slate-400"> — 향성·산성에 오황(5)·이흑(2)이 든 방위</span></span>
+                        </div>
+                        <p className="text-[10px] text-slate-400">현관·거실 큰 창이 좋은 방위에 있는 집이면 가점 요인입니다. 입주 후 세부 배치는 &lsquo;우리집 진단&rsquo; 메뉴에서 확인하세요.</p>
+                    </div>
                 </div>
             )}
 
@@ -279,6 +336,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                                 <th className="font-semibold">좌향</th>
                                 <th className="font-semibold">준공(운)</th>
                                 <th className="font-semibold">입주</th>
+                                <th className="font-semibold">현관</th>
                                 <th className="font-semibold">격국</th>
                                 <th className="font-semibold">판정</th>
                                 <th></th>
@@ -286,13 +344,14 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                         </thead>
                         <tbody>
                             {cands.map((c) => {
-                                const v = diagnose(c.sitting, c.built, c.year, nowYear, ming);
+                                const v = diagnose(c.sitting, c.built, c.year, nowYear, (c.ent as Palace) || null, ming);
                                 return (
                                     <tr key={c.name} className="border-b border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                                         <td className="py-1.5 font-semibold text-left">{c.name}</td>
                                         <td className="text-center font-noto-serif">{c.sitting}山{v?.facing ?? ""}向</td>
                                         <td className="text-center">{c.built} ({v?.builtPeriod ?? "-"}운)</td>
                                         <td className="text-center">{c.year ?? "-"}</td>
+                                        <td className="text-center">{c.ent ? PALACE_DIR[c.ent] : "-"}</td>
                                         <td className="text-center">{v?.structure ?? "-"}</td>
                                         <td className="text-center whitespace-nowrap">{v ? `${v.emoji} ${v.grade}` : "-"}</td>
                                         <td className="text-center">
