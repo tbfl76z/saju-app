@@ -11,7 +11,6 @@ import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { Button } from "@/components/ui/button";
 import FloorPlanView from "@/components/FloorPlanView";
-import MoveCheckView from "@/components/MoveCheckView";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
 
@@ -76,7 +75,7 @@ const GUIDE_STEPS: [string, string][] = [
     ["STEP 2 활용", "복잡하게 계산할 필요 없이 아래 '📋 용도별 추천 배치'를 보세요 — 현관·침실·공부방·금고를 어느 방향에 두면 좋은지 정리돼 있습니다. ⚠ 주의 방위에서는 올해/이달 공사·이사·침대 옮기기를 피하세요. 다 확인했으면 🏠 집으로 저장(다음부터 원탭), 📷 로 이미지 보관."],
     ["STEP 3 도면", "우리 집 평면도나 위성지도 캡처를 불러온 뒤, ① 사진 속 집 가운데를 콕 → ② 집 정면(베란다) 방향을 한 번 더 콕 찍으세요. 방금 잰 각도에 맞춰 도면이 자동으로 정렬되고 기운 지도가 얹힙니다. 도면을 먼저 올리고 나중에 각도를 재도 됩니다. 어긋나 보이면 슬라이더로 미세 조정하세요."],
     ["STEP 4 AI 풀이", "마지막으로 'AI 현공 풀이' 버튼을 누르면 지금까지의 결과를 사람 말로 풀어줍니다 — 어느 방에서 자고, 어디에 책상과 금고를 두면 좋은지, 올해 조심할 방향은 어디인지."],
-    ["이사 진단", "이사를 고민 중이라면 맨 아래 '🏡 이사할 집 진단'에 후보 집의 좌향과 준공(건축) 연도를 넣어 보세요. 그 집에 고착된 운의 격국으로 좋은 집인지(🟢~🔴) 바로 판정해 주며, 입주 예정 해까지 넣으면 그 해의 흉성 방위(이사 시기)도 함께 점검합니다. 여러 후보를 저장해 나란히 비교할 수 있습니다."],
+    ["이사 진단", "이사를 고민 중이라면 상단 '🏡 이사할 집 진단' 메뉴에 후보 집의 좌향과 준공(건축) 연도를 넣어 보세요. 그 집에 고착된 운의 격국으로 좋은 집인지(🟢~🔴) 바로 판정해 주며, 입주 예정 해까지 넣으면 그 해의 흉성 방위(이사 시기)도 함께 점검합니다. 여러 후보를 저장해 나란히 비교할 수 있습니다."],
 ];
 
 function GuideModal({ onClose }: { onClose: () => void }) {
@@ -721,9 +720,6 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     {interp && <ReportRenderer text={interp} streaming={interpreting} />}
                 </div>
             )}
-
-            {/* ═ 이사할 집 진단 — 후보 집 좌향·입주 예정 해로 계약 전 미리 판정 ═ */}
-            <MoveCheckView birthYear={birthYear} gender={gender} currentSitting={sitting} currentDeg={measuredDeg} />
         </div>
     );
 }

@@ -132,7 +132,7 @@ function diagnose(sitting: string, builtYear: number, moveYear: number | null, n
 interface Props {
     birthYear?: number;
     gender?: "male" | "female";
-    /** STEP 1에서 실측·선택된 현재 좌산 — '측정값 가져오기'에 사용 */
+    /** '우리집 진단' 탭에서 실측·선택된 좌산 — 미전달 시 localStorage에서 읽는다 */
     currentSitting?: string;
     currentDeg?: number | null;
 }
@@ -166,10 +166,23 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
     );
 
     const useMeasured = () => {
-        if (!currentSitting || !MOUNTAIN_INFO[currentSitting]) return;
-        setSitting(currentSitting);
+        // 별도 탭에서 쓰이므로 props가 없으면 '우리집 진단' 탭의 실측값을 localStorage에서 읽는다
+        let sit = currentSitting;
+        let deg = currentDeg ?? null;
+        if (!sit) {
+            try {
+                sit = window.localStorage.getItem("destiny-luopan-sitting") ?? undefined;
+                const d = parseFloat(window.localStorage.getItem("destiny-luopan-deg") || "");
+                deg = Number.isFinite(d) ? d : null;
+            } catch { /* 무시 */ }
+        }
+        if (!sit || !MOUNTAIN_INFO[sit]) {
+            notify.error("가져올 실측값이 없습니다", "'우리집 진단' 메뉴의 STEP 1에서 좌향을 먼저 재세요.");
+            return;
+        }
+        setSitting(sit);
         notify.success(
-            `STEP 1 좌향 가져옴: ${currentSitting}坐` + (currentDeg != null ? ` (실측 ${currentDeg.toFixed(1)}°)` : ""),
+            `실측 좌향 가져옴: ${sit}坐` + (deg != null ? ` (${deg.toFixed(1)}°)` : ""),
             "후보 집 현장에서 실측한 값이면 가장 정확합니다."
         );
     };
@@ -194,7 +207,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
             <p className="text-[12px] text-slate-500 dark:text-slate-400">
                 후보 집의 <b>좌향</b>과 <b>준공(건축) 연도</b>만 넣으면 그 집에 고착된 운의 반을 세워 판정합니다.
                 <b> 입주 예정 해</b>는 선택 — 넣으면 그 해의 흉성 방위(이사 시기)까지 함께 점검합니다.
-                후보 집에 방문했다면 위 STEP 1로 좌향을 실측한 뒤 아래 &lsquo;측정값 가져오기&rsquo;를 누르는 것이 가장 정확합니다.
+                후보 집에 방문했다면 &lsquo;우리집 진단&rsquo; 메뉴의 STEP 1로 좌향을 실측한 뒤 아래 &lsquo;실측값 가져오기&rsquo;를 누르는 것이 가장 정확합니다.
             </p>
 
             {/* 입력 — 좌향 · 준공 연도 · 입주 예정 해 */}
@@ -204,7 +217,7 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                     className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
                     {MOUNTAINS_24.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <Button onClick={useMeasured} variant="outline" className="h-8 rounded-full text-xs">🧭 STEP 1 측정값 가져오기</Button>
+                <Button onClick={useMeasured} variant="outline" className="h-8 rounded-full text-xs">🧭 실측값 가져오기</Button>
             </div>
             <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                 <span>준공(건축) 연도</span>

@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import Luopan from "@/components/Luopan";
 import FlyingStarsView from "@/components/FlyingStarsView";
 import SamhapView from "@/components/SamhapView";
+import MoveCheckView from "@/components/MoveCheckView";
 
-type Mode = "현공" | "팔택" | "삼합";
+type Mode = "현공" | "이사" | "팔택" | "삼합";
+// 메뉴 이름은 쉬운 말 우선, 괄호에 유파 병기(공부 탭과 연결)
+const TABS: { key: Mode; label: string }[] = [
+    { key: "현공", label: "🏠 우리집 진단" },
+    { key: "이사", label: "🏡 이사할 집 진단" },
+    { key: "팔택", label: "🧭 나침반 길방" },
+    { key: "삼합", label: "💧 물길 좌향" },
+];
 type Gender = "male" | "female";
 const BIRTH_KEY = "destiny-fengshui-birth"; // 풍수 앱 자체 생년 저장(팔택 본명괘용)
 
@@ -44,7 +52,7 @@ export default function LuopanHome() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-24">
             <div className="text-center space-y-2 py-5 md:py-8">
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🧭 풍수 나경</h2>
-                <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰 방위 센서로 좌향을 재고 현공비성·팔택 길흉 방위를 확인합니다.</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰으로 집 방향을 재서 우리 집 기운 지도를 그리고, 이사할 집도 미리 진단합니다.</p>
             </div>
 
             {/* 본명괘용 생년·성별 (선택) — 입춘(2/4) 전 출생은 전년도로 입력 */}
@@ -64,17 +72,20 @@ export default function LuopanHome() {
                 <span className="text-[11px] text-slate-400">본명괘(팔택) 계산용 · 입춘(2/4) 전 출생은 전년도로</span>
             </div>
 
-            {/* 유파 탭: 현공비성(기본) / 팔택 나경(센서) / 삼합수법 / 도면 방위 */}
+            {/* 메뉴 탭: 우리집 진단(현공, 기본) / 이사할 집 진단 / 나침반 길방(팔택) / 물길 좌향(삼합) */}
             <div className="flex gap-1.5 mb-4 flex-wrap justify-center">
-                {(["현공", "팔택", "삼합"] as Mode[]).map((m) => (
-                    <button key={m} onClick={() => setMode(m)}
-                        className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors " +
-                            (mode === m ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
+                {TABS.map(({ key, label }) => (
+                    <button key={key} onClick={() => setMode(key)}
+                        className={"px-4 py-2 rounded-full text-sm font-semibold transition-colors whitespace-nowrap " +
+                            (mode === key ? "bg-[#d4af37]/15 text-[#bf953f] dark:text-[#e6c35c]"
                                 : "text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60")}>
-                        {m === "팔택" ? "팔택 나경" : m === "현공" ? "현공비성" : "삼합수법"}
+                        {label}
                     </button>
                 ))}
             </div>
+            <p className="text-center text-[11px] text-slate-400 -mt-2 mb-4">
+                {mode === "현공" ? "현공비성 — 지금 사는 집의 기운 지도" : mode === "이사" ? "현공비성 — 이사 후보 집을 계약 전에 판정" : mode === "팔택" ? "팔택 — 내 본명괘 기준 길한 방위" : "삼합수법 — 물길·출입구 방위"}
+            </p>
 
             {mode === "팔택" && (
                 /* 나경은 어두운 배경 전제로 디자인돼 있어 짙은 배경 카드에 담는다 */
@@ -88,6 +99,7 @@ export default function LuopanHome() {
                 </div>
             )}
             {mode === "현공" && <FlyingStarsView birthYear={birthYear} gender={gender} />}
+            {mode === "이사" && <MoveCheckView birthYear={birthYear} gender={gender} />}
             {mode === "삼합" && <SamhapView />}
         </div>
     );

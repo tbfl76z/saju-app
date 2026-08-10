@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { Compass, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// 풍수 앱 네비 — 나경(홈) + 현공 공부
+// 풍수 앱 네비 — 진단(홈: 우리집·이사·나침반·물길) + 현공 공부
 const NAV_ITEMS = [
-    { href: "/", label: "나경", icon: Compass },
+    { href: "/", label: "진단", icon: Compass },
     { href: "/learn", label: "공부", icon: GraduationCap },
 ] as const;
 
