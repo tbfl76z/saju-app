@@ -236,6 +236,28 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         }, 30);
     };
 
+    // 도면 자세 보정 — 거울상·회전된 사진을 바로잡는다.
+    // 좌우 반전 도면을 그대로 쓰면 동서가 뒤바뀌어(震↔兌, 巽↔坤) 궁 판정이 통째로 틀어진다.
+    // 좌표 변환을 따로 하지 않고 **이미지 자체를 고쳐** 이후 단계가 전부 그대로 동작하게 한다.
+    const transformImage = (mode: "flipH" | "rot90") => {
+        const el = imgElRef.current;
+        if (!el || !el.complete || !img) { notify.error("도면을 먼저 불러오세요"); return; }
+        const swap = mode === "rot90";
+        const cv = document.createElement("canvas");
+        cv.width = swap ? natH : natW;
+        cv.height = swap ? natW : natH;
+        const ctx = cv.getContext("2d");
+        if (!ctx) return;
+        if (mode === "flipH") { ctx.translate(natW, 0); ctx.scale(-1, 1); }
+        else { ctx.translate(natH, 0); ctx.rotate(Math.PI / 2); }
+        ctx.drawImage(el, 0, 0);
+        setNatural([cv.width, cv.height]);
+        setImg(cv.toDataURL("image/png"));
+        setCenter(null); setOutline([]); setAligned(false); setPickMode("center");
+        setCenterNote(""); setAiRead(null);
+        notify.success(mode === "flipH" ? "좌우 반전 적용" : "90도 회전 적용", "찍은 점은 초기화됐습니다.");
+    };
+
     // AI 도면 판독 — 좌표가 아니라 '어느 공간을 전유부로 볼 것인가'를 받는다.
     // 비전 모델은 픽셀 좌표를 정밀하게 못 찍으므로 외곽선은 위 자동 검출이 맡는다.
     const analyzeWithAI = async () => {
@@ -331,6 +353,12 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         📐 도면/사진 불러오기
                         <input type="file" accept="image/*" onChange={onFile} className="hidden" />
                     </label>
+                    {img && (
+                        <>
+                            <Button onClick={() => transformImage("flipH")} variant="outline" className="h-7 rounded-full text-[11px]">↔ 좌우 반전</Button>
+                            <Button onClick={() => transformImage("rot90")} variant="outline" className="h-7 rounded-full text-[11px]">↻ 90°</Button>
+                        </>
+                    )}
                     <span className="mx-1">모드</span>
                     {(["24산", "팔택", "현공"] as OverlayMode[]).map((m) => (
                         <button key={m} onClick={() => setMode(m)}
@@ -362,6 +390,15 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         {chart && <span className="text-xs text-[#bf953f] font-semibold">{chart.period}운 {chart.sitting}山{chart.facing}向 · {chart.structure}</span>}
                     </div>
                 )}
+                {/* 거울상 경고 — 방위 판정을 통째로 뒤집는 함정이라 눈에 띄게 둔다 */}
+                {img && (
+                    <div className="rounded-xl bg-rose-50/70 dark:bg-rose-950/25 border border-rose-200/60 dark:border-rose-800/40 px-3 py-2 text-[12px] text-rose-800 dark:text-rose-300">
+                        🪞 <b>도면이 거울상은 아닌지 먼저 확인하세요.</b> 부동산 사이트 캡처 중에는 좌우가 뒤집힌 것이 있습니다 —
+                        <b> 글자가 뒤집혀 보이면 반전된 도면</b>입니다. 그대로 쓰면 <b>동서가 통째로 바뀌어</b>(진궁↔태궁, 손궁↔곤궁)
+                        산성·향성 판정이 정반대가 됩니다. 위의 <b>↔ 좌우 반전</b>으로 바로잡고 시작하세요.
+                    </div>
+                )}
+
                 {/* ⓪ 외곽선으로 입극점 자동 산출 — 다각형 평면에서 눈대중 오차를 없앤다 */}
                 <div className="rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/5 p-2.5 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap text-[11px]">
