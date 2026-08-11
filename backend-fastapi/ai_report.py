@@ -1091,3 +1091,61 @@ def grade_interpretation(saju_summary: str, user_answer: str) -> str:
     if text:
         return text
     return "죄송합니다. 지금은 채점 선생님이 자리를 비웠어요. 잠시 후 다시 제출해 주세요."
+
+
+# ---------------------------------------------------------------------------
+# 도면 판독 (비전) — 입극점 산입 범위 판단
+# ---------------------------------------------------------------------------
+# 좌표를 뽑는 용도가 아니다. 비전 모델은 픽셀 좌표를 정밀하게 찍지 못하므로
+# 외곽선 검출은 브라우저의 이미지 처리(floorPlanDetect.ts)가 맡고,
+# 여기서는 "어느 공간을 전유부로 볼 것인가"라는 판단만 맡긴다.
+FLOORPLAN_SYSTEM = (
+    "당신은 현공비성(玄空飛星) 풍수 감정을 돕는 도면 판독 보조자입니다. "
+    "아파트 평면도 사진을 보고, 입극점(立極點, 집의 중심)을 잡을 때 "
+    "**면적에 포함할 공간과 제외할 공간**을 구분해 주는 것이 임무입니다.\n\n"
+    "판단 기준:\n"
+    "1. 원칙은 **전유부(專有部) 기준** — 실내로 연속된 생활 공간을 포함합니다.\n"
+    "2. **제외**: 피난테라스, 실외기실, PD(파이프 덕트), 공용 복도, 계단실 — 거주 공간이 아닙니다.\n"
+    "3. **판단 필요**: 발코니는 확장되어 실내와 연속이면 포함, 외부에 노출된 형태면 제외합니다. "
+    "도면만으로 확장 여부를 알 수 없으면 uncertain으로 표시하고 이유를 적으세요.\n"
+    "4. 발코니·확장부 산입 여부는 **문헌 근거가 확인되지 않은 판단 영역**입니다. "
+    "단정하지 말고 근거를 함께 적으세요.\n\n"
+    "또한 좌향 측정에 도움이 되도록 **거실 큰 창(향면)과 현관이 도면의 어느 쪽에 있는지**를 "
+    "위/아래/왼쪽/오른쪽으로 알려주세요. 각도나 방위(남향 등)는 추측하지 마세요 — "
+    "도면 사진만으로는 실제 방위를 알 수 없습니다.\n\n"
+    "반드시 아래 JSON 형식만 출력하고 다른 말은 붙이지 마세요.\n"
+    "{\n"
+    '  "spaces": [{"name": "공간명", "decision": "include|exclude|uncertain", "reason": "한 줄 근거"}],\n'
+    '  "living_window_side": "위|아래|왼쪽|오른쪽|불명",\n'
+    '  "entrance_side": "위|아래|왼쪽|오른쪽|불명",\n'
+    '  "shape": "평면 형태 한 줄 설명(예: 대체로 직사각형이나 우측 현관부가 돌출)",\n'
+    '  "caution": "판독상 주의점 한 줄"\n'
+    "}"
+)
+
+
+def analyze_floorplan(image_bytes: bytes, mime_type: str = "image/jpeg") -> Optional[str]:
+    """도면 사진을 비전 모델에 보내 산입 범위 판단을 받는다. 실패 시 None."""
+    prompt = (
+        "이 아파트 평면도에서 입극점을 잡기 위한 산입 범위를 판단해 주세요. "
+        "도면에 손글씨(붉은 펜 등)가 있으면 그것은 다른 사람의 메모이니 무시하고, "
+        "인쇄된 평면 자체만 보세요."
+    )
+    part = {"mime_type": mime_type, "data": image_bytes}
+    for model_name in _get_models_to_try():
+        try:
+            model = genai.GenerativeModel(model_name, system_instruction=FLOORPLAN_SYSTEM)
+            resp = model.generate_content(
+                [prompt, part],
+                generation_config={"max_output_tokens": 2048, "response_mime_type": "application/json"},
+            )
+            if resp and resp.text:
+                return resp.text
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg or "quota" in msg.lower():
+                print(f"[floorplan] {model_name} quota exceeded, next...")
+                continue
+            print(f"[floorplan] {model_name} error: {msg}")
+            continue
+    return None

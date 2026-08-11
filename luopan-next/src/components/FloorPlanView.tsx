@@ -8,6 +8,17 @@ import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, type Palace 
 import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
 import { detectOutline } from "@/lib/floorPlanDetect";
 
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
+
+/** AI 도면 판독 결과 — 좌표가 아니라 '산입 범위 판단'만 받는다 */
+interface PlanRead {
+    spaces?: { name: string; decision: "include" | "exclude" | "uncertain"; reason: string }[];
+    living_window_side?: string;
+    entrance_side?: string;
+    shape?: string;
+    caution?: string;
+}
+
 // 도면 방위 오버레이 — 도면/위성사진을 불러와 중심점을 찍고 북쪽을 맞추면
 // 24산 방사선(+팔택/현공 정보)을 겹쳐 보여준다. 전부 클라이언트에서 처리(업로드 없음).
 // 향후: 주소 검색 → 아파트 도면 API 자동 로드로 확장 예정.
@@ -113,6 +124,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [outline, setOutline] = useState<Pt[]>([]); // 평면 외곽선 — 입극점 자동 산출용
     const [centerNote, setCenterNote] = useState(""); // 중심 산출 결과 안내
     const [detecting, setDetecting] = useState(false); // 외곽 자동 검출 중
+    const [aiBusy, setAiBusy] = useState(false);       // AI 도면 판독 중
+    const [aiRead, setAiRead] = useState<PlanRead | null>(null);
     const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
@@ -221,6 +234,36 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 setDetecting(false);
             }
         }, 30);
+    };
+
+    // AI 도면 판독 — 좌표가 아니라 '어느 공간을 전유부로 볼 것인가'를 받는다.
+    // 비전 모델은 픽셀 좌표를 정밀하게 못 찍으므로 외곽선은 위 자동 검출이 맡는다.
+    const analyzeWithAI = async () => {
+        const el = imgElRef.current;
+        if (!el || !el.complete || !img) { notify.error("도면을 먼저 불러오세요"); return; }
+        setAiBusy(true);
+        try {
+            // 전송 전 축소(장변 1024px, JPEG) — 트래픽·한도 절약
+            const S = 1024;
+            const sc = Math.min(1, S / Math.max(natW, natH));
+            const cv = document.createElement("canvas");
+            cv.width = Math.round(natW * sc); cv.height = Math.round(natH * sc);
+            cv.getContext("2d")?.drawImage(el, 0, 0, cv.width, cv.height);
+            const dataUrl = cv.toDataURL("image/jpeg", 0.85);
+            const r = await fetch(`${API_BASE}/classic/floorplan/analyze`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: dataUrl, mime_type: "image/jpeg" }),
+            });
+            if (!r.ok) throw new Error(String(r.status));
+            const j: PlanRead = await r.json();
+            setAiRead(j);
+            notify.success("도면 판독 완료", "산입 범위 권고를 확인하고 외곽선을 조정하세요.");
+        } catch {
+            notify.error("판독에 실패했습니다", "잠시 후 다시 시도하거나 직접 판단해 주세요.");
+        } finally {
+            setAiBusy(false);
+        }
     };
 
     // 외곽선으로 입극점 자동 산출 — 면적 가중 중심(도심), U형 특칙 포함
@@ -355,6 +398,45 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         </span>
                     </div>
                     {centerNote && <p className="text-[11px] text-emerald-700 dark:text-emerald-300">{centerNote}</p>}
+
+                    {/* AI 도면 판독 — 산입 범위 판단(좌표 아님) */}
+                    <div className="pt-1 border-t border-[#d4af37]/20 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Button onClick={analyzeWithAI} disabled={!img || aiBusy} variant="outline"
+                                className="h-7 rounded-full text-[11px]">
+                                {aiBusy ? "판독 중…" : "🧠 AI 도면 판독(산입 범위)"}
+                            </Button>
+                            <span className="text-[10px] text-slate-400">
+                                어느 공간을 면적에 넣을지 판단해 줍니다 — 좌표는 위 자동 검출이 맡습니다
+                            </span>
+                        </div>
+                        {aiRead && (
+                            <div className="rounded-lg bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 p-2.5 space-y-1.5 text-[11px]">
+                                {aiRead.shape && <p className="text-slate-600 dark:text-slate-300"><b>평면 형태</b> — {aiRead.shape}</p>}
+                                {!!aiRead.spaces?.length && (
+                                    <div className="space-y-0.5">
+                                        {aiRead.spaces.map((s, i) => (
+                                            <div key={i} className="flex gap-1.5">
+                                                <span className={"shrink-0 w-11 font-bold " + (s.decision === "include" ? "text-emerald-600 dark:text-emerald-400" : s.decision === "exclude" ? "text-rose-500" : "text-amber-600 dark:text-amber-400")}>
+                                                    {s.decision === "include" ? "포함" : s.decision === "exclude" ? "제외" : "판단필요"}
+                                                </span>
+                                                <span className="text-slate-600 dark:text-slate-300"><b>{s.name}</b> — {s.reason}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="text-slate-500 dark:text-slate-400">
+                                    거실 큰 창 <b>{aiRead.living_window_side || "불명"}</b> 쪽 · 현관 <b>{aiRead.entrance_side || "불명"}</b> 쪽
+                                    <span className="text-slate-400"> — ② 창(정면) 방향을 탭할 때 참고하세요</span>
+                                </p>
+                                {aiRead.caution && <p className="text-amber-700 dark:text-amber-400">⚠ {aiRead.caution}</p>}
+                                <p className="text-[10px] text-slate-400">
+                                    ※ 발코니·확장부 산입 여부는 <b>문헌 근거가 확인되지 않은 판단 영역</b>입니다. 최종 결정은 직접 하시고,
+                                    감정 기록에는 &lsquo;발코니 제외 / 전유부 기준&rsquo;처럼 산입 기준을 남겨 두세요.
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* 정렬 진행 표시 — 지금 어느 단계인지, 적용됐는지를 분명하게 */}

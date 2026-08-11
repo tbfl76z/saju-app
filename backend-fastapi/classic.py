@@ -692,3 +692,54 @@ class HyeongongReq(BaseModel):
 async def hyeongong_analyze(req: HyeongongReq):
     """현공비성 AI 해석(스트리밍)."""
     return StreamingResponse(ai_report.stream_hyeongong(req.model_dump()), media_type="text/event-stream")
+
+
+# ── 도면 판독(비전) — 입극점 산입 범위 판단 ────────────────────────────────
+class FloorPlanReq(BaseModel):
+    image: str = ""          # data URL 또는 순수 base64
+    mime_type: str = "image/jpeg"
+
+
+@router.post("/floorplan/analyze")
+async def floorplan_analyze(req: FloorPlanReq):
+    """도면 사진의 산입 범위를 AI가 판단한다.
+
+    좌표는 뽑지 않는다 — 외곽선 검출은 클라이언트 이미지 처리가 맡고,
+    여기서는 '어느 공간을 전유부로 볼 것인가'라는 판단만 받는다.
+    """
+    import base64
+    import json as _json
+
+    raw = (req.image or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="이미지가 비어 있습니다.")
+    mime = req.mime_type or "image/jpeg"
+    if raw.startswith("data:"):
+        try:
+            header, raw = raw.split(",", 1)
+            mime = header.split(":", 1)[1].split(";", 1)[0] or mime
+        except Exception:
+            raise HTTPException(status_code=400, detail="이미지 형식을 읽을 수 없습니다.")
+    try:
+        data = base64.b64decode(raw, validate=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="이미지 디코딩에 실패했습니다.")
+    if not data:
+        raise HTTPException(status_code=400, detail="이미지가 비어 있습니다.")
+    if len(data) > 6 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="이미지가 너무 큽니다(6MB 초과). 축소해서 보내주세요.")
+
+    text = ai_report.analyze_floorplan(data, mime)
+    if not text:
+        raise HTTPException(status_code=503, detail="도면 판독에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+    try:
+        return _json.loads(text)
+    except Exception:
+        # 모델이 JSON 외 텍스트를 섞은 경우 첫 { ~ 마지막 } 만 추려 재시도
+        s, e = text.find("{"), text.rfind("}")
+        if s >= 0 and e > s:
+            try:
+                return _json.loads(text[s:e + 1])
+            except Exception:
+                pass
+        raise HTTPException(status_code=502, detail="판독 결과를 해석하지 못했습니다.")
