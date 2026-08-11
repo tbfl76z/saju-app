@@ -175,9 +175,45 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const facingDeg = measuredDeg != null
         ? ((measuredDeg + 180) % 360 + 360) % 360
         : ((MOUNTAIN_INFO[sitting]?.deg ?? 0) + 180) % 360;
+    // 꼭짓점 드래그 수정 — 잘못 찍은 점을 지우고 다시 찍지 않아도 되게
+    const dragIdx = useRef<number | null>(null);
+    const dragged = useRef(false);
+    const toImgXY = (e: { clientX: number; clientY: number }): Pt | null => {
+        const el = boxRef.current;
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return [((e.clientX - r.left) / r.width) * natW, ((e.clientY - r.top) / r.height) * natH];
+    };
+    const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        dragged.current = false;
+        if (pickMode !== "outline" || !outline.length) return;
+        const p = toImgXY(e);
+        if (!p) return;
+        const thr = Math.min(natW, natH) * 0.05;   // 손가락으로도 잡히는 반경
+        let best = -1, bd = thr;
+        outline.forEach((q, i) => {
+            const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+            if (d < bd) { bd = d; best = i; }
+        });
+        if (best >= 0) {
+            dragIdx.current = best;
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+        }
+    };
+    const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (dragIdx.current == null) return;
+        const p = toImgXY(e);
+        if (!p) return;
+        dragged.current = true;
+        const i = dragIdx.current;
+        setOutline((prev) => prev.map((q, k) => (k === i ? p : q)));
+    };
+    const onPointerUp = () => { dragIdx.current = null; };
+
     const onPick = (e: React.MouseEvent<HTMLDivElement>) => {
         const el = boxRef.current;
         if (!el || !img) return;
+        if (dragged.current) { dragged.current = false; return; }  // 드래그였으면 점 추가 안 함
         const r = el.getBoundingClientRect();
         const x = ((e.clientX - r.left) / r.width) * natW;
         const y = ((e.clientY - r.top) / r.height) * natH;
@@ -502,7 +538,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                     {!img
                         ? <>도면을 불러오면 시작합니다. (이미지는 기기에서만 처리됩니다)</>
                         : pickMode === "outline"
-                            ? <>평면의 <b>바깥 모서리를 시계 방향으로 차례차례 탭</b>하세요. 다 찍고 &lsquo;완료&rsquo;를 누르면 <b>면적 가중 중심(도심)</b>으로 입극점이 잡힙니다.</>
+                            ? <><b className="text-blue-600 dark:text-blue-400">파란 점 ①</b>부터 <b>바깥 모서리를 차례로 탭</b>하세요. 잘못 찍은 점은 <b>손가락(마우스)으로 끌어서 옮기면</b> 됩니다.
+                                점선은 마지막 점과 ①이 이어질 선입니다. 다 되면 &lsquo;완료&rsquo; → <b>면적 가중 중심(도심)</b>으로 입극점이 잡힙니다.</>
                             : !center
                             ? <>① 사진 속 우리 집(터)의 <b>한가운데를 탭</b>하세요.</>
                             : !aligned
@@ -513,7 +550,12 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
 
             {img ? (
                 <>
-                    <div ref={boxRef} onClick={onPick} className="relative rounded-2xl overflow-hidden border border-[#d4af37]/30 cursor-crosshair bg-white">
+                    <div ref={boxRef} onClick={onPick}
+                        onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+                        onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+                        style={{ touchAction: pickMode === "outline" ? "none" : undefined }}
+                        className={"relative rounded-2xl overflow-hidden border bg-white "
+                            + (pickMode === "outline" ? "border-blue-500 ring-2 ring-blue-400/40 cursor-crosshair" : "border-[#d4af37]/30 cursor-crosshair")}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img ref={imgElRef} src={img} alt="도면" className="w-full block" />
                         <svg viewBox={`0 0 ${natW} ${natH}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
@@ -597,25 +639,45 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     </g>
                                 );
                             })()}
-                            {/* 외곽선(입극점 산출용) — 찍는 중이거나 산출 후에도 근거로 남긴다 */}
-                            {outline.length > 0 && (
-                                <g>
-                                    <polygon points={outline.map((p) => p.join(",")).join(" ")}
-                                        fill="rgba(212,175,55,0.14)" stroke="#bf953f" strokeWidth={natW / 400}
-                                        strokeDasharray={pickMode === "outline" ? `${natW / 120},${natW / 200}` : undefined} />
-                                    {outline.map((p, i) => (
-                                        <circle key={i} cx={p[0]} cy={p[1]} r={Math.min(natW, natH) / 150}
-                                            fill="#bf953f" stroke="#fff" strokeWidth={natW / 900} />
-                                    ))}
-                                </g>
-                            )}
+                            {/* 외곽선 — 도면에 묻히지 않게 흰 테두리(halo) + 짙은 파랑 이중선 */}
+                            {outline.length > 0 && (() => {
+                                const pts = outline.map((p) => p.join(",")).join(" ");
+                                const vr = Math.min(natW, natH) / 55;      // 꼭짓점 반경(손가락으로 잡히는 크기)
+                                const fs = Math.min(natW, natH) / 62;
+                                const closing = pickMode === "outline" && outline.length >= 3;
+                                return (
+                                    <g>
+                                        {/* 채움 + 흰 halo */}
+                                        <polygon points={pts} fill="rgba(29,78,216,0.16)" stroke="#fff"
+                                            strokeWidth={natW / 90} strokeLinejoin="round" />
+                                        <polygon points={pts} fill="none" stroke="#1d4ed8"
+                                            strokeWidth={natW / 170} strokeLinejoin="round" />
+                                        {/* 아직 찍는 중이면 '닫힐 선'을 점선으로 예고 */}
+                                        {closing && (
+                                            <line x1={outline[outline.length - 1][0]} y1={outline[outline.length - 1][1]}
+                                                x2={outline[0][0]} y2={outline[0][1]}
+                                                stroke="#1d4ed8" strokeWidth={natW / 220}
+                                                strokeDasharray={`${natW / 90},${natW / 130}`} opacity={0.7} />
+                                        )}
+                                        {/* 꼭짓점 — 번호를 달아 순서를 보이게, 시작점은 붉게 */}
+                                        {outline.map((p, i) => (
+                                            <g key={i}>
+                                                <circle cx={p[0]} cy={p[1]} r={vr} fill={i === 0 ? "#dc2626" : "#1d4ed8"}
+                                                    stroke="#fff" strokeWidth={natW / 300} />
+                                                <text x={p[0]} y={p[1] + fs * 0.36} fontSize={fs} fontWeight={700}
+                                                    fill="#fff" textAnchor="middle">{i + 1}</text>
+                                            </g>
+                                        ))}
+                                    </g>
+                                );
+                            })()}
                             {/* 중심점 */}
                             <circle cx={cx} cy={cy} r={Math.min(natW, natH) / 90} fill="#c0392b" stroke="#fff" strokeWidth={natW / 500} />
                         </svg>
                         {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지) */}
                         {!aligned && (
                             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-slate-900/85 text-white text-[11px] font-bold pointer-events-none whitespace-nowrap">
-                                {pickMode === "outline" ? `👆 평면 바깥 모서리를 차례로 탭 (${outline.length}점)`
+                                {pickMode === "outline" ? `✏️ 모서리를 차례로 탭 · 점을 끌어 수정 (${outline.length}점)`
                                     : pickMode === "center" ? "👆 ① 집 중심을 탭하세요" : "👆 ② 창(정면) 방향을 탭하세요"}
                             </div>
                         )}
