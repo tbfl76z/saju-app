@@ -126,6 +126,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [detecting, setDetecting] = useState(false); // 외곽 자동 검출 중
     const [aiBusy, setAiBusy] = useState(false);       // AI 도면 판독 중
     const [aiRead, setAiRead] = useState<PlanRead | null>(null);
+    const [fitView, setFitView] = useState(true);      // 긴 도면을 화면 높이에 맞춰 축소
     const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
@@ -175,9 +176,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const facingDeg = measuredDeg != null
         ? ((measuredDeg + 180) % 360 + 360) % 360
         : ((MOUNTAIN_INFO[sitting]?.deg ?? 0) + 180) % 360;
-    // 꼭짓점 드래그 수정 — 잘못 찍은 점을 지우고 다시 찍지 않아도 되게
+    // 탭·드래그는 전부 포인터 이벤트로 처리한다.
+    // (터치에서 합성되는 click은 clientX/Y가 0으로 오는 경우가 있어, 첫 점이
+    //  손가락 위치가 아니라 좌상단 구석에 찍히는 일이 생긴다)
     const dragIdx = useRef<number | null>(null);
     const dragged = useRef(false);
+    const tapStart = useRef<{ x: number; y: number } | null>(null);
+    const TAP_SLOP = 12;  // 이보다 많이 움직이면 탭이 아니라 스크롤/드래그로 본다
     const toImgXY = (e: { clientX: number; clientY: number }): Pt | null => {
         const el = boxRef.current;
         if (!el) return null;
@@ -185,7 +190,10 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         return [((e.clientX - r.left) / r.width) * natW, ((e.clientY - r.top) / r.height) * natH];
     };
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!img) return;
         dragged.current = false;
+        dragIdx.current = null;
+        tapStart.current = { x: e.clientX, y: e.clientY };
         if (pickMode !== "outline" || !outline.length) return;
         const p = toImgXY(e);
         if (!p) return;
@@ -208,15 +216,21 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         const i = dragIdx.current;
         setOutline((prev) => prev.map((q, k) => (k === i ? p : q)));
     };
-    const onPointerUp = () => { dragIdx.current = null; };
+    const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        const wasDrag = dragIdx.current != null && dragged.current;
+        dragIdx.current = null;
+        dragged.current = false;
+        const st = tapStart.current;
+        tapStart.current = null;
+        if (wasDrag || !st) return;                                        // 꼭짓점 이동이었으면 점 추가 안 함
+        if (Math.hypot(e.clientX - st.x, e.clientY - st.y) > TAP_SLOP) return;  // 스크롤 제스처
+        const p = toImgXY(e);
+        if (p) onPick(p[0], p[1]);
+    };
+    const onPointerCancel = () => { dragIdx.current = null; dragged.current = false; tapStart.current = null; };
 
-    const onPick = (e: React.MouseEvent<HTMLDivElement>) => {
-        const el = boxRef.current;
-        if (!el || !img) return;
-        if (dragged.current) { dragged.current = false; return; }  // 드래그였으면 점 추가 안 함
-        const r = el.getBoundingClientRect();
-        const x = ((e.clientX - r.left) / r.width) * natW;
-        const y = ((e.clientY - r.top) / r.height) * natH;
+    const onPick = (x: number, y: number) => {
+        if (!img) return;
         if (pickMode === "outline") {
             setOutline((prev) => [...prev, [x, y] as Pt]);
             return;
@@ -393,6 +407,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         <>
                             <Button onClick={() => transformImage("flipH")} variant="outline" className="h-7 rounded-full text-[11px]">↔ 좌우 반전</Button>
                             <Button onClick={() => transformImage("rot90")} variant="outline" className="h-7 rounded-full text-[11px]">↻ 90°</Button>
+                            <Button onClick={() => setFitView((v) => !v)} variant="outline" className="h-7 rounded-full text-[11px]">
+                                {fitView ? "🔍 크게 보기" : "🖥 화면에 맞추기"}
+                            </Button>
                         </>
                     )}
                     <span className="mx-1">모드</span>
@@ -452,17 +469,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 직접 찍기
                             </Button>
                         ) : (
-                            <>
-                                <span className="text-[11px] font-semibold text-[#bf953f]">외곽 {outline.length}점 찍음</span>
-                                <Button onClick={applyOutline} disabled={outline.length < 3}
-                                    className="h-7 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                                    완료 → 중심 계산
-                                </Button>
-                                <Button onClick={() => setOutline((p) => p.slice(0, -1))} disabled={!outline.length}
-                                    variant="outline" className="h-7 rounded-full text-[11px]">↶ 한 점 취소</Button>
-                                <Button onClick={() => { setOutline([]); setPickMode("center"); }}
-                                    variant="outline" className="h-7 rounded-full text-[11px]">그만두기</Button>
-                            </>
+                            <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                                외곽 {outline.length}점 찍음 — 되돌리기·완료 버튼은 도면 아래에 있습니다
+                            </span>
                         )}
                         <span className="text-[10px] text-slate-400">
                             {pickMode === "outline"
@@ -550,14 +559,19 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
 
             {img ? (
                 <>
-                    <div ref={boxRef} onClick={onPick}
+                    <div ref={boxRef}
                         onPointerDown={onPointerDown} onPointerMove={onPointerMove}
-                        onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
-                        style={{ touchAction: pickMode === "outline" ? "none" : undefined }}
-                        className={"relative rounded-2xl overflow-hidden border bg-white "
+                        onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
+                        style={{
+                            touchAction: pickMode === "outline" ? "none" : undefined,
+                            aspectRatio: `${natW} / ${natH}`,
+                            // 세로로 긴 도면이 화면을 넘지 않게 — 높이 기준으로 폭을 제한한다
+                            maxWidth: fitView ? `calc(72vh * ${natW / natH})` : undefined,
+                        }}
+                        className={"relative w-full mx-auto rounded-2xl overflow-hidden border bg-white "
                             + (pickMode === "outline" ? "border-blue-500 ring-2 ring-blue-400/40 cursor-crosshair" : "border-[#d4af37]/30 cursor-crosshair")}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img ref={imgElRef} src={img} alt="도면" className="w-full block" />
+                        <img ref={imgElRef} src={img} alt="도면" className="w-full h-full block" />
                         <svg viewBox={`0 0 ${natW} ${natH}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
                             {/* 8괘 반투명 부채꼴 (팔택/현공) */}
                             {mode !== "24산" && GUA8.map((g, i) => {
@@ -682,6 +696,27 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             </div>
                         )}
                     </div>
+                    {/* 외곽선 편집 액션 바 — 도면 바로 아래에, 스크롤해도 따라오게 */}
+                    {pickMode === "outline" && (
+                        <div className="sticky bottom-2 z-20 flex items-center gap-1.5 flex-wrap rounded-2xl border border-blue-300 dark:border-blue-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-2.5 py-2 shadow-lg">
+                            <span className="text-[12px] font-bold text-blue-700 dark:text-blue-300">
+                                {outline.length}점
+                            </span>
+                            <Button onClick={() => setOutline((p) => p.slice(0, -1))} disabled={!outline.length}
+                                variant="outline" className="h-8 rounded-full text-[12px] px-3">↶ 되돌리기</Button>
+                            <Button onClick={() => setOutline([])} disabled={!outline.length}
+                                variant="outline" className="h-8 rounded-full text-[12px] px-3">🗑 전부 지우기</Button>
+                            <Button onClick={() => { setOutline([]); setPickMode("center"); }}
+                                variant="outline" className="h-8 rounded-full text-[12px] px-3">그만두기</Button>
+                            <Button onClick={applyOutline} disabled={outline.length < 3}
+                                className={"h-8 rounded-full text-[12px] px-4 font-bold ml-auto "
+                                    + (outline.length >= 3
+                                        ? "bg-blue-600 hover:bg-blue-700 text-white animate-pulse"
+                                        : "bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500")}>
+                                {outline.length >= 3 ? "✓ 다 찍었어요 → 다음" : `점 ${3 - outline.length}개 더 필요`}
+                            </Button>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-[11px] text-slate-400">
                             {mode === "팔택" && ming && <>본명괘 <b className="font-noto-serif">{ming}</b> 기준 — 초록=길방, 붉음=흉방. </>}
