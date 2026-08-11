@@ -6,6 +6,7 @@ import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
 import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, type Palace } from "@/lib/flyingStars";
 import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
+import { detectOutline } from "@/lib/floorPlanDetect";
 
 // 도면 방위 오버레이 — 도면/위성사진을 불러와 중심점을 찍고 북쪽을 맞추면
 // 24산 방사선(+팔택/현공 정보)을 겹쳐 보여준다. 전부 클라이언트에서 처리(업로드 없음).
@@ -111,6 +112,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [aligned, setAligned] = useState(false);   // ②까지 완료(자동 정렬 적용) 여부
     const [outline, setOutline] = useState<Pt[]>([]); // 평면 외곽선 — 입극점 자동 산출용
     const [centerNote, setCenterNote] = useState(""); // 중심 산출 결과 안내
+    const [detecting, setDetecting] = useState(false); // 외곽 자동 검출 중
+    const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
     const year = extYear ?? yearIn;
@@ -193,6 +196,31 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const resetPick = () => {
         setCenter(null); setAligned(false); setPickMode("center");
         setOutline([]); setCenterNote("");
+    };
+
+    // 이미지 처리로 평면 외곽을 자동 추정 — 전부 기기 안에서 처리(업로드 없음)
+    const autoDetect = () => {
+        const el = imgElRef.current;
+        if (!el || !el.complete) { notify.error("도면을 먼저 불러오세요"); return; }
+        setDetecting(true);
+        // 무거운 동기 연산이라 페인트 한 프레임 양보
+        setTimeout(() => {
+            try {
+                const res = detectOutline(el, natW, natH);
+                if (!res) {
+                    notify.error("외곽을 찾지 못했습니다", "도면이 잘 보이게 잘라서 다시 올리거나, 외곽선을 직접 찍어 주세요.");
+                    return;
+                }
+                setOutline(res.polygon);
+                setPickMode("outline");
+                setCenterNote(`자동 검출: 꼭짓점 ${res.points}개 · 사진의 ${(res.coverage * 100).toFixed(0)}% 영역. 어긋난 점은 직접 다시 찍고, 맞으면 '완료'를 누르세요.`);
+                notify.success(`외곽 자동 검출 완료 — ${res.points}점`, "결과를 확인하고 '완료 → 중심 계산'을 누르세요.");
+            } catch {
+                notify.error("자동 검출에 실패했습니다", "외곽선을 직접 찍어 주세요.");
+            } finally {
+                setDetecting(false);
+            }
+        }, 30);
     };
 
     // 외곽선으로 입극점 자동 산출 — 면적 가중 중심(도심), U형 특칙 포함
@@ -298,10 +326,14 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         <span className="text-slate-500 dark:text-slate-400">— ㄱ자·ㄷ자처럼 반듯하지 않은 평면에 권장</span>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
+                        <Button onClick={autoDetect} disabled={!img || detecting}
+                            className="h-7 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                            {detecting ? "검출 중…" : "🤖 외곽 자동 검출"}
+                        </Button>
                         {pickMode !== "outline" ? (
                             <Button onClick={() => { setOutline([]); setCenterNote(""); setPickMode("outline"); }}
                                 disabled={!img} variant="outline" className="h-7 rounded-full text-[11px]">
-                                외곽선 찍기 시작
+                                직접 찍기
                             </Button>
                         ) : (
                             <>
@@ -364,7 +396,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 <>
                     <div ref={boxRef} onClick={onPick} className="relative rounded-2xl overflow-hidden border border-[#d4af37]/30 cursor-crosshair bg-white">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt="도면" className="w-full block" />
+                        <img ref={imgElRef} src={img} alt="도면" className="w-full block" />
                         <svg viewBox={`0 0 ${natW} ${natH}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
                             {/* 8괘 반투명 부채꼴 (팔택/현공) */}
                             {mode !== "24산" && GUA8.map((g, i) => {
