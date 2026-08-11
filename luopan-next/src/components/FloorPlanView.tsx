@@ -21,6 +21,62 @@ function dir(deg: number): [number, number] {
     return [Math.sin(rad), -Math.cos(rad)];
 }
 
+/* ── 입극점(立極點) 자동 산출 — 다각형 평면의 면적 가중 중심 ──
+   현공 감정 절차 5단계 "평면도상 기하학적 방법으로 중심점 산출"에 해당.
+   ㄷ자(U형)처럼 중심이 집 밖으로 나가면 "가장 가까운 꺾임부"를 취하는 특칙까지 반영. */
+type Pt = [number, number];
+
+/** 신발끈 공식 — 다각형 면적(부호 없음) */
+function polygonArea(p: Pt[]): number {
+    let s = 0;
+    for (let i = 0, n = p.length; i < n; i++) {
+        const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % n];
+        s += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(s) / 2;
+}
+
+/** 다각형 도심(centroid) — 면적 가중. 면적이 0에 가까우면 산술평균으로 대체 */
+function polygonCentroid(p: Pt[]): Pt {
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0, n = p.length; i < n; i++) {
+        const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % n];
+        const f = x1 * y2 - x2 * y1;
+        a += f; cx += (x1 + x2) * f; cy += (y1 + y2) * f;
+    }
+    if (Math.abs(a) < 1e-9) {
+        const n = p.length;
+        return [p.reduce((s, q) => s + q[0], 0) / n, p.reduce((s, q) => s + q[1], 0) / n];
+    }
+    a *= 0.5;
+    return [cx / (6 * a), cy / (6 * a)];
+}
+
+/** 점이 다각형 안에 있는가 — ray casting */
+function pointInPolygon([x, y]: Pt, p: Pt[]): boolean {
+    let inside = false;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+        const [xi, yi] = p[i], [xj, yj] = p[j];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+/** 다각형 변 위에서 주어진 점에 가장 가까운 지점 — U형 중심이 집 밖으로 나갈 때 사용 */
+function nearestOnPolygon([x, y]: Pt, p: Pt[]): Pt {
+    let best: Pt = p[0], bd = Infinity;
+    for (let i = 0, n = p.length; i < n; i++) {
+        const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % n];
+        const dx = x2 - x1, dy = y2 - y1;
+        const len2 = dx * dx + dy * dy;
+        const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / len2));
+        const qx = x1 + t * dx, qy = y1 + t * dy;
+        const d = (x - qx) ** 2 + (y - qy) ** 2;
+        if (d < bd) { bd = d; best = [qx, qy]; }
+    }
+    return best;
+}
+
 interface Props {
     birthYear?: number;
     gender?: "male" | "female";
@@ -50,9 +106,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         try { const v = parseInt(window.localStorage.getItem("destiny-luopan-year") || "", 10); return v >= 1864 && v <= 2100 ? v : new Date().getFullYear(); } catch { return new Date().getFullYear(); }
     });
     const [saving, setSaving] = useState(false);
-    // 탭 2단계 상태: ① 집 중심 → ② 집 정면(베란다) 방향
-    const [pickMode, setPickMode] = useState<"center" | "facing">("center");
+    // 탭 단계: ⓪ 외곽선(선택) → ① 집 중심 → ② 집 정면(베란다) 방향
+    const [pickMode, setPickMode] = useState<"outline" | "center" | "facing">("center");
     const [aligned, setAligned] = useState(false);   // ②까지 완료(자동 정렬 적용) 여부
+    const [outline, setOutline] = useState<Pt[]>([]); // 평면 외곽선 — 입극점 자동 산출용
+    const [centerNote, setCenterNote] = useState(""); // 중심 산출 결과 안내
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
     const year = extYear ?? yearIn;
@@ -107,8 +165,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         const r = el.getBoundingClientRect();
         const x = ((e.clientX - r.left) / r.width) * natW;
         const y = ((e.clientY - r.top) / r.height) * natH;
+        if (pickMode === "outline") {
+            setOutline((prev) => [...prev, [x, y] as Pt]);
+            return;
+        }
         if (pickMode === "center") {
             setCenter([x, y]);
+            setCenterNote("");
             setAligned(false);
             setPickMode("facing");
             notify.success("① 중심 설정 완료", "이제 창(베란다)·정면 방향을 한 번 더 탭하세요.");
@@ -127,7 +190,34 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
             notify.success("✅ 도면 정렬 완료", `실측 향 ${facingDeg.toFixed(0)}°에 맞춰 도면 상단 방위를 ${nd}°로 설정했습니다.`);
         }
     };
-    const resetPick = () => { setCenter(null); setAligned(false); setPickMode("center"); };
+    const resetPick = () => {
+        setCenter(null); setAligned(false); setPickMode("center");
+        setOutline([]); setCenterNote("");
+    };
+
+    // 외곽선으로 입극점 자동 산출 — 면적 가중 중심(도심), U형 특칙 포함
+    const applyOutline = () => {
+        if (outline.length < 3) {
+            notify.error("점이 부족합니다", "평면 외곽을 최소 3점 이상 찍어 주세요.");
+            return;
+        }
+        const c = polygonCentroid(outline);
+        const inside = pointInPolygon(c, outline);
+        const final = inside ? c : nearestOnPolygon(c, outline);
+        setCenter(final);
+        setAligned(false);
+        setPickMode("facing");
+        const areaRatio = polygonArea(outline) / (natW * natH);
+        setCenterNote(
+            inside
+                ? `외곽선 ${outline.length}점의 면적 가중 중심(도심)으로 입극점을 잡았습니다. (평면이 사진의 ${(areaRatio * 100).toFixed(0)}% 차지)`
+                : `⚠ 도심이 집 밖(ㄷ자·요철 평면)에 떨어져, 현공 특칙에 따라 **가장 가까운 꺾임부**로 이동시켰습니다.`
+        );
+        notify.success(
+            inside ? "입극점 자동 산출 완료" : "입극점 보정 완료(꺾임부)",
+            "이제 창(정면) 방향을 탭하면 도면이 정렬됩니다."
+        );
+    };
 
     // 방위각 → 화면 각도(도면 상단이 northDeg를 가리키므로 그만큼 보정)
     const screenDeg = (d: number) => d - northDeg;
@@ -201,7 +291,41 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         {chart && <span className="text-xs text-[#bf953f] font-semibold">{chart.period}운 {chart.sitting}山{chart.facing}向 · {chart.structure}</span>}
                     </div>
                 )}
-                {/* 2탭 정렬 진행 표시 — 지금 어느 단계인지, 적용됐는지를 분명하게 */}
+                {/* ⓪ 외곽선으로 입극점 자동 산출 — 다각형 평면에서 눈대중 오차를 없앤다 */}
+                <div className="rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/5 p-2.5 space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                        <span className="font-bold text-[#bf953f]">📐 입극점(立極點) 자동 산출</span>
+                        <span className="text-slate-500 dark:text-slate-400">— ㄱ자·ㄷ자처럼 반듯하지 않은 평면에 권장</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        {pickMode !== "outline" ? (
+                            <Button onClick={() => { setOutline([]); setCenterNote(""); setPickMode("outline"); }}
+                                disabled={!img} variant="outline" className="h-7 rounded-full text-[11px]">
+                                외곽선 찍기 시작
+                            </Button>
+                        ) : (
+                            <>
+                                <span className="text-[11px] font-semibold text-[#bf953f]">외곽 {outline.length}점 찍음</span>
+                                <Button onClick={applyOutline} disabled={outline.length < 3}
+                                    className="h-7 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                                    완료 → 중심 계산
+                                </Button>
+                                <Button onClick={() => setOutline((p) => p.slice(0, -1))} disabled={!outline.length}
+                                    variant="outline" className="h-7 rounded-full text-[11px]">↶ 한 점 취소</Button>
+                                <Button onClick={() => { setOutline([]); setPickMode("center"); }}
+                                    variant="outline" className="h-7 rounded-full text-[11px]">그만두기</Button>
+                            </>
+                        )}
+                        <span className="text-[10px] text-slate-400">
+                            {pickMode === "outline"
+                                ? "평면 바깥 모서리를 순서대로 탭하세요(발코니·피난테라스 포함 여부는 직접 선택)"
+                                : "건너뛰고 중심을 직접 탭해도 됩니다"}
+                        </span>
+                    </div>
+                    {centerNote && <p className="text-[11px] text-emerald-700 dark:text-emerald-300">{centerNote}</p>}
+                </div>
+
+                {/* 정렬 진행 표시 — 지금 어느 단계인지, 적용됐는지를 분명하게 */}
                 <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
                     <span className={"px-2.5 py-1 rounded-full border " + (!img
                         ? "opacity-40 border-slate-200 dark:border-slate-700 text-slate-400"
@@ -226,7 +350,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 <p className="text-[11px] text-slate-400">
                     {!img
                         ? <>도면을 불러오면 시작합니다. (이미지는 기기에서만 처리됩니다)</>
-                        : !center
+                        : pickMode === "outline"
+                            ? <>평면의 <b>바깥 모서리를 시계 방향으로 차례차례 탭</b>하세요. 다 찍고 &lsquo;완료&rsquo;를 누르면 <b>면적 가중 중심(도심)</b>으로 입극점이 잡힙니다.</>
+                            : !center
                             ? <>① 사진 속 우리 집(터)의 <b>한가운데를 탭</b>하세요.</>
                             : !aligned
                                 ? <>② 이제 <b>창(베란다)·정면 방향을 한 번 더 탭</b>하세요 — 실측 향({facingDeg.toFixed(0)}°)에 맞춰 도면이 자동 회전됩니다.</>
@@ -320,13 +446,26 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     </g>
                                 );
                             })()}
+                            {/* 외곽선(입극점 산출용) — 찍는 중이거나 산출 후에도 근거로 남긴다 */}
+                            {outline.length > 0 && (
+                                <g>
+                                    <polygon points={outline.map((p) => p.join(",")).join(" ")}
+                                        fill="rgba(212,175,55,0.14)" stroke="#bf953f" strokeWidth={natW / 400}
+                                        strokeDasharray={pickMode === "outline" ? `${natW / 120},${natW / 200}` : undefined} />
+                                    {outline.map((p, i) => (
+                                        <circle key={i} cx={p[0]} cy={p[1]} r={Math.min(natW, natH) / 150}
+                                            fill="#bf953f" stroke="#fff" strokeWidth={natW / 900} />
+                                    ))}
+                                </g>
+                            )}
                             {/* 중심점 */}
                             <circle cx={cx} cy={cy} r={Math.min(natW, natH) / 90} fill="#c0392b" stroke="#fff" strokeWidth={natW / 500} />
                         </svg>
                         {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지) */}
                         {!aligned && (
                             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-slate-900/85 text-white text-[11px] font-bold pointer-events-none whitespace-nowrap">
-                                {pickMode === "center" ? "👆 ① 집 중심을 탭하세요" : "👆 ② 창(정면) 방향을 탭하세요"}
+                                {pickMode === "outline" ? `👆 평면 바깥 모서리를 차례로 탭 (${outline.length}점)`
+                                    : pickMode === "center" ? "👆 ① 집 중심을 탭하세요" : "👆 ② 창(정면) 방향을 탭하세요"}
                             </div>
                         )}
                     </div>
