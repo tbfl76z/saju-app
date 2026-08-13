@@ -72,6 +72,61 @@ export function oppositeMountain(m: string): string {
   throw new Error(`대향 산 없음: ${m}`);
 }
 
+/* ── 겸향(兼向) 판정 ──
+   각 산은 15°. 중앙 9°(중심 ±4.5°)가 정향(하괘)이고, 좌우 각 3°가 겸향 구간이다.
+   겸향이라고 전부 체괘를 쓰지는 않는다 — 48개 겸향 경계 중
+
+     · 동괘 내 음겸음 8 · 양겸양 8  → 체괘 불사용 ("음겸음, 양겸양 불체")
+     · 동괘 내 음양호겸 16          → 사용 ("음양호겸 용체")
+     · 출괘(다른 궁의 산과 겸) 16   → 무조건 사용 ("출괘필체, 불론음양")
+
+   ⚠ 유파 이설: 유훈승 계열은 체괘를 아예 쓰지 않고 각도 적중률 감쇠만 인정한다.
+     기성결에 5개 별만 나오는 점 등 논리적 의문이 남아 있어, 최종 선택은 사용자에게 맡긴다. */
+export type KyemType = "정향" | "음겸음" | "양겸양" | "음양호겸" | "출괘";
+export interface KyemResult {
+  mountain: string;      // 실측이 속한 산
+  offset: number;        // 산 중심에서 벗어난 각(도, 부호 있음. +는 시계방향)
+  kyem: boolean;         // 겸향 구간인가
+  neighbor: string | null; // 기울어 간 쪽 이웃 산
+  type: KyemType;
+  useTi: boolean;        // 체괘를 쓰는 유형인가
+  note: string;
+}
+/** 하괘 반폭(도) — 중앙 9°의 절반 */
+const HAGWA_HALF = 4.5;
+
+/** 실측 좌 방위각 → 겸향·체괘 판정 */
+export function kyemCheck(deg: number): KyemResult {
+  const d = ((deg % 360) + 360) % 360;
+  const mountain = mountainFromDeg(d);
+  const info = MOUNTAIN_INFO[mountain];
+  let off = d - info.deg;
+  if (off > 180) off -= 360;
+  if (off < -180) off += 360;
+
+  if (Math.abs(off) <= HAGWA_HALF) {
+    return {
+      mountain, offset: off, kyem: false, neighbor: null, type: "정향", useTi: false,
+      note: `산 중심에서 ${Math.abs(off).toFixed(1)}° — 정향(하괘) 구간입니다.`,
+    };
+  }
+  // 기울어 간 쪽 이웃 산 (15°씩 떨어져 있다)
+  const neighbor = mountainFromDeg(info.deg + (off > 0 ? 15 : -15));
+  const nInfo = MOUNTAIN_INFO[neighbor];
+  const outOfPalace = nInfo.palace !== info.palace;
+  const sameYin = MOUNTAIN_YINYANG[mountain] === MOUNTAIN_YINYANG[neighbor];
+  const yang = MOUNTAIN_YINYANG[mountain] === 1;
+
+  const type: KyemType = outOfPalace ? "출괘" : sameYin ? (yang ? "양겸양" : "음겸음") : "음양호겸";
+  const useTi = type === "출괘" || type === "음양호겸";
+  const note = type === "출괘"
+    ? `${mountain}산이 다른 궁의 ${neighbor}산 쪽으로 ${Math.abs(off).toFixed(1)}° 기울었습니다 — 출괘겸향이라 음양을 따지지 않고 체괘를 씁니다.`
+    : type === "음양호겸"
+      ? `${mountain}(${yang ? "양" : "음"})이 ${neighbor}(${yang ? "음" : "양"}) 쪽으로 ${Math.abs(off).toFixed(1)}° 기울었습니다 — 음양호겸이라 체괘를 씁니다.`
+      : `${mountain}·${neighbor} 모두 ${yang ? "양" : "음"}이라 ${type}입니다 — 체괘를 쓰지 않고 하괘 그대로 봅니다.`;
+  return { mountain, offset: off, kyem: true, neighbor, type, useTi, note };
+}
+
 /** 방위각(도) → 24산 (각 산 ±7.5도) */
 export function mountainFromDeg(deg: number): string {
   const d = ((deg % 360) + 360) % 360;
@@ -113,19 +168,56 @@ export interface StarChart {
   water: Record<Palace, number>;        // 향성
   structure: string;                    // 격국(왕산왕향 등)
   structureNote: string;
+  replaced: boolean;                    // 체괘로 세운 반인지
+}
+
+/* ── 체괘(替卦) ──
+   좌향이 산 중앙을 벗어나 겸향이 되면, 운반수를 그대로 입중하지 않고
+   기성결(起星訣)이 정한 체성(替星)으로 갈아끼워 반을 세운다.
+
+   기성결: "자계병갑신 탐랑일로행 / 임묘을미곤 오위위거문 / 건해진손사 연술무곡위
+            / 유신축간병 천성설파군 / 인오경정상 우필사성림"
+
+   변경 13산(임·신申·갑·묘·을·진·손·사·경·축·간·인·병)만 하괘와 달라지고
+   나머지 11산은 체성이 하괘와 같다. 5(염정)는 체성이 없어 그대로 쓴다. */
+const TI_STAR: Record<string, number> = {
+  壬: 2, 子: 1, 癸: 1,     // 감1
+  未: 2, 坤: 2, 申: 1,     // 곤2
+  甲: 1, 卯: 2, 乙: 2,     // 진3
+  辰: 6, 巽: 6, 巳: 6,     // 손4
+  戌: 6, 乾: 6, 亥: 6,     // 건6
+  庚: 9, 酉: 7, 辛: 7,     // 태7
+  丑: 7, 艮: 7, 寅: 9,     // 간8
+  丙: 7, 午: 9, 丁: 9,     // 리9
+};
+
+/** 원룡 → PALACE_MOUNTAINS 인덱스 */
+const yuanIdx = (yuan: YuanLong) => (yuan === "지원룡" ? 0 : yuan === "천원룡" ? 1 : 2);
+
+/**
+ * 체괘 입중수.
+ * 체성은 좌·향 글자가 아니라 **운반수가 가리키는 궁에서 좌·향과 같은 원룡인 산**으로 조회한다.
+ * 운반수가 5면 대응 궁이 없어 갈아끼울 것이 없다(염정 무체) — 5를 그대로 입중한다.
+ */
+function tiCenter(centerNum: number, yuan: YuanLong): number {
+  if (centerNum === 5) return 5;
+  const palace = NUM_PALACE[centerNum] as Exclude<Palace, "中">;
+  return TI_STAR[PALACE_MOUNTAINS[palace][yuanIdx(yuan)]];
 }
 
 /** 5 특칙 포함: 입중수의 원궁에서 원룡 위치 산의 음양 → 순/역 */
 function flyDirection(centerNum: number, yuan: YuanLong, selfMountain: string): boolean {
   if (centerNum === 5) return MOUNTAIN_YINYANG[selfMountain] === 1; // 5는 좌/향산 자체 음양
   const palace = NUM_PALACE[centerNum] as Exclude<Palace, "中">;
-  const idx = yuan === "지원룡" ? 0 : yuan === "천원룡" ? 1 : 2;
-  const mountain = PALACE_MOUNTAINS[palace][idx];
+  const mountain = PALACE_MOUNTAINS[palace][yuanIdx(yuan)];
   return MOUNTAIN_YINYANG[mountain] === 1;
 }
 
-/** 좌산·운(또는 연도)으로 비성반 산출 */
-export function starChart(sitting: string, period: number): StarChart {
+/**
+ * 좌산·운으로 비성반 산출.
+ * @param useTi 체괘로 세울지 여부. 순역은 체괘에서도 바뀌지 않는다(대응산의 원래 음양 그대로).
+ */
+export function starChart(sitting: string, period: number, useTi = false): StarChart {
   const sitInfo = MOUNTAIN_INFO[sitting];
   if (!sitInfo) throw new Error(`알 수 없는 좌산: ${sitting}`);
   const facing = oppositeMountain(sitting);
@@ -133,15 +225,15 @@ export function starChart(sitting: string, period: number): StarChart {
 
   const base = flyChart(period, true); // 운반은 항상 순비
 
-  // 산성: 좌궁 운반수 입중
+  // 산성: 좌궁 운반수 입중 (체괘면 그 자리의 체성으로 갈아끼운다)
   const mCenter = base[sitInfo.palace];
   const mForward = flyDirection(mCenter, sitInfo.yuan, sitting);
-  const mountain = flyChart(mCenter, mForward);
+  const mountain = flyChart(useTi ? tiCenter(mCenter, sitInfo.yuan) : mCenter, mForward);
 
   // 향성: 향궁 운반수 입중
   const wCenter = base[faceInfo.palace];
   const wForward = flyDirection(wCenter, faceInfo.yuan, facing);
-  const water = flyChart(wCenter, wForward);
+  const water = flyChart(useTi ? tiCenter(wCenter, faceInfo.yuan) : wCenter, wForward);
 
   // 격국: 당운수 위치
   const mAtSit = mountain[sitInfo.palace] === period;   // 산성 당운이 좌궁
@@ -154,7 +246,7 @@ export function starChart(sitting: string, period: number): StarChart {
   else if (mAtFace && wAtFace) { structure = "쌍성회향"; structureNote = "산·향성이 모두 향궁에 — 재물은 왕하나 인정은 부족. 향쪽에 물과 그 너머 산이 함께 있으면 겸수할 수 있습니다."; }
   else if (mAtSit && wAtSit) { structure = "쌍성회좌"; structureNote = "산·향성이 모두 좌궁에 — 인정은 왕하나 재물은 부족. 좌쪽에 산과 물이 함께 있으면 겸수할 수 있습니다."; }
 
-  return { period, sitting, facing, base, mountain, water, structure, structureNote };
+  return { period, sitting, facing, base, mountain, water, structure, structureNote, replaced: useTi };
 }
 
 /** 성수(星數) 이름 — 표시용 */

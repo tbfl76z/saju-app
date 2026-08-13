@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
     mountainFromDeg, annualChart, monthlyChart, monthlyCenter, comboFor,
-    fanFuYin, earthLuck, samBanGwa, chilseongTagyeop, cityGate, hapsip, type Palace,
+    fanFuYin, earthLuck, samBanGwa, chilseongTagyeop, cityGate, hapsip, kyemCheck, type Palace,
 } from "@/lib/flyingStars";
 import { mingGua, starFor, voidCheck, type Trigram, type Star } from "@/lib/eightMansions";
 import { streamSSE } from "@/lib/analyzeStream";
@@ -340,9 +340,15 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         }, 3000);
     };
 
+    // 겸향 판정 — 실측 각도가 산 중앙 9°를 벗어났는지, 그 유형이 체괘를 쓰는지
+    const kyem = useMemo(() => (measuredDeg == null ? null : kyemCheck(measuredDeg)), [measuredDeg]);
+    // 체괘 사용 여부. 판정을 기본값으로 쓰되, 체괘 무용론(유훈승 계열)도 있어 수동으로 덮을 수 있게 한다.
+    const [tiOverride, setTiOverride] = useState<boolean | null>(null);
+    const useTi = tiOverride ?? kyem?.useTi ?? false;
+
     const chart = useMemo(() => {
-        try { return starChart(sitting, periodOf(year)); } catch { return null; }
-    }, [sitting, year]);
+        try { return starChart(sitting, periodOf(year), useTi); } catch { return null; }
+    }, [sitting, year, useTi]);
     const annual = useMemo(() => annualChart(annualYear), [annualYear]);
     const period = periodOf(year);          // 원운 — 반의 골조(준공년 기준)
     const [py0, py1] = periodYears(period);
@@ -470,11 +476,14 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
     // 고급 이기(理氣) 판정 — 반음복음·지운입수·삼반괘·칠성타겁·성문결·합십
     // 전부 216국 전수 검산 + 외부 정본 성반 대조를 마친 계산만 노출한다.
+    // ⚠ 검산 범위는 하괘 216국 한정이다. 체괘반의 삼반괘·타겁·반복음·입수는 아직 대조하지 않았다.
+    //   특히 지운(입수)은 "중궁 향성 = 운반[향수궁]"이라는 하괘 항등식에서 유도한 식이라
+    //   체괘반에서는 규칙 자체가 분기한다 — 추정치를 내지 않고 아예 표시하지 않는다.
     const adv = useMemo(() => {
         if (!chart) return null;
         return {
             ff: fanFuYin(chart),
-            el: earthLuck(chart, nowYear),
+            el: chart.replaced ? null : earthLuck(chart, nowYear),
             sam: samBanGwa(chart),
             tag: chilseongTagyeop(chart),
             gate: cityGate(chart),
@@ -715,8 +724,47 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                             <Button onClick={() => goStep(1)} variant="outline" className="h-7 rounded-full text-[11px] ml-auto">← 좌향 재러 가기</Button>
                         </div>
                     )}
+                    {/* 겸향(兼向)·체괘(替卦) — 실측 각도가 산 중앙을 벗어났는지, 어느 반으로 볼지 */}
+                    {kyem && (
+                        <div className={"rounded-xl px-3 py-2 text-[12px] border space-y-1.5 "
+                            + (kyem.kyem
+                                ? "bg-violet-50/70 dark:bg-violet-950/30 border-violet-300/60 dark:border-violet-800/50 text-violet-800 dark:text-violet-300"
+                                : "bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300")}>
+                            <div>
+                                {kyem.kyem ? "⟡" : "•"} <b>{kyem.kyem ? `겸향 — ${kyem.type}` : "정향(하괘)"}</b>
+                                <span className="text-slate-500 dark:text-slate-400"> · {kyem.mountain} 중심에서 {kyem.offset > 0 ? "+" : ""}{kyem.offset.toFixed(1)}°</span>
+                            </div>
+                            <p>{kyem.note}</p>
+                            {kyem.kyem && (
+                                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                    <span className="text-[11px]">이 반은</span>
+                                    {([false, true] as boolean[]).map((t) => (
+                                        <button key={String(t)} onClick={() => setTiOverride(t)}
+                                            className={"px-3 py-1 rounded-full text-[11px] font-semibold border "
+                                                + (useTi === t
+                                                    ? "border-violet-400 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
+                                                    : "border-slate-300 dark:border-slate-600 text-slate-400")}>
+                                            {t ? "체괘(替卦)" : "하괘(下卦)"}
+                                        </button>
+                                    ))}
+                                    {tiOverride != null && (
+                                        <button onClick={() => setTiOverride(null)} className="text-[11px] text-slate-400 underline">판정값으로</button>
+                                    )}
+                                    <span className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                                        판정: {kyem.useTi ? "체괘" : "하괘"}
+                                    </span>
+                                </div>
+                            )}
+                            {kyem.kyem && (
+                                <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                                    ⚠ 체괘는 유파가 갈립니다 — 쓰지 않고 각도 적중률 감쇠만 인정하는 계열(유훈승)도 있고,
+                                    <b> 체괘는 당운만 관장하고 운이 지나면 효력을 잃는다</b>고 봅니다. 어느 반으로 봤는지 기록에 남기세요.
+                                </p>
+                            )}
+                        </div>
+                    )}
                     <div className="text-center">
-                        <span className="text-sm text-slate-500">{chart.period}운 반{chart.period !== curPeriod ? ` (현재 ${curPeriod}운)` : ""} <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
+                        <span className="text-sm text-slate-500">{chart.period}운 {chart.replaced ? "체괘" : "하괘"}반{chart.period !== curPeriod ? ` (현재 ${curPeriod}운)` : ""} <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
                     </div>
                     {/* 배치 토글 — 남상(전통 서적·필기와 동일) / 북상(지도·도면과 동일) */}
@@ -786,12 +834,25 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     {adv && (
                         <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40 p-3 space-y-1.5">
                             <div className="text-xs font-bold text-slate-700 dark:text-slate-200">🔬 이 판의 특수 격국 <span className="font-normal text-[10px] text-slate-400">(현공비성 고급 판정)</span></div>
+                            {/* 체괘반은 검산 범위 밖 — 숨기지 말고 한계를 명시한다 */}
+                            {chart.replaced && (
+                                <p className="text-[10.5px] text-amber-700 dark:text-amber-400 leading-snug">
+                                    ⚠ 아래 판정은 <b>하괘 216국으로 검산</b>한 계산입니다. <b>체괘반은 대조 전</b>이라 참고로만 보세요.
+                                </p>
+                            )}
                             {/* 입수 — 지금 가장 실무적인 항목 */}
                             <div className="flex items-start gap-2 text-xs">
                                 <span className="w-20 shrink-0 font-semibold text-slate-600 dark:text-slate-300">지운·입수</span>
-                                <span className={"flex-1 " + (adv.el.imprisoned ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-slate-600 dark:text-slate-300")}>
-                                    지운 {adv.el.years}년 · {adv.el.note}
-                                </span>
+                                {adv.el ? (
+                                    <span className={"flex-1 " + (adv.el.imprisoned ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-slate-600 dark:text-slate-300")}>
+                                        지운 {adv.el.years}년 · {adv.el.note}
+                                    </span>
+                                ) : (
+                                    <span className="flex-1 text-slate-500 dark:text-slate-400">
+                                        체괘반은 <b>입수 규칙이 하괘와 분기</b>합니다(당령성 입중 기준 ↔ 향수궁 운성 기준).
+                                        검산 전이라 추정치를 내지 않습니다 — 하괘로 전환하면 표시됩니다.
+                                    </span>
+                                )}
                             </div>
                             {(adv.ff.mountain || adv.ff.water) && (
                                 <div className="flex items-start gap-2 text-xs">
@@ -880,7 +941,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             {chart && (
                 <div className={"pt-1 " + (step === 3 ? "" : "hidden")}>
                     <div className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">STEP 3 · 도면에 적용 <span className="font-normal text-[11px] text-slate-400">— 도면을 먼저 올려도 됩니다. 중심 탭 → 정면 탭이면 잰 각도에 자동 정렬</span></div>
-                    <FloorPlanView birthYear={birthYear} gender={gender} sitting={sitting} year={year} measuredDeg={measuredDeg} embedded />
+                    <FloorPlanView birthYear={birthYear} gender={gender} sitting={sitting} year={year} measuredDeg={measuredDeg} useTi={useTi} embedded />
                 </div>
             )}
 

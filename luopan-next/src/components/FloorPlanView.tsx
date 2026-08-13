@@ -113,9 +113,11 @@ interface Props {
     embedded?: boolean;
     /** 실측 좌향 각도(도) — 있으면 도면 자동 정렬에 사용 */
     measuredDeg?: number | null;
+    /** 체괘로 세운 반인지 — STEP 2와 같은 반을 얹어야 판정이 어긋나지 않는다 */
+    useTi?: boolean;
 }
 
-export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false, measuredDeg = null }: Props) {
+export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false, measuredDeg = null, useTi = false }: Props) {
     const [img, setImg] = useState<string | null>(null);
     const [natural, setNatural] = useState<[number, number]>([1000, 750]);
     const [center, setCenter] = useState<[number, number] | null>(null);
@@ -162,8 +164,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     }, [birthYear, gender]);
 
     const chart = useMemo(() => {
-        try { return starChart(sitting, periodOf(year)); } catch { return null; }
-    }, [sitting, year]);
+        try { return starChart(sitting, periodOf(year), useTi); } catch { return null; }
+    }, [sitting, year, useTi]);
     const now = new Date();
     const annualYear = now.getMonth() + 1 < 2 || (now.getMonth() + 1 === 2 && now.getDate() < 4) ? now.getFullYear() - 1 : now.getFullYear();
     const annual = useMemo(() => annualChart(annualYear), [annualYear]);
@@ -490,7 +492,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                     <span className="text-xs text-slate-400">° (위성지도 캡처는 대개 0=북)</span>
                 </div>
                 {mode === "현공" && embedded && chart && (
-                    <p className="text-[11px] text-slate-400">위 현공 반의 <b className="text-[#bf953f] font-noto-serif">{chart.sitting}山{chart.facing}向 · {chart.period}운</b>이 그대로 적용됩니다.</p>
+                    <p className="text-[11px] text-slate-400">위 현공 반의 <b className="text-[#bf953f] font-noto-serif">{chart.sitting}山{chart.facing}向 · {chart.period}운 {chart.replaced ? "체괘" : "하괘"}반</b>이 그대로 적용됩니다.</p>
                 )}
                 {mode === "현공" && !embedded && (
                     <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
