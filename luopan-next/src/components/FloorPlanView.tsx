@@ -163,6 +163,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 지도 종류 — 기본은 일반지도. 위성은 고층 건물의 옆면이 보여(시차) 지붕 윤곽이
     // 실제 대지 경계와 어긋난다. 일반지도는 건물이 폴리곤이라 중심·외곽 잡기가 정확하다.
     const [mapType, setMapType] = useState<"basic" | "satellite">("basic");
+    // 배율 — 20이 최대(네이버 level 상한). 20이면 약 121m 폭이라 아파트 한 동이 화면을 채운다.
+    const [mapZoom, setMapZoom] = useState(20);
+    // 마지막으로 찾은 좌표. 확대·축소는 이 좌표로 다시 받아 지오코딩 호출을 아낀다.
+    const mapPos = useRef<{ lat: number; lng: number } | null>(null);
+    const [panMode, setPanMode] = useState(false);          // 지도 끌어서 이동
+    const [panOff, setPanOff] = useState<[number, number]>([0, 0]);  // 끄는 중의 화면 이동량(px)
+    const panStart = useRef<{ x: number; y: number } | null>(null);
     const [northLocked, setNorthLocked] = useState(false); // 위성지도 = 위가 정북(방위 확정)
     const imgElRef = useRef<HTMLImageElement>(null);
     // 복원 완료 전에는 저장하지 않는다(빈 값으로 덮어쓰기 방지).
@@ -291,6 +298,12 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     };
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         if (!img) return;
+        if (panMode) {
+            panStart.current = { x: e.clientX, y: e.clientY };
+            setPanOff([0, 0]);
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+            return;
+        }
         dragged.current = false;
         dragIdx.current = null;
         tapStart.current = { x: e.clientX, y: e.clientY };
@@ -309,6 +322,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         }
     };
     const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (panMode) {
+            const st = panStart.current;
+            if (st) setPanOff([e.clientX - st.x, e.clientY - st.y]);
+            return;
+        }
         if (dragIdx.current == null) return;
         const p = toImgXY(e);
         if (!p) return;
@@ -317,6 +335,24 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         setOutline((prev) => prev.map((q, k) => (k === i ? p : q)));
     };
     const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (panMode) {
+            const st = panStart.current;
+            panStart.current = null;
+            setPanOff([0, 0]);
+            const info = mapInfo, pos = mapPos.current;
+            if (!st || !info || !pos) return;
+            const dx = e.clientX - st.x, dy = e.clientY - st.y;
+            if (Math.hypot(dx, dy) < 6) return;                 // 살짝 눌린 것은 무시
+            // 화면 이동량 → 이미지 픽셀 → 미터 → 위경도.
+            // 내용이 오른쪽으로 밀리면 보는 지점은 서쪽으로 간다(부호 반대).
+            const dxImg = dx * k, dyImg = dy * k;
+            const north = dyImg * info.mpp;                     // y는 아래가 남쪽
+            const east = -dxImg * info.mpp;
+            const lat = pos.lat + north / 110540;
+            const lng = pos.lng + east / (111320 * Math.cos((pos.lat * Math.PI) / 180));
+            loadMap({ byCoords: true, center: { lat, lng }, shift: [dxImg, dyImg] });
+            return;
+        }
         const wasDrag = dragIdx.current != null && dragged.current;
         dragIdx.current = null;
         dragged.current = false;
@@ -327,7 +363,10 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         const p = toImgXY(e);
         if (p) onPick(p[0], p[1]);
     };
-    const onPointerCancel = () => { dragIdx.current = null; dragged.current = false; tapStart.current = null; };
+    const onPointerCancel = () => {
+        dragIdx.current = null; dragged.current = false; tapStart.current = null;
+        panStart.current = null; setPanOff([0, 0]);
+    };
 
     const onPick = (x: number, y: number) => {
         if (!img) return;
@@ -410,9 +449,25 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 주소로 위성지도 불러오기.
     // 위성지도는 위가 정북이므로 도면 상단 방위를 0°로 고정하고 시작한다 —
     // 나침반 없이도 건물이 앉은 각을 볼 수 있어 실측의 교차검증이 된다.
-    const loadMap = async () => {
+    /**
+     * 지도 불러오기.
+     * @param zoom  배율(생략 시 현재 값)
+     * @param byCoords true면 주소 대신 이미 찾아둔 좌표로 받는다 — 확대·축소용(지오코딩 호출 절약)
+     */
+    const loadMap = async (opts: {
+        zoom?: number;
+        byCoords?: boolean;                       // 주소 대신 저장된 좌표로 (확대·축소·이동용)
+        type?: "basic" | "satellite";
+        center?: { lat: number; lng: number };    // 이동한 새 중심
+        shift?: [number, number];                 // 찍어둔 점을 옮길 픽셀량(이동 시 지리 위치 유지)
+    } = {}) => {
+        const { zoom, byCoords = false, type, center: newCenter, shift } = opts;
         const q = addr.trim();
-        if (!q) { notify.error("주소를 입력하세요"); return; }
+        const pos = newCenter ?? mapPos.current;
+        if (byCoords && !pos) return;
+        if (!byCoords && !q) { notify.error("주소를 입력하세요"); return; }
+        const z = Math.max(16, Math.min(20, zoom ?? mapZoom));
+        const mt = type ?? mapType;   // setMapType 직후 호출되면 state는 아직 옛 값이다
         userActed.current = true;
         clearPlan();
         setMapBusy(true);
@@ -421,29 +476,49 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 // 크기는 서버가 공급자 상한(네이버 1024 / 구글 640)으로 잘라 준다.
-                // 네이버 1024·scale2 = 2048px, 실측 약 242m 폭 — 단지 한 동이 넉넉히 들어온다.
-                body: JSON.stringify({ address: q, zoom: 19, size: 1024, maptype: mapType }),
+                body: JSON.stringify(
+                    byCoords && pos
+                        ? { lat: pos.lat, lng: pos.lng, zoom: z, size: 1024, maptype: mt }
+                        : { address: q, zoom: z, size: 1024, maptype: mt },
+                ),
             });
             if (!r.ok) {
                 let msg = `요청 실패(${r.status})`;
                 try { const j = await r.json(); if (j?.detail) msg = j.detail; } catch { /* 무시 */ }
-                notify.error("위성지도를 불러오지 못했습니다", msg);
+                notify.error("지도를 불러오지 못했습니다", msg);
                 return;
             }
-            const j: { image: string; address: string; meters_per_pixel: number; provider?: string } = await r.json();
+            const j: { image: string; address: string; lat: number; lng: number; meters_per_pixel: number; provider?: string } = await r.json();
             const im = new Image();
             im.onload = () => {
                 setNatural([im.naturalWidth, im.naturalHeight]);
-                setCenter(null); setOutline([]); setRooms([]); setAligned(false);
-                setPickMode("center"); setCenterNote(""); setAiRead(null);
-                setNorthDeg(0); setNorthLocked(true);   // 위성지도는 위 = 정북
+                if (shift) {
+                    // 지도를 옮긴 경우 — 찍어둔 점이 같은 '땅 위 지점'에 남도록 픽셀만큼 이동시킨다
+                    const [sx, sy] = shift;
+                    setCenter((c) => (c ? [c[0] + sx, c[1] + sy] : c));
+                    setOutline((o) => o.map(([x, y]) => [x + sx, y + sy] as Pt));
+                    setRooms((r) => r.map((v) => ({ ...v, x: v.x + sx, y: v.y + sy })));
+                } else {
+                    // 배율·종류가 바뀌면 픽셀 위치가 전부 달라져 찍어둔 점을 그대로 둘 수 없다
+                    setCenter(null); setOutline([]); setRooms([]); setAligned(false);
+                    setPickMode("center"); setCenterNote(""); setAiRead(null);
+                }
+                setNorthDeg(0); setNorthLocked(true);   // 지도는 위 = 정북
                 setImg(j.image);
+                setMapZoom(z);
+                mapPos.current = { lat: j.lat, lng: j.lng };
                 setMapInfo({ address: j.address || q, mpp: j.meters_per_pixel, provider: j.provider || "" });
-                notify.success("위성지도를 불러왔습니다", "위가 정북으로 맞춰져 있습니다. 집 중심 → 정면을 탭하세요.");
+                const span = Math.round(im.naturalWidth * j.meters_per_pixel);
+                if (!shift) {
+                    notify.success(
+                        byCoords ? `배율 ${z} — 약 ${span}m 폭` : "지도를 불러왔습니다",
+                        byCoords ? "찍어둔 점은 초기화됐습니다." : `위가 정북입니다. 약 ${span}m 폭 · 집 중심 → 정면을 탭하세요.`,
+                    );
+                }
             };
             im.src = j.image;
         } catch {
-            notify.error("위성지도를 불러오지 못했습니다", "네트워크 상태를 확인해 주세요.");
+            notify.error("지도를 불러오지 못했습니다", "네트워크 상태를 확인해 주세요.");
         } finally {
             setMapBusy(false);
         }
@@ -618,12 +693,12 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         placeholder="주소 입력 (예: 서울 강남구 테헤란로 1)"
                         className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
                     {(["basic", "satellite"] as const).map((t) => (
-                        <button key={t} onClick={() => setMapType(t)}
+                        <button key={t} onClick={() => { setMapType(t); if (mapPos.current) loadMap({ byCoords: true, type: t }); }}
                             className={"px-2.5 py-1 rounded-full text-[11px] font-semibold " + (mapType === t ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
                             {t === "basic" ? "일반" : "위성"}
                         </button>
                     ))}
-                    <Button onClick={loadMap} disabled={mapBusy} className="h-8 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                    <Button onClick={() => loadMap()} disabled={mapBusy} className="h-8 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
                         {mapBusy ? "불러오는 중…" : "🗺 지도 불러오기"}
                     </Button>
                     {img && (
@@ -659,7 +734,25 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         {mapInfo.provider && <span className="text-slate-500 dark:text-slate-400"> ({mapInfo.provider === "naver" ? "네이버" : "구글"})</span>}
                         {mapInfo.address && <span> · {mapInfo.address} </span>}
                         · 약 {mapInfo.mpp.toFixed(2)} m/픽셀
-                        <br />건물 중심 → 정면(베란다 쪽)을 차례로 탭하면 <b>좌향이 계산</b>됩니다.
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                            <span className="text-[11px] font-semibold">배율</span>
+                            <button onClick={() => loadMap({ zoom: mapZoom - 1, byCoords: true })} disabled={mapBusy || mapZoom <= 16}
+                                className="w-7 h-7 rounded-full border border-sky-300 dark:border-sky-700 font-bold disabled:opacity-40">−</button>
+                            <span className="text-[11px] w-16 text-center">{mapZoom} 단계</span>
+                            <button onClick={() => loadMap({ zoom: mapZoom + 1, byCoords: true })} disabled={mapBusy || mapZoom >= 20}
+                                className="w-7 h-7 rounded-full border border-sky-300 dark:border-sky-700 font-bold disabled:opacity-40">+</button>
+                            <span className="text-[10.5px] text-slate-500 dark:text-slate-400">
+                                {mapBusy ? "불러오는 중…" : `가로 약 ${Math.round(natW * mapInfo.mpp)}m`}
+                            </span>
+                            <button onClick={() => setPanMode((v) => !v)}
+                                className={"ml-auto px-2.5 py-1 rounded-full text-[11px] font-semibold border "
+                                    + (panMode
+                                        ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                                        : "border-slate-300 dark:border-slate-600 text-slate-500")}>
+                                {panMode ? "🖐 이동 중 — 끄기" : "🖐 지도 이동"}
+                            </button>
+                        </div>
+                        건물 중심 → 정면(베란다 쪽)을 차례로 탭하면 <b>좌향이 계산</b>됩니다.
                         아파트는 동마다 배치각이 달라 이 값은 <b>실측의 대체가 아니라 교차검증용</b>입니다.
                         {mapType === "satellite" && <><br /><b>※ 위성사진은 고층일수록 건물 옆면이 보여</b> 지붕 윤곽이 실제 대지 경계와 어긋납니다 — 중심을 잡을 땐 <b>일반지도</b>가 정확합니다.</>}
                     </div>
@@ -828,13 +921,20 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         onPointerDown={onPointerDown} onPointerMove={onPointerMove}
                         onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
                         style={{
-                            touchAction: pickMode === "outline" ? "none" : undefined,
+                            touchAction: pickMode === "outline" || panMode ? "none" : undefined,
                             aspectRatio: `${natW} / ${natH}`,
                             // 세로로 긴 도면이 화면을 넘지 않게 — 높이 기준으로 폭을 제한한다
                             maxWidth: fitView ? `calc(72vh * ${natW / natH})` : undefined,
                         }}
                         className={"relative w-full mx-auto rounded-2xl overflow-hidden border bg-white "
-                            + (pickMode === "outline" ? "border-blue-500 ring-2 ring-blue-400/40 cursor-crosshair" : "border-[#d4af37]/30 cursor-crosshair")}>
+                            + (panMode ? "border-sky-500 ring-2 ring-sky-400/40 cursor-grab active:cursor-grabbing"
+                                : pickMode === "outline" ? "border-blue-500 ring-2 ring-blue-400/40 cursor-crosshair"
+                                    : "border-[#d4af37]/30 cursor-crosshair")}>
+                        {/* 끄는 동안은 이미지와 오버레이를 같이 밀어 준다(놓을 때 실제로 다시 받아온다) */}
+                        <div className="absolute inset-0" style={{
+                            transform: panOff[0] || panOff[1] ? `translate(${panOff[0]}px, ${panOff[1]}px)` : undefined,
+                            transition: panStart.current ? "none" : "transform 120ms ease-out",
+                        }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img ref={imgElRef} src={img} alt="도면" className="w-full h-full block" />
                         <svg viewBox={`0 0 ${natW} ${natH}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
@@ -1000,9 +1100,15 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {/* 중심점 */}
                             <circle cx={cx} cy={cy} r={7 * k} fill="#c0392b" stroke="#fff" strokeWidth={1.5 * k} />
                         </svg>
+                        </div>
                         {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지).
                             단 방 찍기는 정렬 이후에 하는 작업이라 그때도 띄운다. */}
-                        {(!aligned || pickMode === "room") && (
+                        {panMode && (
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-sky-600/90 text-white text-[11px] font-bold pointer-events-none whitespace-nowrap">
+                                🖐 끌어서 주변 지도 보기 · 놓으면 그 위치로 불러옵니다
+                            </div>
+                        )}
+                        {!panMode && (!aligned || pickMode === "room") && (
                             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-slate-900/85 text-white text-[11px] font-bold pointer-events-none whitespace-nowrap">
                                 {pickMode === "room" ? `🏷 ${roomName} 위치를 탭하세요`
                                     : pickMode === "outline" ? `✏️ 모서리를 차례로 탭 · 점을 끌어 수정 (${outline.length}점)`
