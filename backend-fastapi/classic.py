@@ -766,6 +766,14 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
     """네이버 클라우드 플랫폼 — Geocoding + Static Map(위성).
 
     Static Map은 월 300만 건 무료이고 최대 1024px까지 받는다.
+
+    실호출로 확인한 두 가지:
+      · 엔드포인트는 maps.apigw.ntruss.com 이다. 구 naveropenapi.apigw.ntruss.com 은
+        같은 키로도 401 "A subscription to the API is required" 가 난다.
+      · maptype 은 satellite_base 를 쓴다. satellite 는 상호·도로 라벨이 얹혀 나와
+        중심 찍기와 외곽선 작업을 방해한다.
+      · format 은 jpg. 같은 2048px에서 png 3.5MB / jpg 291KB 로 12배 차이가 난다
+        (위성사진은 사진이라 png 무손실이 의미가 없다).
     center 파라미터가 '경도,위도' 순서인 점에 주의(구글과 반대).
     """
     import base64
@@ -784,7 +792,7 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
             if not addr:
                 raise HTTPException(status_code=400, detail="주소 또는 좌표가 필요합니다.")
             g = await client.get(
-                "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode",
+                "https://maps.apigw.ntruss.com/map-geocode/v2/geocode",
                 params={"query": addr}, headers=H,
             )
             if g.status_code in (401, 403):
@@ -793,18 +801,20 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
                 raise HTTPException(status_code=502, detail=f"주소 검색 실패(HTTP {g.status_code})")
             gj = g.json()
             addrs = gj.get("addresses") or []
-            if gj.get("status") != "OK" or not addrs:
-                raise HTTPException(status_code=404, detail=f"주소를 찾지 못했습니다. ({gj.get('errorMessage') or gj.get('status')})")
+            if gj.get("status") != "OK":
+                raise HTTPException(status_code=502, detail=f"주소 검색 오류: {gj.get('errorMessage') or gj.get('status')}")
+            if not addrs:
+                raise HTTPException(status_code=404, detail="주소를 찾지 못했습니다. 도로명주소나 건물명을 넣어 보세요.")
             top = addrs[0]
             lng, lat = float(top["x"]), float(top["y"])   # x=경도, y=위도
             resolved = top.get("roadAddress") or top.get("jibunAddress") or ""
 
         m = await client.get(
-            "https://naveropenapi.apigw.ntruss.com/map-static/v2/raster",
+            "https://maps.apigw.ntruss.com/map-static/v2/raster",
             params={
                 "center": f"{lng},{lat}",      # 경도,위도 순
                 "level": level, "w": size, "h": size,
-                "scale": scale, "maptype": "satellite", "format": "png",
+                "scale": scale, "maptype": "satellite_base", "format": "jpg",
             },
             headers=H,
         )
@@ -814,7 +824,7 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
         raise HTTPException(status_code=502, detail=f"위성지도를 받지 못했습니다(HTTP {m.status_code}).")
 
     return {
-        "image": "data:image/png;base64," + base64.b64encode(m.content).decode(),
+        "image": "data:image/jpeg;base64," + base64.b64encode(m.content).decode(),
         "lat": lat, "lng": lng, "address": resolved,
         "zoom": level, "meters_per_pixel": round(_mpp(lat, level, scale), 4),
         "north_up": True, "provider": "naver",
@@ -859,7 +869,7 @@ async def _google_map(req: MapReq, key: str) -> dict:
             params={
                 "center": f"{lat},{lng}", "zoom": zoom,
                 "size": f"{size}x{size}", "scale": scale,
-                "maptype": "satellite", "format": "png", "key": key,
+                "maptype": "satellite", "format": "jpg", "key": key,
             },
         )
     if m.status_code != 200:
@@ -868,7 +878,7 @@ async def _google_map(req: MapReq, key: str) -> dict:
         raise HTTPException(status_code=502, detail="위성지도 응답이 이미지가 아닙니다. API 키 제한 설정을 확인하세요.")
 
     return {
-        "image": "data:image/png;base64," + base64.b64encode(m.content).decode(),
+        "image": "data:image/jpeg;base64," + base64.b64encode(m.content).decode(),
         "lat": lat, "lng": lng, "address": resolved,
         "zoom": zoom, "meters_per_pixel": round(_mpp(lat, zoom, scale), 4),
         "north_up": True, "provider": "google",

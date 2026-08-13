@@ -354,7 +354,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
             const r = await fetch(`${API_BASE}/classic/map/satellite`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                // 크기는 서버가 공급자 상한(네이버 1024 / 구글 640)으로 잘라 준다
+                // 크기는 서버가 공급자 상한(네이버 1024 / 구글 640)으로 잘라 준다.
+                // 네이버 1024·scale2 = 2048px, 실측 약 242m 폭 — 단지 한 동이 넉넉히 들어온다.
                 body: JSON.stringify({ address: q, zoom: 19, size: 1024 }),
             });
             if (!r.ok) {

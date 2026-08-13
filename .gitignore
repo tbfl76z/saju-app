@@ -30,3 +30,7 @@ shares.db
 # OS
 .DS_Store
 Thumbs.db
+
+# 환경변수 백업본까지 차단 (.env 만 막으면 .env.bak 이 새어 나간다)
+.env.*
+!.env.example
