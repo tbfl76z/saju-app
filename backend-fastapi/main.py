@@ -168,6 +168,9 @@ async def health_ai():
         "openrouter_api_key": bool(ai_report.OPENROUTER_API_KEY),
         "openrouter_models": ai_report.OPENROUTER_MODELS,
         "priority_models": ai_report.PRIORITY_MODELS,
+        # 위성지도 — 환경변수가 실제로 주입됐는지 배포 후 눈으로 확인하는 용도
+        "naver_maps": bool(os.getenv("NAVER_MAPS_KEY_ID") and os.getenv("NAVER_MAPS_KEY")),
+        "google_maps": bool(os.getenv("GOOGLE_MAPS_API_KEY")),
     }
 
 
