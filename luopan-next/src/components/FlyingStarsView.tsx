@@ -12,6 +12,7 @@ import { streamSSE } from "@/lib/analyzeStream";
 import { ReportRenderer } from "@/components/ReportRenderer";
 import { Button } from "@/components/ui/button";
 import FloorPlanView from "@/components/FloorPlanView";
+import AlignDiagram from "@/components/AlignDiagram";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
 
@@ -532,7 +533,9 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40 px-3 py-2 text-[12px] text-sky-800 dark:text-sky-300 leading-relaxed space-y-1">
                     <p>🧭 <b>핵심 — 어디에 서느냐가 아니라, 폰을 무엇에 맞추느냐입니다.</b> 나침반은 위치를 모르고 방향만 읽습니다. 서는 자리는 각도에 영향이 없습니다.</p>
                     <p>① 거실의 <b>가장 큰 창(베란다)</b> 앞으로 갑니다.</p>
-                    <p>② 폰을 손바닥에 <b>수평으로 눕히고, 폰의 긴 변을 창면(벽면)과 나란히</b> 맞춥니다 — 자를 벽에 대듯. 그 상태에서 <b>폰 위쪽=향(向), 등 뒤=좌(坐)</b>입니다.</p>
+                    <p>② 폰을 손바닥에 <b>수평으로 눕힙니다</b>(화면이 하늘을 보게).</p>
+                    <p>③ 아래 그림처럼, <b>폰의 위쪽 끝(짧은 변)을 창면과 나란히</b> 맞추세요 — 새시 프레임·창틀 선에 <b>자를 대듯</b> 하면 됩니다. 그러면 화살표가 창밖을 뚫고 나가고, <b>그 방향이 향(向)·등 뒤가 좌(坐)</b>입니다.</p>
+                    <AlignDiagram />
                     <p>③ 창틀·방충망에 <b>붙이지 말고 30~50cm 띄우세요.</b> 알루미늄 샷시와 철근이 바늘을 휩니다. <b>자석 케이스는 빼야</b> 합니다.</p>
                     <p className="text-rose-700 dark:text-rose-300">✋ <b>집 한가운데 서서 창을 눈대중으로 겨누지 마세요.</b> 창은 점이 아니라 면이라, 왼쪽 끝을 겨누느냐 오른쪽 끝을 겨누느냐에 따라 <b>20~30°가 흔들립니다</b>(24산은 15° 단위라 산이 통째로 넘어갑니다).</p>
                     <p className="text-slate-500 dark:text-slate-400">📐 &lsquo;집 중심&rsquo;은 이 단계가 아니라 <b>STEP 3 도면에서 8궁을 나눌 때</b> 씁니다. 각도는 집 전체에 한 번만 재면 되고, 방마다 다시 잴 필요가 없습니다.</p>

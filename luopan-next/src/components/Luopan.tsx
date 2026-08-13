@@ -476,7 +476,7 @@ export default function Luopan({
         ) : (
           <div style={{ fontSize: 11.5, color: "#5F6D64", lineHeight: 1.7 }}>
             대문(또는 거실 큰 창) 앞에서 폰을 수평으로 눕히고,<br />
-            폰의 긴 변을 그 <b>문·창의 면과 나란히</b> 맞춘 뒤 버튼을 누르세요<br />
+            폰의 <b>위쪽 끝(짧은 변)을 그 문·창의 면과 나란히</b> 맞춘 뒤 버튼을 누르세요<br />
             <span style={{ color: "#4E5A52" }}>— 중심에서 눈대중으로 겨누면 20~30° 어긋납니다</span>
           </div>
         )}
