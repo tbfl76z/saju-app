@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
-import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, type Palace } from "@/lib/flyingStars";
+import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, mountainFromDeg, type Palace } from "@/lib/flyingStars";
 import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
 import { detectOutline } from "@/lib/floorPlanDetect";
 
@@ -26,6 +26,21 @@ interface PlanRead {
 type OverlayMode = "24산" | "팔택" | "현공";
 const GOOD_STARS: Star[] = ["생기", "천의", "연년", "복위"];
 const GUA8: Trigram[] = ["坎", "艮", "震", "巽", "離", "坤", "兌", "乾"];
+
+/* ── 평면 분할 방식 ──
+   현공 실무는 두 갈래다. 부채꼴(45° 방사)은 비성 분포를 각도 그대로 반영하고,
+   9궁격(井자 3×3)은 전통 구궁도를 평면에 그대로 얹는다. 유파가 갈리는 지점이라
+   프로 도구들도 토글로 둔다. 결과가 다르게 나오는 자리이므로 어느 쪽으로 봤는지 남겨야 한다. */
+type DivideMode = "부채꼴" | "9궁격";
+/** 9궁격 셀 — [행, 열, 화면 위쪽 기준 방위 오프셋]. 가운데(1,1)는 中궁이라 뺀다. */
+const GRID_CELLS: [number, number, number][] = [
+    [0, 0, 315], [0, 1, 0], [0, 2, 45],
+    [1, 0, 270], [1, 2, 90],
+    [2, 0, 225], [2, 1, 180], [2, 2, 135],
+];
+const PAL_KO: Record<string, string> = {
+    坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서", 中: "중앙",
+};
 
 // 방위각(0=북, 시계방향) → 이미지 좌표 방향벡터
 function dir(deg: number): [number, number] {
@@ -127,6 +142,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [aiBusy, setAiBusy] = useState(false);       // AI 도면 판독 중
     const [aiRead, setAiRead] = useState<PlanRead | null>(null);
     const [fitView, setFitView] = useState(true);      // 긴 도면을 화면 높이에 맞춰 축소
+    const [divide, setDivide] = useState<DivideMode>("부채꼴"); // 평면 분할 방식(유파 차이)
+    const [alpha, setAlpha] = useState(100);           // 오버레이 진하기 — 도면 글씨가 가려질 때 낮춘다
     const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
@@ -365,6 +382,31 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 방위각 → 화면 각도(도면 상단이 northDeg를 가리키므로 그만큼 보정)
     const screenDeg = (d: number) => d - northDeg;
 
+    // 9궁격 범위 — 외곽선을 찍었으면 그 바운딩 박스, 아니면 사진 전체
+    const gridBox = useMemo(() => {
+        if (outline.length >= 3) {
+            const xs = outline.map((p) => p[0]), ys = outline.map((p) => p[1]);
+            return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+        }
+        return { x0: 0, y0: 0, x1: natW, y1: natH };
+    }, [outline, natW, natH]);
+    /** 화면 위쪽 기준 오프셋 → 실제 궁 (도면 상단이 northDeg를 가리킨다) */
+    const palaceAt = (off: number): Palace =>
+        MOUNTAIN_INFO[mountainFromDeg(northDeg + off)].palace as Palace;
+    /** 궁 → 오버레이 채움색 (모드별) */
+    const palaceFill = (p: Palace): string => {
+        if (mode === "팔택" && ming && p !== "中") {
+            const st = starFor(ming, p as Trigram);
+            return GOOD_STARS.includes(st) ? "rgba(46,139,107,0.16)" : "rgba(165,48,60,0.14)";
+        }
+        if (mode === "현공" && chart) {
+            const mood = starMood(chart.water[p], curPeriod);
+            return mood === "왕기" ? "rgba(212,175,55,0.22)" : mood === "생기" ? "rgba(46,139,107,0.16)"
+                : mood === "쇠살" ? "rgba(165,48,60,0.10)" : "rgba(120,120,120,0.06)";
+        }
+        return "rgba(120,120,120,0.05)";
+    };
+
     const handleSave = async () => {
         if (!boxRef.current) return;
         setSaving(true);
@@ -420,6 +462,26 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         </button>
                     ))}
                 </div>
+                {/* 평면 분할 방식 — 유파가 갈리는 자리라 토글로 둔다. 결과가 다르게 나온다. */}
+                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
+                    <span>분할</span>
+                    {(["부채꼴", "9궁격"] as DivideMode[]).map((d) => (
+                        <button key={d} onClick={() => setDivide(d)}
+                            className={"px-3 py-1 rounded-full text-xs font-semibold " + (divide === d ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                            {d === "부채꼴" ? "◔ 부채꼴(45°)" : "▦ 9궁격(井)"}
+                        </button>
+                    ))}
+                    <span className="mx-1">진하기</span>
+                    <input type="range" min={20} max={100} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
+                        className="w-24 accent-[#d4af37]" aria-label="오버레이 진하기" />
+                    <span className="text-xs text-slate-400 w-9">{alpha}%</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                    {divide === "부채꼴"
+                        ? <>중심에서 45°씩 방사로 나눕니다 — 각도를 그대로 반영해 <b>비스듬한 벽·모난 평면</b>에 잘 맞습니다.</>
+                        : <>전통 구궁도처럼 <b>가로세로 3등분</b>합니다{outline.length >= 3 ? " (찍어둔 외곽선 범위 기준)" : " (외곽선을 찍으면 그 범위로 잡힙니다)"} — <b>반듯한 평면</b>에 잘 맞습니다.</>}
+                    {" "}유파에 따라 판정이 갈리는 자리이니, <b>어느 쪽으로 봤는지 기록에 남기세요.</b>
+                </p>
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                     <span>도면 상단의 실제 방위</span>
                     <input type="range" min={0} max={359} value={northDeg} onChange={(e) => setNorthDeg(Number(e.target.value))} className="w-36 accent-[#d4af37]" />
@@ -573,8 +635,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img ref={imgElRef} src={img} alt="도면" className="w-full h-full block" />
                         <svg viewBox={`0 0 ${natW} ${natH}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                            <g opacity={alpha / 100}>
                             {/* 8괘 반투명 부채꼴 (팔택/현공) */}
-                            {mode !== "24산" && GUA8.map((g, i) => {
+                            {divide === "부채꼴" && mode !== "24산" && GUA8.map((g, i) => {
                                 const mid = i * 45;
                                 let fill = "transparent";
                                 if (mode === "팔택" && ming) {
@@ -588,7 +651,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 return <path key={g} d={wedge(mid)} fill={fill} />;
                             })}
                             {/* 24산 경계선 */}
-                            {Array.from({ length: 24 }, (_, k) => 7.5 + k * 15).map((b) => {
+                            {divide === "부채꼴" && Array.from({ length: 24 }, (_, k) => 7.5 + k * 15).map((b) => {
                                 const [dx, dy] = dir(screenDeg(b));
                                 return <line key={b} x1={cx} y1={cy} x2={cx + dx * L} y2={cy + dy * L}
                                     stroke="rgba(191,149,63,0.55)" strokeWidth={natW / 700} strokeDasharray={`${natW / 250},${natW / 250}`} />;
@@ -600,7 +663,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     stroke={d === 0 ? "rgba(192,57,43,0.8)" : "rgba(191,149,63,0.8)"} strokeWidth={natW / 450} />;
                             })}
                             {/* 24산 라벨 */}
-                            {Object.entries(MOUNTAIN_INFO).map(([m, info]) => {
+                            {divide === "부채꼴" && Object.entries(MOUNTAIN_INFO).map(([m, info]) => {
                                 const [dx, dy] = dir(screenDeg(info.deg));
                                 const x = cx + dx * rLabel, y = cy + dy * rLabel;
                                 const fs = Math.min(natW, natH) / 24;
@@ -612,7 +675,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 );
                             })}
                             {/* 현공: 8방위 산성·향성·연자백 표기 */}
-                            {mode === "현공" && chart && GUA8.map((g, i) => {
+                            {divide === "부채꼴" && mode === "현공" && chart && GUA8.map((g, i) => {
                                 const mid = i * 45;
                                 const [dx, dy] = dir(screenDeg(mid));
                                 const r = rLabel * 0.55;
@@ -627,7 +690,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 );
                             })}
                             {/* 팔택: 8방위 팔성 표기 */}
-                            {mode === "팔택" && ming && GUA8.map((g, i) => {
+                            {divide === "부채꼴" && mode === "팔택" && ming && GUA8.map((g, i) => {
                                 const mid = i * 45;
                                 const [dx, dy] = dir(screenDeg(mid));
                                 const r = rLabel * 0.55;
@@ -640,6 +703,40 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     </text>
                                 );
                             })}
+                            {/* 9궁격(井자 3×3) — 외곽선 바운딩 박스를 아홉 칸으로 나눠 궁을 얹는다 */}
+                            {divide === "9궁격" && (() => {
+                                const { x0, y0, x1, y1 } = gridBox;
+                                const w = (x1 - x0) / 3, h = (y1 - y0) / 3;
+                                const fs = Math.min(w, h) / 4.2;
+                                const cells: { p: Palace; x: number; y: number }[] = GRID_CELLS.map(([r, c, off]) => ({
+                                    p: palaceAt(off), x: x0 + c * w, y: y0 + r * h,
+                                }));
+                                cells.push({ p: "中", x: x0 + w, y: y0 + h });
+                                return (
+                                    <g>
+                                        {cells.map(({ p, x, y }) => (
+                                            <g key={p}>
+                                                <rect x={x} y={y} width={w} height={h} fill={palaceFill(p)}
+                                                    stroke="rgba(191,149,63,0.75)" strokeWidth={Math.min(w, h) / 60} />
+                                                <text x={x + w / 2} y={y + h / 2 - fs * 0.15} fontSize={fs} fontWeight={700}
+                                                    textAnchor="middle" fill="#1c2f52" stroke="#fff" strokeWidth={fs / 7} paintOrder="stroke"
+                                                    fontFamily="'Noto Serif KR',serif">
+                                                    {mode === "현공" && chart ? `${chart.mountain[p]}·${chart.water[p]}`
+                                                        : mode === "팔택" && ming && p !== "中" ? starFor(ming, p as Trigram) : p}
+                                                </text>
+                                                <text x={x + w / 2} y={y + h / 2 + fs * 0.95} fontSize={fs * 0.62} fontWeight={700}
+                                                    textAnchor="middle" fill="#7a5c14" stroke="#fff" strokeWidth={fs / 11} paintOrder="stroke">
+                                                    {PAL_KO[p]}
+                                                    {mode === "현공" && chart && p !== "中" && (
+                                                        <tspan fill={annual[p] === 5 || annual[p] === 2 ? "#c0392b" : "#556"}> 年{annual[p]}</tspan>
+                                                    )}
+                                                </text>
+                                            </g>
+                                        ))}
+                                    </g>
+                                );
+                            })()}
+                            </g>
                             {/* 정렬 완료 후: 창(정면=向) 방향 표시선 — 두 번째 탭이 어디에 적용됐는지 보여준다 */}
                             {aligned && center && (() => {
                                 const [fdx, fdy] = dir(screenDeg(facingDeg));

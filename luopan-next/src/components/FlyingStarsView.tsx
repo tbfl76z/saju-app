@@ -24,6 +24,10 @@ const STEP_DEFS = [
     { n: 4, label: "AI 풀이" },
 ] as const;
 
+/** STEP 1에서 확정해 다음 단계로 넘기는 값 — 언제 잰 값인지까지 남긴다 */
+type Step1Save = { sitting: string; year: number; deg: number | null; at: string };
+const STEP1_KEY = "destiny-hyeongong-step1";
+
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
 // 현공비성(玄空飛星) 뷰 — 좌산·준공(건축)년도로 비성반을 산출해 9궁으로 보여준다.
@@ -235,6 +239,11 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             else window.localStorage.setItem("destiny-luopan-deg", String(d));
         } catch { /* 무시 */ }
     };
+    // STEP 1 → STEP 2 인계. 내부적으로는 상태를 공유하지만, 저장 시각을 남겨
+    // "언제 잰 값으로 이 반을 세웠는지"가 다음 단계에서 눈에 보이게 한다.
+    const [step1Saved, setStep1Saved] = useState<Step1Save | null>(() => {
+        try { const raw = window.localStorage.getItem(STEP1_KEY); return raw ? JSON.parse(raw) as Step1Save : null; } catch { return null; }
+    });
     const [homes, setHomes] = useState<HomeProfile[]>([]);
     const [homeName, setHomeName] = useState("");
     const [saving, setSaving] = useState(false);
@@ -509,6 +518,28 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
 
+    // STEP 1 확정 — 이 값으로 이후 단계를 세운다
+    const saveStep1 = () => {
+        const rec: Step1Save = {
+            sitting, year, deg: measuredDeg,
+            at: new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+        };
+        setStep1Saved(rec);
+        try { window.localStorage.setItem(STEP1_KEY, JSON.stringify(rec)); } catch { /* 무시 */ }
+        notify.success("좌향을 저장했습니다", `坐 ${rec.sitting} · 준공 ${rec.year}년 — 이 값으로 비성반을 세웁니다.`);
+        goStep(2);
+    };
+    // STEP 2에서 저장값을 다시 끌어오기(도중에 값을 건드렸을 때 되돌리는 용도)
+    const applyStep1 = () => {
+        if (!step1Saved) return;
+        setSitting(step1Saved.sitting);
+        setYear(step1Saved.year);
+        setMeasuredDeg(step1Saved.deg);
+        notify.success("STEP 1 저장값을 불러왔습니다", `坐 ${step1Saved.sitting} · 준공 ${step1Saved.year}년`);
+    };
+    // 저장값과 지금 값이 어긋났는지 — 어긋나면 배너에서 알려 준다
+    const step1Stale = !!step1Saved && (step1Saved.sitting !== sitting || step1Saved.year !== year);
+
     return (
         <div className="space-y-3" ref={topRef}>
             {/* 상단 바 — 이달의 비성(시점 정보) + 사용 방법 */}
@@ -660,6 +691,30 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                             <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300/60 dark:border-emerald-800/50 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">실측 {measuredDeg.toFixed(1)}° 적용됨</span>
                         )}
                     </div>
+                    {/* STEP 1에서 넘어온 값 — 어느 측정으로 이 반을 세웠는지 밝힌다 */}
+                    {step1Saved ? (
+                        <div className={"rounded-xl px-3 py-2 text-[12px] border "
+                            + (step1Stale
+                                ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300/60 dark:border-amber-800/50 text-amber-800 dark:text-amber-300"
+                                : "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300")}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span>
+                                    {step1Stale ? "⚠" : "🔗"} <b>STEP 1 저장값</b> — 坐 <b className="font-noto-serif">{step1Saved.sitting}</b>
+                                    {step1Saved.deg != null ? ` (실측 ${step1Saved.deg.toFixed(1)}°)` : " (직접 선택)"}
+                                    · 준공 {step1Saved.year}년 · {step1Saved.at} 저장
+                                </span>
+                                {step1Stale && (
+                                    <Button onClick={applyStep1} variant="outline" className="h-7 rounded-full text-[11px] ml-auto">↻ 저장값으로 되돌리기</Button>
+                                )}
+                            </div>
+                            {step1Stale && <p className="mt-1">지금 화면은 저장값과 다릅니다 — 현재 坐 <b className="font-noto-serif">{sitting}</b> · 준공 {year}년으로 계산 중입니다.</p>}
+                        </div>
+                    ) : (
+                        <div className="rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-3 py-2 text-[12px] text-slate-600 dark:text-slate-300 flex items-center gap-2 flex-wrap">
+                            <span>아직 STEP 1에서 저장한 값이 없습니다 — 지금은 직접 선택한 坐 <b className="font-noto-serif">{sitting}</b>로 계산 중입니다.</span>
+                            <Button onClick={() => goStep(1)} variant="outline" className="h-7 rounded-full text-[11px] ml-auto">← 좌향 재러 가기</Button>
+                        </div>
+                    )}
                     <div className="text-center">
                         <span className="text-sm text-slate-500">{chart.period}운 반{chart.period !== curPeriod ? ` (현재 ${curPeriod}운)` : ""} <b className="font-noto-serif text-slate-800 dark:text-slate-100">{chart.sitting}山{chart.facing}向</b> · </span>
                         <span className={"text-sm font-bold " + (chart.structure === "왕산왕향" ? "text-emerald-600 dark:text-emerald-400" : chart.structure === "상산하수" ? "text-rose-500" : "text-[#bf953f]")}>{chart.structure}</span>
@@ -850,12 +905,18 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                         아직 실측 전입니다<br />직접 선택한 좌({sitting})로 진행됩니다
                     </span>
                 )}
-                {step < 4 && (
+                {step === 1 ? (
+                    /* STEP 1은 '저장'이 곧 다음 단계로 넘기는 행위 — 값이 확정돼 넘어간다는 걸 버튼으로 보이게 */
+                    <Button onClick={saveStep1}
+                        className="h-9 rounded-full text-xs px-5 font-bold ml-auto bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900 dark:hover:bg-[#c9a648]">
+                        💾 저장하고 다음 →
+                    </Button>
+                ) : step < 4 ? (
                     <Button onClick={() => goStep(step + 1)}
                         className="h-9 rounded-full text-xs px-5 font-bold ml-auto bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900 dark:hover:bg-[#c9a648]">
                         {STEP_DEFS[step].label} →
                     </Button>
-                )}
+                ) : null}
             </div>
         </div>
     );
