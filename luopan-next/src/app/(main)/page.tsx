@@ -87,20 +87,28 @@ export default function LuopanHome() {
                 {mode === "현공" ? "현공비성 — 지금 사는 집의 기운 지도" : mode === "이사" ? "현공비성 — 이사 후보 집을 계약 전에 판정" : mode === "팔택" ? "팔택 — 내 본명괘 기준 길한 방위" : "삼합수법 — 물길·출입구 방위"}
             </p>
 
-            {mode === "팔택" && (
-                /* 나경은 어두운 배경 전제로 디자인돼 있어 짙은 배경 카드에 담는다 */
+            {/* 탭은 조건부 렌더(언마운트)가 아니라 hidden으로만 감춘다.
+                언마운트하면 재던 좌향·올린 도면·찍어둔 외곽선이 통째로 날아간다. */}
+            <div className={mode === "팔택" ? "" : "hidden"}>
+                {/* 나경은 어두운 배경 전제로 디자인돼 있어 짙은 배경 카드에 담는다 */}
                 <div style={{
                     background: "linear-gradient(160deg, #1b2233, #10151f)",
                     borderRadius: 20,
                     padding: "22px 10px",
                     boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
                 }}>
-                    <Luopan birthYear={birthYear} gender={gender} />
+                    <Luopan birthYear={birthYear} gender={gender} active={mode === "팔택"} />
                 </div>
-            )}
-            {mode === "현공" && <FlyingStarsView birthYear={birthYear} gender={gender} />}
-            {mode === "이사" && <MoveCheckView birthYear={birthYear} gender={gender} />}
-            {mode === "삼합" && <SamhapView />}
+            </div>
+            <div className={mode === "현공" ? "" : "hidden"}>
+                <FlyingStarsView birthYear={birthYear} gender={gender} />
+            </div>
+            <div className={mode === "이사" ? "" : "hidden"}>
+                <MoveCheckView birthYear={birthYear} gender={gender} />
+            </div>
+            <div className={mode === "삼합" ? "" : "hidden"}>
+                <SamhapView />
+            </div>
         </div>
     );
 }

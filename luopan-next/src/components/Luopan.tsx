@@ -56,11 +56,13 @@ interface Props {
   /** 전통 나경은 자침(자북) 기준이라 기본 false */
   defaultTrueNorth?: boolean;
   className?: string;
+  /** 탭이 보이는 중인지. 숨겨진 동안 판 회전 루프를 멈춘다(hidden은 rAF를 멈추지 않는다) */
+  active?: boolean;
 }
 
 export default function Luopan({
   birthYear, birthDate, gender, voidTolerance = 3,
-  defaultTrueNorth = false, className,
+  defaultTrueNorth = false, className, active = true,
 }: Props) {
   const dialRef = useRef<SVGGElement | null>(null);
   const smoothRef = useRef(0);
@@ -110,8 +112,10 @@ export default function Luopan({
     smoothRef.current = norm(smoothRef.current + d * 0.18);
   }, []);
 
-  /* 판 회전은 DOM에 직접, 텍스트는 10Hz로만 갱신 */
+  /* 판 회전은 DOM에 직접, 텍스트는 10Hz로만 갱신.
+     숨겨진 탭에서는 아예 돌리지 않는다 — display:none은 rAF를 멈추지 않아 그냥 배터리만 먹는다. */
   useEffect(() => {
+    if (!active) return;
     let raf = 0;
     const tick = (t: number) => {
       const h = norm(smoothRef.current + (trueNorthRef.current ? DECLINATION : 0));
@@ -124,7 +128,7 @@ export default function Luopan({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [active]);
 
   /* ── 센서 연결 ── */
   const start = useCallback(async () => {

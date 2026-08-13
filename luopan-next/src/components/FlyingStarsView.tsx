@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
@@ -15,6 +15,14 @@ import FloorPlanView from "@/components/FloorPlanView";
 import AlignDiagram from "@/components/AlignDiagram";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
+
+/** 진행 단계 — 재기 → 읽기 → 도면 → 풀이 */
+const STEP_DEFS = [
+    { n: 1, label: "좌향 재기" },
+    { n: 2, label: "비성반 읽기" },
+    { n: 3, label: "도면 적용" },
+    { n: 4, label: "AI 풀이" },
+] as const;
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
@@ -231,6 +239,10 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     const [homeName, setHomeName] = useState("");
     const [saving, setSaving] = useState(false);
     const [guideOpen, setGuideOpen] = useState(false); // 사용 방법 팝업
+    // 진행 단계 — 한 화면에 STEP 1~4를 다 쌓으면 길고 복잡해서 한 번에 하나만 보인다.
+    // 비활성 단계는 언마운트하지 않고 hidden으로만 감춘다(감췄다 돌아와도 상태가 살아 있게).
+    const [step, setStep] = useState(1);
+    const topRef = useRef<HTMLDivElement>(null);     // 단계 이동 시 스크롤 기준
     const chartRef = useRef<HTMLDivElement>(null);   // 비성반 이미지 저장용
     useEffect(() => {
         setHomes(loadHomes()); // 저장된 집 프로필 로드
@@ -491,8 +503,14 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
         } finally { setInterpreting(false); }
     }
 
+    // 단계 이동 — 화면을 위로 올려 새 단계의 머리부터 보이게 한다
+    const goStep = (n: number) => {
+        setStep(Math.min(4, Math.max(1, n)));
+        topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
     return (
-        <div className="space-y-3">
+        <div className="space-y-3" ref={topRef}>
             {/* 상단 바 — 이달의 비성(시점 정보) + 사용 방법 */}
             {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
             <div className="flex items-start gap-2">
@@ -507,8 +525,31 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                 </button>
             </div>
 
+            {/* 진행 단계 표시 — 지금 어디인지, 어디까지 왔는지 */}
+            <div className="glass-card px-3 py-2.5">
+                <div className="flex items-center">
+                    {STEP_DEFS.map((s, i) => (
+                        <Fragment key={s.n}>
+                            <button onClick={() => goStep(s.n)} className="flex flex-col items-center gap-1 shrink-0 px-0.5">
+                                <span className={"w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold border-2 transition-colors "
+                                    + (step === s.n ? "border-[#d4af37] bg-[#d4af37] text-white dark:text-slate-900"
+                                        : step > s.n ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400"
+                                            : "border-slate-300 dark:border-slate-600 text-slate-400")}>
+                                    {step > s.n ? "✓" : s.n}
+                                </span>
+                                <span className={"text-[10px] whitespace-nowrap "
+                                    + (step === s.n ? "font-bold text-[#bf953f]" : "text-slate-400")}>{s.label}</span>
+                            </button>
+                            {i < STEP_DEFS.length - 1 && (
+                                <span className={"flex-1 h-0.5 mx-1 mb-4 rounded " + (step > s.n ? "bg-emerald-400" : "bg-slate-200 dark:bg-slate-700")} />
+                            )}
+                        </Fragment>
+                    ))}
+                </div>
+            </div>
+
             {/* ═ STEP 1. 좌향 재기 ═ */}
-            <div className="glass-card p-4 space-y-3">
+            <div className={"glass-card p-4 space-y-3 " + (step === 1 ? "" : "hidden")}>
                 <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 1 · 좌향 재기 <span className="font-normal text-[11px] text-slate-400">— 집이 등진 방위(坐)를 실측합니다</span></div>
                 {/* 저장된 집 — 실측을 한 번 해두면 다음부터 원탭 로드 */}
                 {homes.length > 0 && (
@@ -612,7 +653,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             </div>
 
             {chart && (
-                <div ref={chartRef} className="glass-card p-4 space-y-3">
+                <div ref={chartRef} className={"glass-card p-4 space-y-3 " + (step === 2 ? "" : "hidden")}>
                     <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
                         STEP 2 · 비성반 읽기
                         {measuredDeg != null && (
@@ -782,7 +823,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
             {/* ═ STEP 3. 도면에 적용 — 실측한 좌향·준공년을 그대로 물려받아 오버레이 ═ */}
             {chart && (
-                <div className="pt-1">
+                <div className={"pt-1 " + (step === 3 ? "" : "hidden")}>
                     <div className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">STEP 3 · 도면에 적용 <span className="font-normal text-[11px] text-slate-400">— 도면을 먼저 올려도 됩니다. 중심 탭 → 정면 탭이면 잰 각도에 자동 정렬</span></div>
                     <FloorPlanView birthYear={birthYear} gender={gender} sitting={sitting} year={year} measuredDeg={measuredDeg} embedded />
                 </div>
@@ -790,7 +831,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
 
             {/* ═ STEP 4. AI 풀이 ═ */}
             {chart && (
-                <div className="glass-card p-4 space-y-3">
+                <div className={"glass-card p-4 space-y-3 " + (step === 4 ? "" : "hidden")}>
                     <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 4 · AI 풀이 <span className="font-normal text-[11px] text-slate-400">— 격국·배치·올해 주의 방위를 종합 해석</span></div>
                     <Button onClick={interpret} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
                         {interpreting ? "풀이 중..." : "✨ AI 현공 풀이"}
@@ -798,6 +839,24 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                     {interp && <ReportRenderer text={interp} streaming={interpreting} />}
                 </div>
             )}
+
+            {/* 단계 이동 — 화면 아래에 고정해 스크롤 끝까지 내려가지 않아도 넘어갈 수 있게 */}
+            <div className="sticky bottom-2 z-30 flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-2.5 py-2 shadow-lg">
+                {step > 1 ? (
+                    <Button onClick={() => goStep(step - 1)} variant="outline" className="h-9 rounded-full text-xs px-4">← 이전</Button>
+                ) : <span />}
+                {step === 1 && measuredDeg == null && (
+                    <span className="text-[10.5px] leading-tight text-amber-600 dark:text-amber-400">
+                        아직 실측 전입니다<br />직접 선택한 좌({sitting})로 진행됩니다
+                    </span>
+                )}
+                {step < 4 && (
+                    <Button onClick={() => goStep(step + 1)}
+                        className="h-9 rounded-full text-xs px-5 font-bold ml-auto bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900 dark:hover:bg-[#c9a648]">
+                        {STEP_DEFS[step].label} →
+                    </Button>
+                )}
+            </div>
         </div>
     );
 }
