@@ -973,8 +973,18 @@ def build_hyeongong_prompt(data: dict) -> str:
         period_note = f"[운 구분] 반의 {period}운은 준공 시기의 원운이며, 현재 당운은 {cur}운입니다(실운). 왕쇠 판정은 {cur}운 기준으로 하세요.\n"
     elif cur:
         period_note = f"[운 구분] 원운과 당운이 같은 {cur}운입니다(득운).\n"
+    # 겸향이면 체괘로 세운 반이다. 알려주지 않으면 AI가 하괘 전제로 서술해 버린다.
+    plate = (data.get("plate") or "").strip()
+    plate_note = ""
+    if plate == "체괘":
+        plate_note = ("[반 종류] 좌향이 산 중앙을 벗어난 겸향이라 **체괘(替卦)**로 세운 반입니다. "
+                      "하괘반이 아니므로 '정향' 전제의 서술은 하지 마세요. "
+                      "체괘는 당운만 관장한다는 견해가 있고, 체괘를 쓰지 않는 유파도 있습니다.\n")
+    elif plate == "하괘":
+        plate_note = "[반 종류] 정향(하괘)으로 세운 반입니다.\n"
     return now_context() + (
         f"[비성반] {period}운 반(준공 기준) {data.get('sitting', '')}山{data.get('facing', '')}向 · 격국 {data.get('structure', '')}\n"
+        + plate_note
         + period_note
         + f"[궁별 성요] {cell_txt}\n"
         f"[연자백 기준 연도] {data.get('annual_year', '')}\n"

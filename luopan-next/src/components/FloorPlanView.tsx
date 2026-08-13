@@ -119,9 +119,11 @@ interface Props {
     measuredDeg?: number | null;
     /** 체괘로 세운 반인지 — STEP 2와 같은 반을 얹어야 판정이 어긋나지 않는다 */
     useTi?: boolean;
+    /** 위성지도에서 좌향을 산출했을 때 상위(STEP 1)로 올려 보낸다 */
+    onMapFacing?: (facingDeg: number) => void;
 }
 
-export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false, measuredDeg = null, useTi = false }: Props) {
+export default function FloorPlanView({ birthYear, gender, sitting: extSitting, year: extYear, embedded = false, measuredDeg = null, useTi = false, onMapFacing }: Props) {
     const [img, setImg] = useState<string | null>(null);
     const [natural, setNatural] = useState<[number, number]>([1000, 750]);
     const [center, setCenter] = useState<[number, number] | null>(null);
@@ -153,6 +155,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 방별 궁 배정 — 도면에서 방을 찍으면 어느 궁에 떨어지는지 표로 정리한다
     const [rooms, setRooms] = useState<RoomPin[]>([]);
     const [roomName, setRoomName] = useState(ROOM_PRESETS[0]);
+    // 위성지도 — 주소로 불러오면 위가 항상 정북이라 방위가 이미 정해져 있다
+    const [addr, setAddr] = useState("");
+    const [mapBusy, setMapBusy] = useState(false);
+    const [mapInfo, setMapInfo] = useState<{ address: string; mpp: number } | null>(null);
+    const [northLocked, setNorthLocked] = useState(false); // 위성지도 = 위가 정북(방위 확정)
     const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
@@ -188,7 +195,10 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
             const im = new Image();
             im.onload = () => {
                 setNatural([im.naturalWidth, im.naturalHeight]);
+                // 새 도면에 옛 좌표를 남기면 안 된다 — 외곽선·방 핀은 그 사진에서만 의미가 있다
                 setCenter(null); setAligned(false); setPickMode("center");
+                setOutline([]); setRooms([]); setCenterNote(""); setAiRead(null);
+                setNorthLocked(false); setMapInfo(null);
                 setImg(url);
                 notify.success("도면을 불러왔습니다", "① 사진 속 집(터)의 한가운데를 탭하세요.");
             };
@@ -280,8 +290,22 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 notify.error("중심과 너무 가깝습니다", "중심에서 창(정면) 쪽으로 더 떨어진 지점을 탭해 주세요.");
                 return;
             }
-            // 화면상 정면 방향(0=위, 시계+) → 실측 향각과 매칭 → 도면 상단의 실제 방위 산출
+            // 화면상 정면 방향(0=위, 시계+)
             const phi = (Math.atan2(x - cx, -(y - cy)) * 180) / Math.PI;
+            if (northLocked) {
+                // 위성지도: 북이 이미 정해져 있으므로 반대로 **좌향을 산출**한다.
+                const face = ((phi + northDeg) % 360 + 360) % 360;
+                const sit = (face + 180) % 360;
+                setAligned(true);
+                setPickMode("center");
+                onMapFacing?.(face);
+                notify.success(
+                    `✅ 지도에서 좌향 산출 — 向 ${face.toFixed(1)}°`,
+                    `坐 ${mountainFromDeg(sit)} ${sit.toFixed(1)}° · 向 ${mountainFromDeg(face)}. 실측값과 대조해 보세요.`,
+                );
+                return;
+            }
+            // 도면 사진: 실측 향각과 매칭해 도면 상단의 실제 방위를 역산한다
             const nd = Math.round(((facingDeg - phi) % 360 + 360) % 360);
             setNorthDeg(nd);
             setAligned(true);
@@ -291,7 +315,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     };
     const resetPick = () => {
         setCenter(null); setAligned(false); setPickMode("center");
-        setOutline([]); setCenterNote("");
+        setOutline([]); setRooms([]); setCenterNote("");
     };
 
     // 이미지 처리로 평면 외곽을 자동 추정 — 전부 기기 안에서 처리(업로드 없음)
@@ -319,6 +343,44 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         }, 30);
     };
 
+    // 주소로 위성지도 불러오기.
+    // 위성지도는 위가 정북이므로 도면 상단 방위를 0°로 고정하고 시작한다 —
+    // 나침반 없이도 건물이 앉은 각을 볼 수 있어 실측의 교차검증이 된다.
+    const loadMap = async () => {
+        const q = addr.trim();
+        if (!q) { notify.error("주소를 입력하세요"); return; }
+        setMapBusy(true);
+        try {
+            const r = await fetch(`${API_BASE}/classic/map/satellite`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ address: q, zoom: 19 }),
+            });
+            if (!r.ok) {
+                let msg = `요청 실패(${r.status})`;
+                try { const j = await r.json(); if (j?.detail) msg = j.detail; } catch { /* 무시 */ }
+                notify.error("위성지도를 불러오지 못했습니다", msg);
+                return;
+            }
+            const j: { image: string; address: string; meters_per_pixel: number } = await r.json();
+            const im = new Image();
+            im.onload = () => {
+                setNatural([im.naturalWidth, im.naturalHeight]);
+                setCenter(null); setOutline([]); setRooms([]); setAligned(false);
+                setPickMode("center"); setCenterNote(""); setAiRead(null);
+                setNorthDeg(0); setNorthLocked(true);   // 위성지도는 위 = 정북
+                setImg(j.image);
+                setMapInfo({ address: j.address || q, mpp: j.meters_per_pixel });
+                notify.success("위성지도를 불러왔습니다", "위가 정북으로 맞춰져 있습니다. 집 중심 → 정면을 탭하세요.");
+            };
+            im.src = j.image;
+        } catch {
+            notify.error("위성지도를 불러오지 못했습니다", "네트워크 상태를 확인해 주세요.");
+        } finally {
+            setMapBusy(false);
+        }
+    };
+
     // 도면 자세 보정 — 거울상·회전된 사진을 바로잡는다.
     // 좌우 반전 도면을 그대로 쓰면 동서가 뒤바뀌어(震↔兌, 巽↔坤) 궁 판정이 통째로 틀어진다.
     // 좌표 변환을 따로 하지 않고 **이미지 자체를 고쳐** 이후 단계가 전부 그대로 동작하게 한다.
@@ -336,9 +398,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         ctx.drawImage(el, 0, 0);
         setNatural([cv.width, cv.height]);
         setImg(cv.toDataURL("image/png"));
-        setCenter(null); setOutline([]); setAligned(false); setPickMode("center");
-        setCenterNote(""); setAiRead(null);
-        notify.success(mode === "flipH" ? "좌우 반전 적용" : "90도 회전 적용", "찍은 점은 초기화됐습니다.");
+        setCenter(null); setOutline([]); setRooms([]); setAligned(false); setPickMode("center");
+        setCenterNote(""); setAiRead(null); setNorthLocked(false);
+        notify.success(mode === "flipH" ? "좌우 반전 적용" : "90도 회전 적용", "찍은 점과 방 핀은 초기화됐습니다.");
     };
 
     // AI 도면 판독 — 좌표가 아니라 '어느 공간을 전유부로 볼 것인가'를 받는다.
@@ -482,6 +544,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         📐 도면/사진 불러오기
                         <input type="file" accept="image/*" onChange={onFile} className="hidden" />
                     </label>
+                    <input value={addr} onChange={(e) => setAddr(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") loadMap(); }}
+                        placeholder="주소 입력 (예: 서울 강남구 테헤란로 1)"
+                        className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
+                    <Button onClick={loadMap} disabled={mapBusy} className="h-8 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                        {mapBusy ? "불러오는 중…" : "🗺 위성지도"}
+                    </Button>
                     {img && (
                         <>
                             <Button onClick={() => transformImage("flipH")} variant="outline" className="h-7 rounded-full text-[11px]">↔ 좌우 반전</Button>
@@ -499,6 +568,16 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         </button>
                     ))}
                 </div>
+                {/* 위성지도 상태 — 방위가 확정됐다는 것과 축척을 알린다 */}
+                {mapInfo && (
+                    <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40 px-3 py-2 text-[12px] text-sky-800 dark:text-sky-300">
+                        🗺 <b>위성지도 — 위가 정북(0°)으로 고정</b>됐습니다. {mapInfo.address && <span>· {mapInfo.address} </span>}
+                        · 약 {mapInfo.mpp.toFixed(2)} m/픽셀
+                        <br />건물 중심 → 정면(베란다 쪽)을 차례로 탭하면 <b>좌향이 계산</b>됩니다.
+                        아파트는 동마다 배치각이 달라 이 값은 <b>실측의 대체가 아니라 교차검증용</b>입니다.
+                    </div>
+                )}
+
                 {/* 평면 분할 방식 — 유파가 갈리는 자리라 토글로 둔다. 결과가 다르게 나온다. */}
                 <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                     <span>분할</span>
@@ -834,11 +913,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {/* 중심점 */}
                             <circle cx={cx} cy={cy} r={Math.min(natW, natH) / 90} fill="#c0392b" stroke="#fff" strokeWidth={natW / 500} />
                         </svg>
-                        {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지) */}
-                        {!aligned && (
+                        {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지).
+                            단 방 찍기는 정렬 이후에 하는 작업이라 그때도 띄운다. */}
+                        {(!aligned || pickMode === "room") && (
                             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-slate-900/85 text-white text-[11px] font-bold pointer-events-none whitespace-nowrap">
-                                {pickMode === "outline" ? `✏️ 모서리를 차례로 탭 · 점을 끌어 수정 (${outline.length}점)`
-                                    : pickMode === "center" ? "👆 ① 집 중심을 탭하세요" : "👆 ② 창(정면) 방향을 탭하세요"}
+                                {pickMode === "room" ? `🏷 ${roomName} 위치를 탭하세요`
+                                    : pickMode === "outline" ? `✏️ 모서리를 차례로 탭 · 점을 끌어 수정 (${outline.length}점)`
+                                        : pickMode === "center" ? "👆 ① 집 중심을 탭하세요" : "👆 ② 창(정면) 방향을 탭하세요"}
                             </div>
                         )}
                     </div>

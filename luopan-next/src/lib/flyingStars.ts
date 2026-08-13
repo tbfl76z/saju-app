@@ -387,6 +387,10 @@ export interface EarthLuck {
   mountainYear: number;
   imprisoned: boolean;    // 지금 이미 입수했는가
   note: string;
+  /** 입수 판정 두 규칙이 어긋났는가 (체괘반에서만 생긴다) */
+  split: boolean;
+  /** 규칙② — 향수궁 천반운성 기준으로 본 향성 입수 운 */
+  waterPeriodByBase: number;
 }
 const PERIOD_START = (p: number) => 1864 + (p - 1) * 20;   // 1운 1864 기점
 export function earthLuck(chart: StarChart, nowYear: number): EarthLuck {
@@ -409,7 +413,15 @@ export function earthLuck(chart: StarChart, nowYear: number): EarthLuck {
   else if (nowYear >= waterYear) note = `${waterYear}년부터 향성이 중궁에 갇혔습니다(입수) — 재물 흐름이 막히는 시기입니다.`;
   else if (nowYear >= mountainYear) note = `${mountainYear}년부터 산성이 중궁에 갇혔습니다(입수) — 사람·건강 쪽이 눌리는 시기입니다.`;
   else note = `향성 입수는 ${waterYear}년, 산성 입수는 ${mountainYear}년입니다.`;
-  return { years, waterPeriod: wP, waterYear, mountainPeriod: mP, mountainYear, imprisoned, note };
+  // 입수 판정 두 규칙 — ① 당령지성이 중궁에 들면 입수(중궁 향성 기준)
+  //                    ② 향수궁 천반운성 기준
+  // 하괘는 `중궁 향성 = 운반[향궁]`이 항상 성립해 두 규칙이 같은 값을 낸다(216/216 확인).
+  // 체괘반에서는 이 항등식이 깨져 216국 중 104국에서 갈린다 — 어느 한쪽을 임의로 고르지 않고 갈렸다는 사실을 넘긴다.
+  const waterPeriodByBase = chart.base[facePal];
+  return {
+    years, waterPeriod: wP, waterYear, mountainPeriod: mP, mountainYear, imprisoned, note,
+    waterPeriodByBase, split: wP !== waterPeriodByBase,
+  };
 }
 
 /** 삼반괘(三般卦) — 9궁 전부에서 (운·산·향)이 한 조를 이룰 때 */
