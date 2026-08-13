@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import {
     starChart, periodOf, periodYears, STAR_NAMES, starMood, MOUNTAIN_INFO,
     mountainFromDeg, annualChart, monthlyChart, monthlyCenter, comboFor,
-    fanFuYin, earthLuck, samBanGwa, chilseongTagyeop, cityGate, hapsip, kyemCheck, type Palace,
+    fanFuYin, earthLuck, samBanGwa, chilseongTagyeop, cityGate, hapsip, kyemCheck, oppositeMountain,
+    type Palace, type StarChart,
 } from "@/lib/flyingStars";
 import { mingGua, starFor, voidCheck, type Trigram, type Star } from "@/lib/eightMansions";
 import { streamSSE } from "@/lib/analyzeStream";
@@ -23,6 +24,46 @@ const STEP_DEFS = [
     { n: 3, label: "도면 적용" },
     { n: 4, label: "AI 풀이" },
 ] as const;
+
+/** 좌향 후보 비교표의 행 정의 — 후보끼리 실제로 갈리는 항목만 고른다 */
+const COMPARE_ROWS: { label: string; get: (c: StarChart, curPeriod: number, nowYear: number) => string }[] = [
+    { label: "격국", get: (c) => c.structure },
+    {
+        label: "좌궁 산·향", get: (c) => {
+            const p = MOUNTAIN_INFO[c.sitting].palace;
+            return `${c.mountain[p]}·${c.water[p]}`;
+        },
+    },
+    {
+        label: "향궁 산·향", get: (c) => {
+            const p = MOUNTAIN_INFO[c.facing].palace;
+            return `${c.mountain[p]}·${c.water[p]}`;
+        },
+    },
+    { label: "합십", get: (c) => hapsip(c) ?? "—" },
+    { label: "삼반괘", get: (c) => samBanGwa(c) ?? "—" },
+    {
+        label: "반음·복음", get: (c) => {
+            const f = fanFuYin(c);
+            const parts = [f.mountain ? `산반 ${f.mountain}` : "", f.water ? `향반 ${f.water}` : ""].filter(Boolean);
+            return parts.length ? parts.join(" · ") : "없음";
+        },
+    },
+    { label: "칠성타겁", get: (c) => chilseongTagyeop(c)?.kind ?? "—" },
+    {
+        label: "성문", get: (c) => {
+            const ok = cityGate(c).filter((g) => g.ok);
+            return ok.length ? ok.map((g) => PALACE_DIR[g.palace]).join("·") : "없음";
+        },
+    },
+    {
+        label: "지운", get: (c, _cp, nowYear) => {
+            if (c.replaced) return "체괘 미검산";
+            const e = earthLuck(c, nowYear);
+            return `${e.years}년${e.imprisoned ? " · 입수" : ""}`;
+        },
+    },
+];
 
 /** STEP 1에서 확정해 다음 단계로 넘기는 값 — 언제 잰 값인지까지 남긴다 */
 type Step1Save = { sitting: string; year: number; deg: number | null; at: string };
@@ -345,6 +386,9 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     // 체괘 사용 여부. 판정을 기본값으로 쓰되, 체괘 무용론(유훈승 계열)도 있어 수동으로 덮을 수 있게 한다.
     const [tiOverride, setTiOverride] = useState<boolean | null>(null);
     const useTi = tiOverride ?? kyem?.useTi ?? false;
+    // 좌향 후보 비교 — 최대 3개까지 나란히 세워 본다
+    const [cands, setCands] = useState<string[]>([]);
+    const [candPick, setCandPick] = useState("子");
 
     const chart = useMemo(() => {
         try { return starChart(sitting, periodOf(year), useTi); } catch { return null; }
@@ -479,6 +523,17 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     // ⚠ 검산 범위는 하괘 216국 한정이다. 체괘반의 삼반괘·타겁·반복음·입수는 아직 대조하지 않았다.
     //   특히 지운(입수)은 "중궁 향성 = 운반[향수궁]"이라는 하괘 항등식에서 유도한 식이라
     //   체괘반에서는 규칙 자체가 분기한다 — 추정치를 내지 않고 아예 표시하지 않는다.
+    // 비교표 열 — 현재 반 + 후보들. 모두 같은 운·같은 반종류로 세워야 비교가 성립한다.
+    const compareCols = useMemo(() => {
+        if (!chart) return [];
+        const cols = [{ key: "cur", current: true, chart }];
+        for (const c of cands) {
+            if (c === chart.sitting) continue;
+            try { cols.push({ key: c, current: false, chart: starChart(c, periodOf(year), useTi) }); } catch { /* 무시 */ }
+        }
+        return cols;
+    }, [chart, cands, year, useTi]);
+
     const adv = useMemo(() => {
         if (!chart) return null;
         return {
@@ -896,6 +951,59 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                             <div className="text-[10px] text-slate-400">※ 전부 현공비성 계산이며 216국 전수 검산을 마친 항목입니다. 유파에 따라 판정이 다를 수 있습니다.</div>
                         </div>
                     )}
+
+                    {/* 좌향 후보 비교 — 코너 세대처럼 창이 두 방향인 집은 향이 하나로 안 정해진다.
+                        두 후보로 반을 각각 세워 놓고, 실제로 겪은 일과 어느 쪽이 맞는지 역검증하는 것이 실무 방법이다. */}
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/40 dark:bg-slate-800/40 p-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">⚖ 좌향 후보 비교</span>
+                            <span className="text-[10px] text-slate-400">코너 세대·창이 두 방향인 집에서 어느 면을 향으로 볼지 못 정할 때</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                            <select value={candPick} onChange={(e) => setCandPick(e.target.value)}
+                                className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
+                                {MOUNTAINS_24.map((m) => <option key={m} value={m}>{m}坐 → {oppositeMountain(m)}向</option>)}
+                            </select>
+                            <Button onClick={() => setCands((p) => (p.includes(candPick) || p.length >= 3 ? p : [...p, candPick]))}
+                                variant="outline" className="h-7 rounded-full text-[11px]">+ 후보 추가</Button>
+                            {cands.map((c) => (
+                                <span key={c} className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-violet-300 dark:border-violet-700 text-[11px] text-violet-700 dark:text-violet-300">
+                                    <span className="font-noto-serif">{c}坐</span>
+                                    <button onClick={() => setCands((p) => p.filter((x) => x !== c))} className="text-slate-400 hover:text-rose-500">×</button>
+                                </span>
+                            ))}
+                        </div>
+                        {cands.length > 0 && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-[11px] border-collapse">
+                                    <thead>
+                                        <tr className="text-slate-500">
+                                            <th className="text-left font-semibold py-1 pr-2 whitespace-nowrap">항목</th>
+                                            {compareCols.map((c) => (
+                                                <th key={c.key} className={"text-left font-semibold py-1 px-2 whitespace-nowrap " + (c.current ? "text-[#bf953f]" : "text-violet-600 dark:text-violet-400")}>
+                                                    <span className="font-noto-serif">{c.chart.sitting}山{c.chart.facing}向</span>{c.current ? " (현재)" : ""}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-slate-600 dark:text-slate-300">
+                                        {COMPARE_ROWS.map((row) => (
+                                            <tr key={row.label} className="border-t border-slate-200 dark:border-slate-700">
+                                                <td className="py-1 pr-2 font-semibold whitespace-nowrap">{row.label}</td>
+                                                {compareCols.map((c) => (
+                                                    <td key={c.key} className="py-1 px-2">{row.get(c.chart, curPeriod, nowYear)}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                <p className="text-[10px] text-slate-400 mt-1.5">
+                                    모두 <b>{useTi ? "체괘" : "하괘"}반 · {period}운</b> 기준입니다.
+                                    어느 쪽이 맞는지는 <b>이 집에서 실제로 겪은 일</b>(재물 흐름, 아팠던 방위, 힘들었던 가족)과 대조해 정하세요.
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
                     {/* 용도별 배치표 — 실무용 요약 */}
                     {usage.length > 0 && (
