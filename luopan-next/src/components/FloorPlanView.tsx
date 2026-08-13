@@ -171,6 +171,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 화면에 실제로 그려진 폭(px). 오버레이 글씨·선을 **화면 기준 크기**로 고정하는 데 쓴다.
     // 이미지 좌표로 크기를 정하면 도면을 키울 때 방위 라벨까지 같이 커져서 화면을 덮는다.
     const [dispW, setDispW] = useState(0);
+    // 사용자가 이미 도면을 올렸는지. 복원은 비동기라 늦게 도착하는데,
+    // 그 사이 새로 올린 도면을 옛 저장본이 덮어쓰면 "잘못 올린 게 계속 나오는" 상태가 된다.
+    const userActed = useRef(false);
 
     // 표시 폭 추적 — 창 크기·화면맞춤 토글에 따라 바뀐다
     useEffect(() => {
@@ -187,7 +190,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     useEffect(() => {
         let alive = true;
         loadPlan().then((snap) => {
-            if (!alive) { return; }
+            if (!alive || userActed.current) { setRestored(true); return; }  // 새 작업이 먼저면 복원하지 않는다
             if (snap?.img) {
                 setImg(snap.img);
                 setNatural(snap.natural);
@@ -245,7 +248,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 파일 업로드 → dataURL (서버 전송 없음)
     const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0];
+        // 같은 파일을 다시 고를 수 있게 값을 비운다(비우지 않으면 onChange가 아예 안 뜬다)
+        e.target.value = "";
         if (!f) return;
+        userActed.current = true;
+        clearPlan();          // 옛 저장본이 뒤늦게 되살아나지 않게 먼저 지운다
         const rd = new FileReader();
         rd.onload = () => {
             const url = String(rd.result);
@@ -406,6 +413,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const loadMap = async () => {
         const q = addr.trim();
         if (!q) { notify.error("주소를 입력하세요"); return; }
+        userActed.current = true;
+        clearPlan();
         setMapBusy(true);
         try {
             const r = await fetch(`${API_BASE}/classic/map/satellite`, {
@@ -446,6 +455,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const transformImage = (mode: "flipH" | "rot90") => {
         const el = imgElRef.current;
         if (!el || !el.complete || !img) { notify.error("도면을 먼저 불러오세요"); return; }
+        userActed.current = true;   // 복원이 뒤늦게 원본을 되돌리지 못하게
         const swap = mode === "rot90";
         const cv = document.createElement("canvas");
         cv.width = swap ? natH : natW;
@@ -618,6 +628,15 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                     </Button>
                     {img && (
                         <>
+                            <Button onClick={() => {
+                                if (!window.confirm("불러온 도면과 찍어둔 점·방 핀을 모두 지웁니다. 계속할까요?")) return;
+                                userActed.current = true;
+                                setImg(null); setCenter(null); setOutline([]); setRooms([]); setAligned(false);
+                                setPickMode("center"); setCenterNote(""); setAiRead(null);
+                                setNorthLocked(false); setMapInfo(null); setNorthDeg(0);
+                                clearPlan();
+                                notify.success("도면을 지웠습니다", "새 도면을 올리거나 주소로 불러오세요.");
+                            }} variant="outline" className="h-7 rounded-full text-[11px] text-rose-500 border-rose-300">🗑 도면 지우기</Button>
                             <Button onClick={() => transformImage("flipH")} variant="outline" className="h-7 rounded-full text-[11px]">↔ 좌우 반전</Button>
                             <Button onClick={() => transformImage("rot90")} variant="outline" className="h-7 rounded-full text-[11px]">↻ 90°</Button>
                             <Button onClick={() => setFitView((v) => !v)} variant="outline" className="h-7 rounded-full text-[11px]">
