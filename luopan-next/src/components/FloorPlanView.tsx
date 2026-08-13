@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
 import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, mountainFromDeg, comboFor, type Palace } from "@/lib/flyingStars";
 import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
 import { detectOutline } from "@/lib/floorPlanDetect";
+import { savePlan, loadPlan, clearPlan } from "@/lib/planStore";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "https://saju-app-11.onrender.com")).replace(/\/$/, "");
 
@@ -159,14 +160,70 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [addr, setAddr] = useState("");
     const [mapBusy, setMapBusy] = useState(false);
     const [mapInfo, setMapInfo] = useState<{ address: string; mpp: number; provider: string } | null>(null);
+    // 지도 종류 — 기본은 일반지도. 위성은 고층 건물의 옆면이 보여(시차) 지붕 윤곽이
+    // 실제 대지 경계와 어긋난다. 일반지도는 건물이 폴리곤이라 중심·외곽 잡기가 정확하다.
+    const [mapType, setMapType] = useState<"basic" | "satellite">("basic");
     const [northLocked, setNorthLocked] = useState(false); // 위성지도 = 위가 정북(방위 확정)
     const imgElRef = useRef<HTMLImageElement>(null);
+    // 복원 완료 전에는 저장하지 않는다(빈 값으로 덮어쓰기 방지).
+    // ref가 아니라 state로 둬야 복원 직후 저장 훅이 한 번 더 돌아 첫 상태를 놓치지 않는다.
+    const [restored, setRestored] = useState(false);
+    // 화면에 실제로 그려진 폭(px). 오버레이 글씨·선을 **화면 기준 크기**로 고정하는 데 쓴다.
+    // 이미지 좌표로 크기를 정하면 도면을 키울 때 방위 라벨까지 같이 커져서 화면을 덮는다.
+    const [dispW, setDispW] = useState(0);
+
+    // 표시 폭 추적 — 창 크기·화면맞춤 토글에 따라 바뀐다
+    useEffect(() => {
+        const el = boxRef.current;
+        if (!el || typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(([e]) => setDispW(e.contentRect.width));
+        ro.observe(el);
+        setDispW(el.getBoundingClientRect().width);
+        return () => ro.disconnect();
+    }, [img]);
+
+    // 새로고침·앱 재진입 시 도면 작업을 되살린다.
+    // 이미지가 커서 localStorage를 못 쓰므로 IndexedDB에 둔다.
+    useEffect(() => {
+        let alive = true;
+        loadPlan().then((snap) => {
+            if (!alive) { return; }
+            if (snap?.img) {
+                setImg(snap.img);
+                setNatural(snap.natural);
+                setCenter(snap.center);
+                setNorthDeg(snap.northDeg);
+                setNorthLocked(snap.northLocked);
+                setAligned(snap.aligned);
+                setOutline(snap.outline as Pt[]);
+                setRooms(snap.rooms);
+                setMapInfo(snap.mapInfo);
+            }
+            setRestored(true);
+        });
+        return () => { alive = false; };
+    }, []);
+
+    // 작업 상태가 바뀔 때마다 보관. 이미지가 커서 잦은 쓰기를 피하려 잠깐 묶어 둔다.
+    useEffect(() => {
+        if (!restored) return;
+        const t = setTimeout(() => {
+            if (!img) { clearPlan(); return; }
+            savePlan({
+                img, natural, center, northDeg, northLocked, aligned,
+                outline: outline as [number, number][], rooms, mapInfo, savedAt: Date.now(),
+            });
+        }, 600);
+        return () => clearTimeout(t);
+    }, [restored, img, natural, center, northDeg, northLocked, aligned, outline, rooms, mapInfo]);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
     const year = extYear ?? yearIn;
     const boxRef = useRef<HTMLDivElement>(null);
 
     const [natW, natH] = natural;
+    // 이미지 좌표 1px이 화면에서 몇 px인지의 역수 — 화면 13px 글씨를 원하면 13*k 를 쓴다
+    const k = dispW > 0 ? natW / dispW : natW / 900;
     const cx = center?.[0] ?? natW / 2;
     const cy = center?.[1] ?? natH / 2;
     const L = Math.hypot(natW, natH);                 // 화면 밖까지 뻗는 선 길이
@@ -356,7 +413,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 headers: { "Content-Type": "application/json" },
                 // 크기는 서버가 공급자 상한(네이버 1024 / 구글 640)으로 잘라 준다.
                 // 네이버 1024·scale2 = 2048px, 실측 약 242m 폭 — 단지 한 동이 넉넉히 들어온다.
-                body: JSON.stringify({ address: q, zoom: 19, size: 1024 }),
+                body: JSON.stringify({ address: q, zoom: 19, size: 1024, maptype: mapType }),
             });
             if (!r.ok) {
                 let msg = `요청 실패(${r.status})`;
@@ -550,8 +607,14 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         onKeyDown={(e) => { if (e.key === "Enter") loadMap(); }}
                         placeholder="주소 입력 (예: 서울 강남구 테헤란로 1)"
                         className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
+                    {(["basic", "satellite"] as const).map((t) => (
+                        <button key={t} onClick={() => setMapType(t)}
+                            className={"px-2.5 py-1 rounded-full text-[11px] font-semibold " + (mapType === t ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                            {t === "basic" ? "일반" : "위성"}
+                        </button>
+                    ))}
                     <Button onClick={loadMap} disabled={mapBusy} className="h-8 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                        {mapBusy ? "불러오는 중…" : "🗺 위성지도"}
+                        {mapBusy ? "불러오는 중…" : "🗺 지도 불러오기"}
                     </Button>
                     {img && (
                         <>
@@ -573,12 +636,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 {/* 위성지도 상태 — 방위가 확정됐다는 것과 축척을 알린다 */}
                 {mapInfo && (
                     <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40 px-3 py-2 text-[12px] text-sky-800 dark:text-sky-300">
-                        🗺 <b>위성지도 — 위가 정북(0°)으로 고정</b>됐습니다.
+                        🗺 <b>지도 — 위가 정북(0°)으로 고정</b>됐습니다.
                         {mapInfo.provider && <span className="text-slate-500 dark:text-slate-400"> ({mapInfo.provider === "naver" ? "네이버" : "구글"})</span>}
                         {mapInfo.address && <span> · {mapInfo.address} </span>}
                         · 약 {mapInfo.mpp.toFixed(2)} m/픽셀
                         <br />건물 중심 → 정면(베란다 쪽)을 차례로 탭하면 <b>좌향이 계산</b>됩니다.
                         아파트는 동마다 배치각이 달라 이 값은 <b>실측의 대체가 아니라 교차검증용</b>입니다.
+                        {mapType === "satellite" && <><br /><b>※ 위성사진은 고층일수록 건물 옆면이 보여</b> 지붕 윤곽이 실제 대지 경계와 어긋납니다 — 중심을 잡을 땐 <b>일반지도</b>가 정확합니다.</>}
                     </div>
                 )}
 
@@ -774,19 +838,19 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {divide === "부채꼴" && Array.from({ length: 24 }, (_, k) => 7.5 + k * 15).map((b) => {
                                 const [dx, dy] = dir(screenDeg(b));
                                 return <line key={b} x1={cx} y1={cy} x2={cx + dx * L} y2={cy + dy * L}
-                                    stroke="rgba(191,149,63,0.55)" strokeWidth={natW / 700} strokeDasharray={`${natW / 250},${natW / 250}`} />;
+                                    stroke="rgba(191,149,63,0.55)" strokeWidth={1 * k} strokeDasharray={`${4 * k},${4 * k}`} />;
                             })}
                             {/* 정사방(자오묘유) 굵은 선 */}
                             {[0, 90, 180, 270].map((d) => {
                                 const [dx, dy] = dir(screenDeg(d));
                                 return <line key={d} x1={cx} y1={cy} x2={cx + dx * L} y2={cy + dy * L}
-                                    stroke={d === 0 ? "rgba(192,57,43,0.8)" : "rgba(191,149,63,0.8)"} strokeWidth={natW / 450} />;
+                                    stroke={d === 0 ? "rgba(192,57,43,0.8)" : "rgba(191,149,63,0.8)"} strokeWidth={2 * k} />;
                             })}
                             {/* 24산 라벨 */}
                             {divide === "부채꼴" && Object.entries(MOUNTAIN_INFO).map(([m, info]) => {
                                 const [dx, dy] = dir(screenDeg(info.deg));
                                 const x = cx + dx * rLabel, y = cy + dy * rLabel;
-                                const fs = Math.min(natW, natH) / 24;
+                                const fs = 15 * k;
                                 return (
                                     <text key={m} x={x} y={y + fs / 3} fontSize={fs} fontWeight={700} textAnchor="middle"
                                         fontFamily="'Noto Serif KR',serif" fill="#7a5c14" stroke="#fff" strokeWidth={fs / 8} paintOrder="stroke">
@@ -799,7 +863,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 const mid = i * 45;
                                 const [dx, dy] = dir(screenDeg(mid));
                                 const r = rLabel * 0.55;
-                                const fs = Math.min(natW, natH) / 30;
+                                const fs = 12 * k;
                                 const an = annual[g as Palace];
                                 return (
                                     <text key={g} x={cx + dx * r} y={cy + dy * r} fontSize={fs} fontWeight={700} textAnchor="middle"
@@ -814,7 +878,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 const mid = i * 45;
                                 const [dx, dy] = dir(screenDeg(mid));
                                 const r = rLabel * 0.55;
-                                const fs = Math.min(natW, natH) / 30;
+                                const fs = 12 * k;
                                 const st = starFor(ming, g);
                                 return (
                                     <text key={g} x={cx + dx * r} y={cy + dy * r} fontSize={fs} fontWeight={700} textAnchor="middle"
@@ -827,7 +891,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {divide === "9궁격" && (() => {
                                 const { x0, y0, x1, y1 } = gridBox;
                                 const w = (x1 - x0) / 3, h = (y1 - y0) / 3;
-                                const fs = Math.min(w, h) / 4.2;
+                                const fs = Math.min(Math.min(w, h) / 4.2, 15 * k);
                                 const cells: { p: Palace; x: number; y: number }[] = GRID_CELLS.map(([r, c, off]) => ({
                                     p: palaceAt(off), x: x0 + c * w, y: y0 + r * h,
                                 }));
@@ -837,7 +901,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                         {cells.map(({ p, x, y }) => (
                                             <g key={p}>
                                                 <rect x={x} y={y} width={w} height={h} fill={palaceFill(p)}
-                                                    stroke="rgba(191,149,63,0.75)" strokeWidth={Math.min(w, h) / 60} />
+                                                    stroke="rgba(191,149,63,0.75)" strokeWidth={1.5 * k} />
                                                 <text x={x + w / 2} y={y + h / 2 - fs * 0.15} fontSize={fs} fontWeight={700}
                                                     textAnchor="middle" fill="#1c2f52" stroke="#fff" strokeWidth={fs / 7} paintOrder="stroke"
                                                     fontFamily="'Noto Serif KR',serif">
@@ -860,11 +924,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {/* 정렬 완료 후: 창(정면=向) 방향 표시선 — 두 번째 탭이 어디에 적용됐는지 보여준다 */}
                             {aligned && center && (() => {
                                 const [fdx, fdy] = dir(screenDeg(facingDeg));
-                                const fs = Math.min(natW, natH) / 26;
+                                const fs = 13 * k;
                                 return (
                                     <g>
                                         <line x1={cx} y1={cy} x2={cx + fdx * L} y2={cy + fdy * L}
-                                            stroke="rgba(29,79,143,0.85)" strokeWidth={natW / 350} />
+                                            stroke="rgba(29,79,143,0.85)" strokeWidth={2 * k} />
                                         <text x={cx + fdx * rLabel * 0.78} y={cy + fdy * rLabel * 0.78} fontSize={fs} fontWeight={700}
                                             textAnchor="middle" fill="#1d4f8f" stroke="#fff" strokeWidth={fs / 7} paintOrder="stroke">向 정면</text>
                                     </g>
@@ -873,28 +937,28 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {/* 외곽선 — 도면에 묻히지 않게 흰 테두리(halo) + 짙은 파랑 이중선 */}
                             {outline.length > 0 && (() => {
                                 const pts = outline.map((p) => p.join(",")).join(" ");
-                                const vr = Math.min(natW, natH) / 55;      // 꼭짓점 반경(손가락으로 잡히는 크기)
-                                const fs = Math.min(natW, natH) / 62;
+                                const vr = 9 * k;                          // 꼭짓점 반경(화면 기준 — 손가락으로 잡히는 크기)
+                                const fs = 10 * k;
                                 const closing = pickMode === "outline" && outline.length >= 3;
                                 return (
                                     <g>
                                         {/* 채움 + 흰 halo */}
                                         <polygon points={pts} fill="rgba(29,78,216,0.16)" stroke="#fff"
-                                            strokeWidth={natW / 90} strokeLinejoin="round" />
+                                            strokeWidth={5 * k} strokeLinejoin="round" />
                                         <polygon points={pts} fill="none" stroke="#1d4ed8"
-                                            strokeWidth={natW / 170} strokeLinejoin="round" />
+                                            strokeWidth={2.5 * k} strokeLinejoin="round" />
                                         {/* 아직 찍는 중이면 '닫힐 선'을 점선으로 예고 */}
                                         {closing && (
                                             <line x1={outline[outline.length - 1][0]} y1={outline[outline.length - 1][1]}
                                                 x2={outline[0][0]} y2={outline[0][1]}
-                                                stroke="#1d4ed8" strokeWidth={natW / 220}
-                                                strokeDasharray={`${natW / 90},${natW / 130}`} opacity={0.7} />
+                                                stroke="#1d4ed8" strokeWidth={2 * k}
+                                                strokeDasharray={`${7 * k},${5 * k}`} opacity={0.7} />
                                         )}
                                         {/* 꼭짓점 — 번호를 달아 순서를 보이게, 시작점은 붉게 */}
                                         {outline.map((p, i) => (
                                             <g key={i}>
                                                 <circle cx={p[0]} cy={p[1]} r={vr} fill={i === 0 ? "#dc2626" : "#1d4ed8"}
-                                                    stroke="#fff" strokeWidth={natW / 300} />
+                                                    stroke="#fff" strokeWidth={1.5 * k} />
                                                 <text x={p[0]} y={p[1] + fs * 0.36} fontSize={fs} fontWeight={700}
                                                     fill="#fff" textAnchor="middle">{i + 1}</text>
                                             </g>
@@ -904,18 +968,18 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             })()}
                             {/* 방 핀 — 찍어둔 방 위치 */}
                             {rooms.map((r, i) => {
-                                const rr = Math.min(natW, natH) / 70;
-                                const fs = Math.min(natW, natH) / 40;
+                                const rr = 8 * k;
+                                const fs = 12 * k;
                                 return (
                                     <g key={i}>
-                                        <circle cx={r.x} cy={r.y} r={rr} fill="#7c3aed" stroke="#fff" strokeWidth={natW / 400} />
+                                        <circle cx={r.x} cy={r.y} r={rr} fill="#7c3aed" stroke="#fff" strokeWidth={1.5 * k} />
                                         <text x={r.x} y={r.y - rr * 1.5} fontSize={fs} fontWeight={700} textAnchor="middle"
                                             fill="#5b21b6" stroke="#fff" strokeWidth={fs / 6} paintOrder="stroke">{r.name}</text>
                                     </g>
                                 );
                             })}
                             {/* 중심점 */}
-                            <circle cx={cx} cy={cy} r={Math.min(natW, natH) / 90} fill="#c0392b" stroke="#fff" strokeWidth={natW / 500} />
+                            <circle cx={cx} cy={cy} r={7 * k} fill="#c0392b" stroke="#fff" strokeWidth={1.5 * k} />
                         </svg>
                         {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지).
                             단 방 찍기는 정렬 이후에 하는 작업이라 그때도 띄운다. */}

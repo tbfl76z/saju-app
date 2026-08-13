@@ -754,6 +754,7 @@ class MapReq(BaseModel):
     zoom: int = 19           # 18~20이 단지 한 동이 보이는 배율
     size: int = 640          # 정사각
     scale: int = 2           # 2 = 고해상도(같은 범위를 2배 픽셀로)
+    maptype: str = "satellite"   # "satellite" | "basic"(일반지도)
 
 
 def _mpp(lat: float, zoom: int, scale: int) -> float:
@@ -781,6 +782,7 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
     import httpx
 
     H = {"x-ncp-apigw-api-key-id": kid, "x-ncp-apigw-api-key": ksec}
+    mtype = "basic" if (req.maptype or "").lower() == "basic" else "satellite_base"
     lat, lng, resolved = req.lat, req.lng, ""
     level = max(0, min(20, int(req.zoom or 19)))
     size = max(64, min(1024, int(req.size or 640)))
@@ -814,7 +816,8 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
             params={
                 "center": f"{lng},{lat}",      # 경도,위도 순
                 "level": level, "w": size, "h": size,
-                "scale": scale, "maptype": "satellite_base", "format": "jpg",
+                # satellite_base = 라벨 없는 순수 위성 / basic = 일반지도
+                "scale": scale, "maptype": mtype, "format": "jpg",
             },
             headers=H,
         )
@@ -827,7 +830,7 @@ async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
         "image": "data:image/jpeg;base64," + base64.b64encode(m.content).decode(),
         "lat": lat, "lng": lng, "address": resolved,
         "zoom": level, "meters_per_pixel": round(_mpp(lat, level, scale), 4),
-        "north_up": True, "provider": "naver",
+        "north_up": True, "provider": "naver", "maptype": mtype,
     }
 
 
@@ -869,7 +872,8 @@ async def _google_map(req: MapReq, key: str) -> dict:
             params={
                 "center": f"{lat},{lng}", "zoom": zoom,
                 "size": f"{size}x{size}", "scale": scale,
-                "maptype": "satellite", "format": "jpg", "key": key,
+                "maptype": ("roadmap" if (req.maptype or "").lower() == "basic" else "satellite"),
+                "format": "jpg", "key": key,
             },
         )
     if m.status_code != 200:
@@ -882,6 +886,7 @@ async def _google_map(req: MapReq, key: str) -> dict:
         "lat": lat, "lng": lng, "address": resolved,
         "zoom": zoom, "meters_per_pixel": round(_mpp(lat, zoom, scale), 4),
         "north_up": True, "provider": "google",
+        "maptype": ("basic" if (req.maptype or "").lower() == "basic" else "satellite"),
     }
 
 

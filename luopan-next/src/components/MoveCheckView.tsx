@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/useToast";
-import { starChart, periodOf, annualChart, MOUNTAIN_INFO, starMood, type StarChart, type Palace } from "@/lib/flyingStars";
+import { starChart, periodOf, annualChart, MOUNTAIN_INFO, starMood, kyemCheck, type StarChart, type Palace } from "@/lib/flyingStars";
 import { mingGua, type Trigram } from "@/lib/eightMansions";
 
 // 이사할 집 진단 — 반(비성반)은 "준공(건축) 연도"의 운으로 세운다(필수 기준).
@@ -18,7 +18,7 @@ const PALACE_DIR: Record<string, string> = {
     坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서",
 };
 
-interface Candidate { name: string; sitting: string; built: number; year: number | null; ent?: string | null }
+interface Candidate { name: string; sitting: string; built: number; year: number | null; ent?: string | null; deg?: number | null }
 const CAND_KEY = "destiny-hyeongong-candidates";
 function loadCands(): Candidate[] {
     try {
@@ -43,11 +43,11 @@ interface Verdict {
 
 const GUA8: Palace[] = ["坎", "艮", "震", "巽", "離", "坤", "兌", "乾"];
 
-function diagnose(sitting: string, builtYear: number, moveYear: number | null, nowYear: number, entrance: Palace | null, ming: Trigram | null): Verdict | null {
+function diagnose(sitting: string, builtYear: number, moveYear: number | null, nowYear: number, entrance: Palace | null, ming: Trigram | null, useTi = false): Verdict | null {
     const builtPeriod = periodOf(builtYear);            // 원운 — 반의 골조를 결정
     const curPeriod = periodOf(moveYear ?? nowYear);    // 당운(입주 시점, 미입력 시 올해) — 왕쇠 판정 기준
     let chart: StarChart;
-    try { chart = starChart(sitting, builtPeriod); } catch { return null; }
+    try { chart = starChart(sitting, builtPeriod, useTi); } catch { return null; }
     const notes: Note[] = [];
     let score = 0;
     const inPeriod = builtPeriod === curPeriod;   // 원운이 아직 유효한가(실운 여부)
@@ -173,6 +173,9 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
     const [builtIn, setBuiltIn] = useState("");   // 준공 연도 — 기본값 없이 직접 입력(임의 추정 방지)
     const [yearIn, setYearIn] = useState("");     // 입주 예정 해(선택)
     const [ent, setEnt] = useState<Palace | "">("");   // 현관 방위(선택) — 집 중심에서 본 8방위
+    // 실측 좌향각 — 겸향(체괘) 판정에 쓴다. 좌산을 손으로 고르면 각도가 의미를 잃으므로 비운다.
+    const [deg, setDeg] = useState<number | null>(null);
+    const [tiOverride, setTiOverride] = useState<boolean | null>(null);
     const [name, setName] = useState("");
     const [cands, setCands] = useState<Candidate[]>([]);
     useEffect(() => { setCands(loadCands()); }, []);
@@ -181,6 +184,9 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
         if (!birthYear || !gender) return null;
         try { return mingGua(birthYear, gender); } catch { return null; }
     }, [birthYear, gender]);
+
+    const kyem = useMemo(() => (deg == null ? null : kyemCheck(deg)), [deg]);
+    const useTi = tiOverride ?? kyem?.useTi ?? false;
 
     const builtYear = useMemo(() => {
         const v = parseInt(builtIn, 10);
@@ -192,19 +198,19 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
     }, [yearIn]);
 
     const res = useMemo(
-        () => (builtYear != null ? diagnose(sitting, builtYear, moveYear, nowYear, ent || null, ming) : null),
-        [sitting, builtYear, moveYear, nowYear, ent, ming]
+        () => (builtYear != null ? diagnose(sitting, builtYear, moveYear, nowYear, ent || null, ming, useTi) : null),
+        [sitting, builtYear, moveYear, nowYear, ent, ming, useTi]
     );
 
     const useMeasured = () => {
         // 별도 탭에서 쓰이므로 props가 없으면 '우리집 진단' 탭의 실측값을 localStorage에서 읽는다
         let sit = currentSitting;
-        let deg = currentDeg ?? null;
+        let measured = currentDeg ?? null;
         if (!sit) {
             try {
                 sit = window.localStorage.getItem("destiny-luopan-sitting") ?? undefined;
                 const d = parseFloat(window.localStorage.getItem("destiny-luopan-deg") || "");
-                deg = Number.isFinite(d) ? d : null;
+                measured = Number.isFinite(d) ? d : null;
             } catch { /* 무시 */ }
         }
         if (!sit || !MOUNTAIN_INFO[sit]) {
@@ -212,16 +218,21 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
             return;
         }
         setSitting(sit);
+        setDeg(measured);     // 각도까지 받아야 겸향(체괘) 판정이 선다
+        setTiOverride(null);
+        const k = measured != null ? kyemCheck(measured) : null;
         notify.success(
-            `실측 좌향 가져옴: ${sit}坐` + (deg != null ? ` (${deg.toFixed(1)}°)` : ""),
-            "후보 집 현장에서 실측한 값이면 가장 정확합니다."
+            `실측 좌향 가져옴: ${sit}坐` + (measured != null ? ` (${measured.toFixed(1)}°)` : ""),
+            k?.kyem
+                ? `${k.type} 겸향이라 ${k.useTi ? "체괘" : "하괘"}로 반을 세웁니다.`
+                : "후보 집 현장에서 실측한 값이면 가장 정확합니다."
         );
     };
 
     const addCand = () => {
         if (builtYear == null) { notify.error("준공 연도를 먼저 입력하세요", "반(운)을 세우는 기준이라 꼭 필요합니다."); return; }
         const nm = name.trim() || `${sitting}坐 ${builtYear}년 준공`;
-        const next = [{ name: nm, sitting, built: builtYear, year: moveYear, ent: ent || null }, ...cands.filter((c) => c.name !== nm)].slice(0, 8);
+        const next = [{ name: nm, sitting, built: builtYear, year: moveYear, ent: ent || null, deg }, ...cands.filter((c) => c.name !== nm)].slice(0, 8);
         setCands(next); saveCands(next); setName("");
         notify.success(`'${nm}' 비교 목록에 담았습니다`);
     };
@@ -244,12 +255,44 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
             {/* 입력 — 좌향 · 준공 연도 · 입주 예정 해 */}
             <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                 <span>좌(坐)</span>
-                <select value={sitting} onChange={(e) => setSitting(e.target.value)}
+                <select value={sitting} onChange={(e) => { setSitting(e.target.value); setDeg(null); setTiOverride(null); }}
                     className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
                     {MOUNTAINS_24.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <Button onClick={useMeasured} variant="outline" className="h-8 rounded-full text-xs">🧭 실측값 가져오기</Button>
+                {deg != null && <span className="text-[11px] text-slate-400">실측 {deg.toFixed(1)}°</span>}
             </div>
+            {/* 겸향(兼向) — 실측각이 있어야 판정된다. 좌산을 손으로 고르면 각도가 없어 하괘로 본다. */}
+            {kyem && (
+                <div className={"rounded-xl px-3 py-2 text-[12px] border space-y-1.5 "
+                    + (kyem.kyem
+                        ? "bg-violet-50/70 dark:bg-violet-950/30 border-violet-300/60 dark:border-violet-800/50 text-violet-800 dark:text-violet-300"
+                        : "bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300")}>
+                    <div>
+                        {kyem.kyem ? "⟡" : "•"} <b>{kyem.kyem ? `겸향 — ${kyem.type}` : "정향(하괘)"}</b>
+                        <span className="text-slate-500 dark:text-slate-400"> · {kyem.mountain} 중심에서 {kyem.offset > 0 ? "+" : ""}{kyem.offset.toFixed(1)}°</span>
+                    </div>
+                    <p>{kyem.note}</p>
+                    {kyem.kyem && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                            <span className="text-[11px]">이 반은</span>
+                            {([false, true] as boolean[]).map((t) => (
+                                <button key={String(t)} onClick={() => setTiOverride(t)}
+                                    className={"px-3 py-1 rounded-full text-[11px] font-semibold border "
+                                        + (useTi === t
+                                            ? "border-violet-400 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
+                                            : "border-slate-300 dark:border-slate-600 text-slate-400")}>
+                                    {t ? "체괘(替卦)" : "하괘(下卦)"}
+                                </button>
+                            ))}
+                            {tiOverride != null && (
+                                <button onClick={() => setTiOverride(null)} className="text-[11px] text-slate-400 underline">판정값으로</button>
+                            )}
+                            <span className="text-[10.5px] text-slate-500 dark:text-slate-400">판정: {kyem.useTi ? "체괘" : "하괘"}</span>
+                        </div>
+                    )}
+                </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
                 <span>준공(건축) 연도</span>
                 <input type="number" value={builtIn} placeholder="예: 1995" min={1864} max={2100}
@@ -344,7 +387,8 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                         </thead>
                         <tbody>
                             {cands.map((c) => {
-                                const v = diagnose(c.sitting, c.built, c.year, nowYear, (c.ent as Palace) || null, ming);
+                                const cTi = c.deg != null ? kyemCheck(c.deg).useTi : false;
+                                const v = diagnose(c.sitting, c.built, c.year, nowYear, (c.ent as Palace) || null, ming, cTi);
                                 return (
                                     <tr key={c.name} className="border-b border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                                         <td className="py-1.5 font-semibold text-left">{c.name}</td>
