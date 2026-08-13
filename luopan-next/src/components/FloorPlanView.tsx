@@ -158,7 +158,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 위성지도 — 주소로 불러오면 위가 항상 정북이라 방위가 이미 정해져 있다
     const [addr, setAddr] = useState("");
     const [mapBusy, setMapBusy] = useState(false);
-    const [mapInfo, setMapInfo] = useState<{ address: string; mpp: number } | null>(null);
+    const [mapInfo, setMapInfo] = useState<{ address: string; mpp: number; provider: string } | null>(null);
     const [northLocked, setNorthLocked] = useState(false); // 위성지도 = 위가 정북(방위 확정)
     const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
@@ -354,7 +354,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
             const r = await fetch(`${API_BASE}/classic/map/satellite`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ address: q, zoom: 19 }),
+                // 크기는 서버가 공급자 상한(네이버 1024 / 구글 640)으로 잘라 준다
+                body: JSON.stringify({ address: q, zoom: 19, size: 1024 }),
             });
             if (!r.ok) {
                 let msg = `요청 실패(${r.status})`;
@@ -362,7 +363,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 notify.error("위성지도를 불러오지 못했습니다", msg);
                 return;
             }
-            const j: { image: string; address: string; meters_per_pixel: number } = await r.json();
+            const j: { image: string; address: string; meters_per_pixel: number; provider?: string } = await r.json();
             const im = new Image();
             im.onload = () => {
                 setNatural([im.naturalWidth, im.naturalHeight]);
@@ -370,7 +371,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 setPickMode("center"); setCenterNote(""); setAiRead(null);
                 setNorthDeg(0); setNorthLocked(true);   // 위성지도는 위 = 정북
                 setImg(j.image);
-                setMapInfo({ address: j.address || q, mpp: j.meters_per_pixel });
+                setMapInfo({ address: j.address || q, mpp: j.meters_per_pixel, provider: j.provider || "" });
                 notify.success("위성지도를 불러왔습니다", "위가 정북으로 맞춰져 있습니다. 집 중심 → 정면을 탭하세요.");
             };
             im.src = j.image;
@@ -571,7 +572,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 {/* 위성지도 상태 — 방위가 확정됐다는 것과 축척을 알린다 */}
                 {mapInfo && (
                     <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40 px-3 py-2 text-[12px] text-sky-800 dark:text-sky-300">
-                        🗺 <b>위성지도 — 위가 정북(0°)으로 고정</b>됐습니다. {mapInfo.address && <span>· {mapInfo.address} </span>}
+                        🗺 <b>위성지도 — 위가 정북(0°)으로 고정</b>됐습니다.
+                        {mapInfo.provider && <span className="text-slate-500 dark:text-slate-400"> ({mapInfo.provider === "naver" ? "네이버" : "구글"})</span>}
+                        {mapInfo.address && <span> · {mapInfo.address} </span>}
                         · 약 {mapInfo.mpp.toFixed(2)} m/픽셀
                         <br />건물 중심 → 정면(베란다 쪽)을 차례로 탭하면 <b>좌향이 계산</b>됩니다.
                         아파트는 동마다 배치각이 달라 이 값은 <b>실측의 대체가 아니라 교차검증용</b>입니다.

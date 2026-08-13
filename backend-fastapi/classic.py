@@ -751,35 +751,83 @@ class MapReq(BaseModel):
     address: str = ""        # 주소(비우면 lat/lng 사용)
     lat: float | None = None
     lng: float | None = None
-    zoom: int = 19           # 19~20이 단지 한 동이 보이는 배율
-    size: int = 640          # 정사각. Static Maps 무료 상한이 640
+    zoom: int = 19           # 18~20이 단지 한 동이 보이는 배율
+    size: int = 640          # 정사각
     scale: int = 2           # 2 = 고해상도(같은 범위를 2배 픽셀로)
 
 
-@router.post("/map/satellite")
-async def map_satellite(req: MapReq):
-    """주소(또는 좌표)로 위성지도를 받아 온다.
+def _mpp(lat: float, zoom: int, scale: int) -> float:
+    """웹 메르카토르 미터/픽셀 — 위도 보정 포함."""
+    import math
+    return 156543.03392 * math.cos(math.radians(lat)) / (2 ** zoom) / scale
 
-    위성지도는 **항상 위가 정북**이라, 나침반 실측 없이도 건물이 앉은 각도를 볼 수 있다.
-    다만 아파트는 동마다 배치각이 다르므로 이것은 실측의 대체가 아니라 교차검증용이다.
 
-    키는 Google Maps Platform 키를 쓴다(Geocoding API + Maps Static API 필요).
-    Gemini 전용 키로는 동작하지 않으므로, 없으면 조용히 넘기지 말고 무엇을 켜야 하는지 알린다.
+async def _naver_map(req: MapReq, kid: str, ksec: str) -> dict:
+    """네이버 클라우드 플랫폼 — Geocoding + Static Map(위성).
+
+    Static Map은 월 300만 건 무료이고 최대 1024px까지 받는다.
+    center 파라미터가 '경도,위도' 순서인 점에 주의(구글과 반대).
     """
     import base64
-    import os
 
     import httpx
 
-    key = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if not key:
-        raise HTTPException(
-            status_code=503,
-            detail="GOOGLE_MAPS_API_KEY가 설정되지 않았습니다. Google Maps Platform에서 키를 발급하고 Geocoding API·Maps Static API를 켜주세요.",
-        )
+    H = {"x-ncp-apigw-api-key-id": kid, "x-ncp-apigw-api-key": ksec}
+    lat, lng, resolved = req.lat, req.lng, ""
+    level = max(0, min(20, int(req.zoom or 19)))
+    size = max(64, min(1024, int(req.size or 640)))
+    scale = 2 if int(req.scale or 2) >= 2 else 1
 
-    lat, lng = req.lat, req.lng
-    resolved = ""
+    async with httpx.AsyncClient(timeout=15) as client:
+        if lat is None or lng is None:
+            addr = (req.address or "").strip()
+            if not addr:
+                raise HTTPException(status_code=400, detail="주소 또는 좌표가 필요합니다.")
+            g = await client.get(
+                "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode",
+                params={"query": addr}, headers=H,
+            )
+            if g.status_code in (401, 403):
+                raise HTTPException(status_code=503, detail="네이버 인증 실패 — Geocoding API 이용 신청과 키를 확인하세요.")
+            if g.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"주소 검색 실패(HTTP {g.status_code})")
+            gj = g.json()
+            addrs = gj.get("addresses") or []
+            if gj.get("status") != "OK" or not addrs:
+                raise HTTPException(status_code=404, detail=f"주소를 찾지 못했습니다. ({gj.get('errorMessage') or gj.get('status')})")
+            top = addrs[0]
+            lng, lat = float(top["x"]), float(top["y"])   # x=경도, y=위도
+            resolved = top.get("roadAddress") or top.get("jibunAddress") or ""
+
+        m = await client.get(
+            "https://naveropenapi.apigw.ntruss.com/map-static/v2/raster",
+            params={
+                "center": f"{lng},{lat}",      # 경도,위도 순
+                "level": level, "w": size, "h": size,
+                "scale": scale, "maptype": "satellite", "format": "png",
+            },
+            headers=H,
+        )
+    if m.status_code in (401, 403):
+        raise HTTPException(status_code=503, detail="네이버 인증 실패 — Static Map API 이용 신청 여부를 확인하세요.")
+    if m.status_code != 200 or not m.headers.get("content-type", "").startswith("image"):
+        raise HTTPException(status_code=502, detail=f"위성지도를 받지 못했습니다(HTTP {m.status_code}).")
+
+    return {
+        "image": "data:image/png;base64," + base64.b64encode(m.content).decode(),
+        "lat": lat, "lng": lng, "address": resolved,
+        "zoom": level, "meters_per_pixel": round(_mpp(lat, level, scale), 4),
+        "north_up": True, "provider": "naver",
+    }
+
+
+async def _google_map(req: MapReq, key: str) -> dict:
+    """Google Maps Platform — Geocoding + Maps Static(위성). 무료 상한 640px."""
+    import base64
+
+    import httpx
+
+    lat, lng, resolved = req.lat, req.lng, ""
     zoom = max(15, min(21, int(req.zoom or 19)))
     size = max(256, min(640, int(req.size or 640)))
     scale = 2 if int(req.scale or 2) >= 2 else 1
@@ -819,13 +867,41 @@ async def map_satellite(req: MapReq):
     if not m.content or not m.headers.get("content-type", "").startswith("image"):
         raise HTTPException(status_code=502, detail="위성지도 응답이 이미지가 아닙니다. API 키 제한 설정을 확인하세요.")
 
-    # 축척(미터/픽셀) — 웹 메르카토르 기준. 위도 보정 포함
-    import math
-    mpp = 156543.03392 * math.cos(math.radians(lat)) / (2 ** zoom) / scale
-
     return {
         "image": "data:image/png;base64," + base64.b64encode(m.content).decode(),
         "lat": lat, "lng": lng, "address": resolved,
-        "zoom": zoom, "meters_per_pixel": round(mpp, 4),
-        "north_up": True,
+        "zoom": zoom, "meters_per_pixel": round(_mpp(lat, zoom, scale), 4),
+        "north_up": True, "provider": "google",
     }
+
+
+@router.post("/map/satellite")
+async def map_satellite(req: MapReq):
+    """주소(또는 좌표)로 위성지도를 받아 온다.
+
+    위성지도는 **항상 위가 정북**이라, 나침반 실측 없이도 건물이 앉은 각도를 볼 수 있다.
+    다만 아파트는 동마다 배치각이 달라 이것은 실측의 대체가 아니라 교차검증용이다.
+
+    공급자는 네이버를 먼저 쓴다 — 한국 주소 정확도가 높고 Static Map 무료량(월 300만)이 크며
+    최대 1024px까지 받는다. 네이버 키가 없으면 구글로 넘어간다.
+    키가 아예 없으면 조용히 넘기지 말고 무엇을 발급·활성화해야 하는지 알린다.
+    """
+    import os
+
+    nid = os.getenv("NAVER_MAPS_KEY_ID")
+    nsec = os.getenv("NAVER_MAPS_KEY")
+    if nid and nsec:
+        return await _naver_map(req, nid, nsec)
+
+    gkey = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if gkey:
+        return await _google_map(req, gkey)
+
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "지도 API 키가 없습니다. 둘 중 하나를 설정하세요 — "
+            "① 네이버(권장): NAVER_MAPS_KEY_ID·NAVER_MAPS_KEY, NCP에서 Maps의 Geocoding·Static Map 이용 신청. "
+            "② 구글: GOOGLE_MAPS_API_KEY, Geocoding API·Maps Static API 활성화."
+        ),
+    )
