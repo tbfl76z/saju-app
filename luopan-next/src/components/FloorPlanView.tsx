@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportAsImage } from "@/lib/exportImage";
 import { notify } from "@/lib/useToast";
-import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, mountainFromDeg, type Palace } from "@/lib/flyingStars";
+import { MOUNTAIN_INFO, starChart, periodOf, annualChart, starMood, mountainFromDeg, comboFor, type Palace } from "@/lib/flyingStars";
 import { mingGua, starFor, type Trigram, type Star } from "@/lib/eightMansions";
 import { detectOutline } from "@/lib/floorPlanDetect";
 
@@ -41,6 +41,10 @@ const GRID_CELLS: [number, number, number][] = [
 const PAL_KO: Record<string, string> = {
     坎: "북", 艮: "북동", 震: "동", 巽: "남동", 離: "남", 坤: "남서", 兌: "서", 乾: "북서", 中: "중앙",
 };
+
+/** 방별 궁 배정 — 도면에 찍은 방 위치 */
+interface RoomPin { name: string; x: number; y: number }
+const ROOM_PRESETS = ["안방", "작은방", "거실", "주방", "서재", "화장실", "현관", "발코니"];
 
 // 방위각(0=북, 시계방향) → 이미지 좌표 방향벡터
 function dir(deg: number): [number, number] {
@@ -136,7 +140,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     });
     const [saving, setSaving] = useState(false);
     // 탭 단계: ⓪ 외곽선(선택) → ① 집 중심 → ② 집 정면(베란다) 방향
-    const [pickMode, setPickMode] = useState<"outline" | "center" | "facing">("center");
+    const [pickMode, setPickMode] = useState<"outline" | "center" | "facing" | "room">("center");
     const [aligned, setAligned] = useState(false);   // ②까지 완료(자동 정렬 적용) 여부
     const [outline, setOutline] = useState<Pt[]>([]); // 평면 외곽선 — 입극점 자동 산출용
     const [centerNote, setCenterNote] = useState(""); // 중심 산출 결과 안내
@@ -146,6 +150,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [fitView, setFitView] = useState(true);      // 긴 도면을 화면 높이에 맞춰 축소
     const [divide, setDivide] = useState<DivideMode>("부채꼴"); // 평면 분할 방식(유파 차이)
     const [alpha, setAlpha] = useState(100);           // 오버레이 진하기 — 도면 글씨가 가려질 때 낮춘다
+    // 방별 궁 배정 — 도면에서 방을 찍으면 어느 궁에 떨어지는지 표로 정리한다
+    const [rooms, setRooms] = useState<RoomPin[]>([]);
+    const [roomName, setRoomName] = useState(ROOM_PRESETS[0]);
     const imgElRef = useRef<HTMLImageElement>(null);
     // 내장 모드: 현공 탭의 좌향·준공년을 그대로 사용(실측 → 도면 즉시 적용)
     const sitting = extSitting ?? sittingIn;
@@ -252,6 +259,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         if (!img) return;
         if (pickMode === "outline") {
             setOutline((prev) => [...prev, [x, y] as Pt]);
+            return;
+        }
+        if (pickMode === "room") {
+            if (!center) { notify.error("먼저 집 중심을 잡아 주세요", "중심이 없으면 어느 궁인지 계산할 수 없습니다."); return; }
+            const p = palaceOfPoint(x, y);
+            setRooms((prev) => [...prev, { name: roomName, x, y }]);
+            notify.success(`${roomName} → ${PAL_KO[p]}(${p})궁`, "아래 표에서 성요와 함께 확인하세요.");
             return;
         }
         if (pickMode === "center") {
@@ -395,6 +409,27 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     /** 화면 위쪽 기준 오프셋 → 실제 궁 (도면 상단이 northDeg를 가리킨다) */
     const palaceAt = (off: number): Palace =>
         MOUNTAIN_INFO[mountainFromDeg(northDeg + off)].palace as Palace;
+    /**
+     * 도면 위 한 점이 어느 궁에 떨어지는가.
+     * 분할 방식을 그대로 따른다 — 부채꼴이면 중심에서의 방위각, 9궁격이면 격자 칸.
+     * (두 방식은 결과가 다르게 나올 수 있다. 그래서 표에 어느 분할로 잡았는지 함께 남긴다)
+     */
+    const palaceOfPoint = (x: number, y: number): Palace => {
+        if (divide === "9궁격") {
+            const { x0, y0, x1, y1 } = gridBox;
+            const col = Math.min(2, Math.max(0, Math.floor(((x - x0) / (x1 - x0)) * 3)));
+            const row = Math.min(2, Math.max(0, Math.floor(((y - y0) / (y1 - y0)) * 3)));
+            if (row === 1 && col === 1) return "中";
+            const cell = GRID_CELLS.find(([r, c]) => r === row && c === col);
+            return cell ? palaceAt(cell[2]) : "中";
+        }
+        // 부채꼴 — 중심에 너무 가까우면 방위가 불안정해 中궁으로 본다
+        const dx = x - cx, dy = y - cy;
+        if (Math.hypot(dx, dy) < Math.min(natW, natH) * 0.06) return "中";
+        const screenAng = (Math.atan2(dx, -dy) * 180) / Math.PI;
+        return MOUNTAIN_INFO[mountainFromDeg(northDeg + screenAng)].palace as Palace;
+    };
+
     /** 궁 → 오버레이 채움색 (모드별) */
     const palaceFill = (p: Palace): string => {
         if (mode === "팔택" && ming && p !== "中") {
@@ -784,6 +819,18 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     </g>
                                 );
                             })()}
+                            {/* 방 핀 — 찍어둔 방 위치 */}
+                            {rooms.map((r, i) => {
+                                const rr = Math.min(natW, natH) / 70;
+                                const fs = Math.min(natW, natH) / 40;
+                                return (
+                                    <g key={i}>
+                                        <circle cx={r.x} cy={r.y} r={rr} fill="#7c3aed" stroke="#fff" strokeWidth={natW / 400} />
+                                        <text x={r.x} y={r.y - rr * 1.5} fontSize={fs} fontWeight={700} textAnchor="middle"
+                                            fill="#5b21b6" stroke="#fff" strokeWidth={fs / 6} paintOrder="stroke">{r.name}</text>
+                                    </g>
+                                );
+                            })}
                             {/* 중심점 */}
                             <circle cx={cx} cy={cy} r={Math.min(natW, natH) / 90} fill="#c0392b" stroke="#fff" strokeWidth={natW / 500} />
                         </svg>
@@ -816,6 +863,73 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             </Button>
                         </div>
                     )}
+                    {/* 방별 궁 배정 — "안방이 어느 궁인가"를 표로 정리 */}
+                    <div className="glass-card p-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">🏷 방별 궁 배정</span>
+                            <Button onClick={() => setPickMode(pickMode === "room" ? "center" : "room")}
+                                disabled={!center}
+                                className={"h-7 rounded-full text-[11px] " + (pickMode === "room"
+                                    ? "bg-violet-600 hover:bg-violet-700 text-white"
+                                    : "bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900")}>
+                                {pickMode === "room" ? "찍는 중 — 끄기" : "방 찍기"}
+                            </Button>
+                            {!center && <span className="text-[10.5px] text-amber-600 dark:text-amber-400">집 중심을 먼저 잡아야 합니다</span>}
+                            {!!rooms.length && (
+                                <Button onClick={() => setRooms([])} variant="outline" className="h-7 rounded-full text-[11px] ml-auto">전부 지우기</Button>
+                            )}
+                        </div>
+                        {pickMode === "room" && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                                {ROOM_PRESETS.map((n) => (
+                                    <button key={n} onClick={() => setRoomName(n)}
+                                        className={"px-2.5 py-1 rounded-full text-[11px] font-semibold border " + (roomName === n
+                                            ? "border-violet-400 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
+                                            : "border-slate-300 dark:border-slate-600 text-slate-400")}>{n}</button>
+                                ))}
+                                <span className="text-[10.5px] text-slate-400 w-full">이름을 고르고 도면에서 그 방의 한가운데를 탭하세요.</span>
+                            </div>
+                        )}
+                        {rooms.length > 0 && (
+                            <div className="space-y-1">
+                                {rooms.map((r, i) => {
+                                    const p = palaceOfPoint(r.x, r.y);
+                                    const mNum = chart?.mountain[p], wNum = chart?.water[p];
+                                    const mood = chart ? starMood(chart.water[p], curPeriod) : null;
+                                    const combo = chart ? comboFor(chart.mountain[p], chart.water[p]) : null;
+                                    const pStar = ming && p !== "中" ? starFor(ming, p as Trigram) : null;
+                                    const an = annual[p];
+                                    return (
+                                        <div key={i} className="flex items-center gap-2 text-[11px] rounded-lg bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 px-2 py-1.5">
+                                            <b className="w-14 shrink-0 text-slate-700 dark:text-slate-200">{r.name}</b>
+                                            <span className="w-16 shrink-0 text-slate-500">{PAL_KO[p]} <span className="font-noto-serif">{p}</span></span>
+                                            {chart && (
+                                                <span className="font-noto-serif shrink-0">
+                                                    산<b>{mNum}</b>·향<b>{wNum}</b>
+                                                    <span className={an === 5 || an === 2 ? "text-rose-500" : "text-slate-400"}> 年{an}</span>
+                                                </span>
+                                            )}
+                                            {mood && (
+                                                <span className={"shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-bold "
+                                                    + (mood === "왕기" ? "bg-[#d4af37]/20 text-[#bf953f]"
+                                                        : mood === "생기" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
+                                                            : mood === "쇠살" ? "bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400"
+                                                                : "bg-slate-100 dark:bg-slate-700 text-slate-500")}>{mood}</span>
+                                            )}
+                                            {combo && <span className={combo.grade === "길" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"}>{combo.name}</span>}
+                                            {pStar && <span className="text-slate-400">택 {pStar}</span>}
+                                            <button onClick={() => setRooms((prev) => prev.filter((_, k) => k !== i))}
+                                                className="ml-auto shrink-0 text-slate-400 hover:text-rose-500">×</button>
+                                        </div>
+                                    );
+                                })}
+                                <p className="text-[10px] text-slate-400">
+                                    <b>{divide}</b> 분할 기준입니다 — 분할 방식을 바꾸면 경계에 걸친 방은 궁이 달라질 수 있습니다.
+                                    왕쇠는 향성 기준({curPeriod}운)입니다.
+                                </p>
+                            </div>
+                        )}
+                    </div>
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-[11px] text-slate-400">
                             {mode === "팔택" && ming && <>본명괘 <b className="font-noto-serif">{ming}</b> 기준 — 초록=길방, 붉음=흉방. </>}
