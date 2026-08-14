@@ -37,7 +37,17 @@ const CATEGORIES: { key: CategoryKey | null; label: string; icon: string }[] = [
 ];
 
 function getTodayISO(): string {
-    return new Date().toISOString().slice(0, 10);
+    // toISOString()은 UTC 기준이라 한국(UTC+9)에서는 오전 9시까지 '어제'가 나온다.
+    // 일진은 하루가 밀리면 그대로 오답이므로 로컬 날짜로 만든다.
+    const d = new Date();
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
+/** 세운(연운)은 입춘에 바뀐다 — 1월 1일이 아니다. 입춘 전이면 아직 전년도 세운이다. */
+function ipchunYear(d: Date): number {
+    const m = d.getMonth() + 1;
+    return m < 2 || (m === 2 && d.getDate() < 4) ? d.getFullYear() - 1 : d.getFullYear();
 }
 
 function relStr(value: unknown): string {
@@ -69,7 +79,7 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
     const lastDateRef = useRef<string>("");
 
     const now = new Date();
-    const curYear = now.getFullYear();
+    const curYear = ipchunYear(now);      // 세운 기준 연도(입춘 보정)
     const curMonth = now.getMonth() + 1;
 
     // 오늘/이달/올해 운세를 한 번에 불러온다
@@ -77,7 +87,8 @@ export function DailyFortune({ sajuData, apiBase }: DailyFortuneProps) {
         const p = sajuData?.pillars;
         if (!p?.day?.stem) return;
         setIsLoading(true);
-        const common = { day_gan: p.day.stem, year_branch: p.year.branch, pillars: p, day_branch: p.day.branch };
+        // target_date를 반드시 보낸다. 비우면 서버(UTC)의 오늘로 떨어져 하루 밀린다.
+        const common = { day_gan: p.day.stem, year_branch: p.year.branch, pillars: p, day_branch: p.day.branch, target_date: getTodayISO() };
         try {
             // /ilun 응답에 오늘 일진 + 이달(절기 기준) 월주가 함께 온다
             const [ilunRes, yearRes] = await Promise.all([

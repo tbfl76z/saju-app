@@ -152,7 +152,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const [aiRead, setAiRead] = useState<PlanRead | null>(null);
     const [fitView, setFitView] = useState(true);      // 긴 도면을 화면 높이에 맞춰 축소
     const [divide, setDivide] = useState<DivideMode>("부채꼴"); // 평면 분할 방식(유파 차이)
-    const [alpha, setAlpha] = useState(100);           // 오버레이 진하기 — 도면 글씨가 가려질 때 낮춘다
+    const [alpha, setAlpha] = useState(45);            // 방위 표시 진하기. 100%면 지도가 가려져 기본을 낮춘다
     // 방별 궁 배정 — 도면에서 방을 찍으면 어느 궁에 떨어지는지 표로 정리한다
     const [rooms, setRooms] = useState<RoomPin[]>([]);
     const [roomName, setRoomName] = useState(ROOM_PRESETS[0]);
@@ -169,6 +169,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const mapPos = useRef<{ lat: number; lng: number } | null>(null);
     const [panMode, setPanMode] = useState(false);          // 지도 끌어서 이동
     const [panOff, setPanOff] = useState<[number, number]>([0, 0]);  // 끄는 중의 화면 이동량(px)
+    // 화면 확대 — 지도를 다시 받지 않고 이미지+오버레이만 확대한다.
+    // (네이버 배율 상한이 20이라 그 이상은 이 방식으로만 키울 수 있고,
+    //  브라우저 핀치줌처럼 페이지 전체가 커지는 일도 없다)
+    const [viewScale, setViewScale] = useState(1);
+    const [viewOff, setViewOff] = useState<[number, number]>([0, 0]);   // 확대 상태에서의 이동량(px)
     const panStart = useRef<{ x: number; y: number } | null>(null);
     const [northLocked, setNorthLocked] = useState(false); // 위성지도 = 위가 정북(방위 확정)
     const imgElRef = useRef<HTMLImageElement>(null);
@@ -294,7 +299,11 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         const el = boxRef.current;
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        return [((e.clientX - r.left) / r.width) * natW, ((e.clientY - r.top) / r.height) * natH];
+        // 이미지 래퍼에 translate(viewOff) scale(viewScale)가 걸려 있으므로 되돌려 푼다.
+        const hw = r.width / 2, hh = r.height / 2;
+        const u = (e.clientX - r.left - viewOff[0] - hw) / viewScale + hw;
+        const v = (e.clientY - r.top - viewOff[1] - hh) / viewScale + hh;
+        return [(u / r.width) * natW, (v / r.height) * natH];
     };
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         if (!img) return;
@@ -339,9 +348,15 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
             const st = panStart.current;
             panStart.current = null;
             setPanOff([0, 0]);
+            const dx0 = st ? e.clientX - st.x : 0, dy0 = st ? e.clientY - st.y : 0;
+            // 확대해서 보는 중이면 화면 안에서만 옮긴다(지도를 다시 받을 필요가 없다)
+            if (viewScale > 1) {
+                if (st) setViewOff(([ox, oy]) => [ox + dx0, oy + dy0]);
+                return;
+            }
             const info = mapInfo, pos = mapPos.current;
             if (!st || !info || !pos) return;
-            const dx = e.clientX - st.x, dy = e.clientY - st.y;
+            const dx = dx0, dy = dy0;
             if (Math.hypot(dx, dy) < 6) return;                 // 살짝 눌린 것은 무시
             // 화면 이동량 → 이미지 픽셀 → 미터 → 위경도.
             // 내용이 오른쪽으로 밀리면 보는 지점은 서쪽으로 간다(부호 반대).
@@ -755,28 +770,79 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                 </div>
             )}
 
-            {/* 지도 조작 — 지도로 불러왔을 때만, 한 줄 */}
-            {img && mapInfo && (
-                <div className="glass-card p-2.5 flex items-center gap-1.5 flex-wrap text-[11px]">
-                    <span className="font-semibold text-sky-700 dark:text-sky-300">🗺 지도</span>
-                    <span className="text-slate-400 truncate max-w-[40%]">{mapInfo.address}</span>
-                    <button onClick={() => loadMap({ zoom: mapZoom - 1, byCoords: true })} disabled={mapBusy || mapZoom <= 16}
-                        className="w-7 h-7 rounded-full border border-slate-300 dark:border-slate-600 font-bold disabled:opacity-40">−</button>
-                    <span className="text-slate-500 w-20 text-center">{mapBusy ? "불러오는 중" : `가로 ${Math.round(natW * mapInfo.mpp)}m`}</span>
-                    <button onClick={() => loadMap({ zoom: mapZoom + 1, byCoords: true })} disabled={mapBusy || mapZoom >= 20}
-                        className="w-7 h-7 rounded-full border border-slate-300 dark:border-slate-600 font-bold disabled:opacity-40">+</button>
-                    <button onClick={() => setPanMode((v) => !v)}
-                        className={"px-2.5 py-1 rounded-full font-semibold border " + (panMode
-                            ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
-                            : "border-slate-300 dark:border-slate-600 text-slate-500")}>
-                        {panMode ? "🖐 이동 끄기" : "🖐 이동"}
-                    </button>
-                    {(["basic", "satellite"] as const).map((t) => (
-                        <button key={t} onClick={() => { setMapType(t); if (mapPos.current) loadMap({ byCoords: true, type: t }); }}
-                            className={"px-2 py-1 rounded-full font-semibold " + (mapType === t ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
-                            {t === "basic" ? "일반" : "위성"}
+            {/* 도면 조작 바 — 도면이 있으면 항상 보인다.
+                확대는 지도를 다시 받지 않고 화면에서 키운다(배율 상한 20을 넘어서 볼 수 있고,
+                브라우저 핀치줌처럼 페이지 전체가 커지지도 않는다). */}
+            {img && (
+                <div className="glass-card p-2.5 space-y-2">
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">🔍 확대</span>
+                        <button onClick={() => { setViewScale((v) => Math.max(1, +(v - 0.5).toFixed(1))); setViewOff([0, 0]); }}
+                            disabled={viewScale <= 1}
+                            className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 font-bold text-base disabled:opacity-40">−</button>
+                        <span className="w-12 text-center font-semibold">{viewScale.toFixed(1)}×</span>
+                        <button onClick={() => setViewScale((v) => Math.min(6, +(v + 0.5).toFixed(1)))}
+                            disabled={viewScale >= 6}
+                            className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 font-bold text-base disabled:opacity-40">+</button>
+                        <button onClick={() => setPanMode((v) => !v)}
+                            className={"px-2.5 py-1.5 rounded-full font-semibold border " + (panMode
+                                ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                                : "border-slate-300 dark:border-slate-600 text-slate-500")}>
+                            {panMode ? "🖐 이동 끄기" : "🖐 이동"}
                         </button>
-                    ))}
+                        <span className="mx-1 text-slate-300">|</span>
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">진하기</span>
+                        <input type="range" min={0} max={100} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
+                            className="w-20 accent-[#d4af37]" aria-label="방위 표시 진하기" />
+                        <span className="w-8 text-slate-400">{alpha}%</span>
+                        <button onClick={() => {
+                            if (!window.confirm("불러온 도면과 찍어둔 점·방 핀을 모두 지웁니다. 계속할까요?")) return;
+                            userActed.current = true;
+                            setImg(null); setCenter(null); setOutline([]); setRooms([]); setAligned(false);
+                            setPickMode("center"); setCenterNote(""); setAiRead(null);
+                            setNorthLocked(false); setMapInfo(null); setNorthDeg(0);
+                            setViewScale(1); setViewOff([0, 0]); mapPos.current = null;
+                            clearPlan();
+                            notify.success("초기화했습니다", "새 도면을 올리거나 주소로 불러오세요.");
+                        }} className="ml-auto px-2.5 py-1.5 rounded-full border border-rose-300 text-rose-500 font-semibold">↺ 초기화</button>
+                    </div>
+                    {/* 지도로 불러온 경우 — 주소·지도 배율·종류 */}
+                    {mapInfo && (
+                        <div className="flex items-center gap-1.5 flex-wrap text-[11px] border-t border-slate-200 dark:border-slate-700 pt-2">
+                            <span className="font-semibold text-sky-700 dark:text-sky-300">🗺</span>
+                            <span className="text-slate-400 truncate max-w-[45%]">{mapInfo.address}</span>
+                            <button onClick={() => loadMap({ zoom: mapZoom - 1, byCoords: true })} disabled={mapBusy || mapZoom <= 16}
+                                className="px-2 py-1 rounded-full border border-slate-300 dark:border-slate-600 disabled:opacity-40">넓게</button>
+                            <span className="text-slate-500">{mapBusy ? "불러오는 중" : `가로 ${Math.round(natW * mapInfo.mpp)}m`}</span>
+                            <button onClick={() => loadMap({ zoom: mapZoom + 1, byCoords: true })} disabled={mapBusy || mapZoom >= 20}
+                                className="px-2 py-1 rounded-full border border-slate-300 dark:border-slate-600 disabled:opacity-40">좁게</button>
+                            {(["basic", "satellite"] as const).map((t) => (
+                                <button key={t} onClick={() => { setMapType(t); if (mapPos.current) loadMap({ byCoords: true, type: t }); }}
+                                    className={"px-2 py-1 rounded-full font-semibold " + (mapType === t ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                                    {t === "basic" ? "일반" : "위성"}
+                                </button>
+                            ))}
+                            <label className="ml-auto px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 cursor-pointer hover:border-[#d4af37]">
+                                📐 도면 사진으로 바꾸기
+                                <input type="file" accept="image/*" onChange={onFile} className="hidden" />
+                            </label>
+                        </div>
+                    )}
+                    {!mapInfo && (
+                        <div className="flex items-center gap-1.5 flex-wrap text-[11px] border-t border-slate-200 dark:border-slate-700 pt-2">
+                            <input value={addr} onChange={(e) => setAddr(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") loadMap(); }}
+                                placeholder="주소로 지도 불러오기"
+                                className="flex-1 min-w-[140px] px-2.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70" />
+                            <Button onClick={() => loadMap()} disabled={mapBusy} className="h-7 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
+                                {mapBusy ? "…" : "🗺 지도"}
+                            </Button>
+                            <label className="px-2.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 cursor-pointer hover:border-[#d4af37]">
+                                📐 다른 사진
+                                <input type="file" accept="image/*" onChange={onFile} className="hidden" />
+                            </label>
+                        </div>
+                    )}
                 </div>
             )}
             {img ? (
@@ -796,7 +862,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     : "border-[#d4af37]/30 cursor-crosshair")}>
                         {/* 끄는 동안은 이미지와 오버레이를 같이 밀어 준다(놓을 때 실제로 다시 받아온다) */}
                         <div className="absolute inset-0" style={{
-                            transform: panOff[0] || panOff[1] ? `translate(${panOff[0]}px, ${panOff[1]}px)` : undefined,
+                            transform: `translate(${viewOff[0] + panOff[0]}px, ${viewOff[1] + panOff[1]}px) scale(${viewScale})`,
+                            transformOrigin: "center",
                             transition: panStart.current ? "none" : "transform 120ms ease-out",
                         }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -833,7 +900,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {divide === "부채꼴" && Object.entries(MOUNTAIN_INFO).map(([m, info]) => {
                                 const [dx, dy] = dir(screenDeg(info.deg));
                                 const x = cx + dx * rLabel, y = cy + dy * rLabel;
-                                const fs = 15 * k;
+                                const fs = 13 * k;
                                 return (
                                     <text key={m} x={x} y={y + fs / 3} fontSize={fs} fontWeight={700} textAnchor="middle"
                                         fontFamily="'Noto Serif KR',serif" fill="#7a5c14" stroke="#fff" strokeWidth={fs / 8} paintOrder="stroke">
@@ -920,7 +987,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {/* 외곽선 — 도면에 묻히지 않게 흰 테두리(halo) + 짙은 파랑 이중선 */}
                             {outline.length > 0 && (() => {
                                 const pts = outline.map((p) => p.join(",")).join(" ");
-                                const vr = 9 * k;                          // 꼭짓점 반경(화면 기준 — 손가락으로 잡히는 크기)
+                                const vr = 7 * k;                          // 꼭짓점 반경(화면 기준 — 손가락으로 잡히는 크기)
                                 const fs = 10 * k;
                                 const closing = pickMode === "outline" && outline.length >= 3;
                                 return (
@@ -951,7 +1018,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             })()}
                             {/* 방 핀 — 찍어둔 방 위치 */}
                             {rooms.map((r, i) => {
-                                const rr = 8 * k;
+                                const rr = 5.5 * k;
                                 const fs = 12 * k;
                                 return (
                                     <g key={i}>
@@ -962,7 +1029,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 );
                             })}
                             {/* 중심점 */}
-                            <circle cx={cx} cy={cy} r={7 * k} fill="#c0392b" stroke="#fff" strokeWidth={1.5 * k} />
+                            <circle cx={cx} cy={cy} r={4.5 * k} fill="#c0392b" stroke="#fff" strokeWidth={1.2 * k} />
                         </svg>
                         </div>
                         {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지).

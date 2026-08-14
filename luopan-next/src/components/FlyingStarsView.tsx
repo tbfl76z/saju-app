@@ -400,7 +400,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
     }, [sitting, year, useTi]);
     const annual = useMemo(() => annualChart(annualYear), [annualYear]);
     const period = periodOf(year);          // 원운 — 반의 골조(준공년 기준)
-    const [py0, py1] = periodYears(period);
+    const [py0, py1] = periodYears(period, year);   // 준공년이 속한 삼원 주기로
     const curPeriod = periodOf(nowYear);    // 당운 — 왕쇠(왕기·생기·쇠살) 판정 기준
 
     // 팔택 본명괘(있으면 궁별 팔성 표시 + 교집합 추천)
@@ -700,7 +700,7 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
                             </Button>
                         </>
                     )}
-                    <span className="text-[11px] text-slate-400">폰의 긴 변을 창면(벽면)과 나란히 맞춘 채 3초간 유지하세요</span>
+                    <span className="text-[11px] text-slate-400">폰 위쪽 끝(짧은 변)을 창면과 나란히 맞춘 채 3초간 유지하세요</span>
                 </div>
                 {capNote && (
                     capNote.startsWith("✅")

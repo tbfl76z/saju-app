@@ -144,10 +144,13 @@ export function periodOf(year: number): number {
   return ((Math.floor((year - 1864) / 20) % 9) + 9) % 9 + 1;
 }
 /** 운 → 기간 [시작, 끝] (가장 최근 주기) */
-export function periodYears(period: number): [number, number] {
-  // 9운=2024~2043 기준 역산
-  const start = 1864 + (period - 1) * 20 + 160; // 최근 주기(1864+180=2044 직전)
-  return start > 2043 ? [start - 180, start - 161] : [start, start + 19];
+export function periodYears(period: number, refYear = new Date().getFullYear()): [number, number] {
+  // 삼원 한 주기는 180년(1864~2043, 2044~2223 …). refYear가 속한 주기에서 그 운의 연도를 준다.
+  // 1운 1864~1883 … 8운 2004~2023, 9운 2024~2043.
+  // 예전 식은 +160을 더해 모든 운이 한 칸(20년)씩 밀려 있었다(9운이 2004~2023으로 표시됨).
+  const cycleStart = 1864 + Math.floor((refYear - 1864) / 180) * 180;
+  const start = cycleStart + (period - 1) * 20;
+  return [start, start + 19];
 }
 
 /** 중궁수와 순/역으로 9궁 배치 — palace→수 */
