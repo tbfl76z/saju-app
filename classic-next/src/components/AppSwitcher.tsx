@@ -26,7 +26,15 @@ export function AppSwitcher() {
     const toggle = () => {
         if (!open && btnRef.current) {
             const r = btnRef.current.getBoundingClientRect();
-            setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+            // 버튼 오른쪽에 맞추되, 폭(MENU_W) 때문에 왼쪽이 화면 밖으로 나가지 않게 당겨 준다.
+            // 앱 버튼 뒤에 글자크기·스킨 버튼이 있어 버튼이 화면 끝이 아니라서,
+            // 좁은 화면에서는 그냥 두면 메뉴 왼쪽이 잘려 아이콘이 반만 보인다.
+            const MENU_W = 288;   // w-72
+            const EDGE = 8;
+            let right = Math.max(EDGE, window.innerWidth - r.right);
+            const overflowLeft = window.innerWidth - right - MENU_W;
+            if (overflowLeft < EDGE) right = Math.max(EDGE, window.innerWidth - MENU_W - EDGE);
+            setPos({ top: r.bottom + 8, right });
         }
         setOpen((v) => !v);
     };
@@ -64,7 +72,7 @@ export function AppSwitcher() {
                 <div
                     ref={menuRef}
                     style={{ position: "fixed", top: pos.top, right: pos.right }}
-                    className="z-[9999] w-72 glass-card !rounded-2xl p-2 shadow-2xl bg-white/95 dark:bg-slate-900/95 animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="z-[9999] w-72 max-w-[calc(100vw-16px)] glass-card !rounded-2xl p-2 shadow-2xl bg-white/95 dark:bg-slate-900/95 animate-in fade-in slide-in-from-top-2 duration-200"
                 >
                     {APPS.map(({ key, href, name, desc, icon: Icon }) => {
                         const isCur = key === CURRENT;

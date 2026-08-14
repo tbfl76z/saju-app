@@ -172,9 +172,13 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     // 화면 확대 — 지도를 다시 받지 않고 이미지+오버레이만 확대한다.
     // (네이버 배율 상한이 20이라 그 이상은 이 방식으로만 키울 수 있고,
     //  브라우저 핀치줌처럼 페이지 전체가 커지는 일도 없다)
-    const [viewScale, setViewScale] = useState(1);
+    const [viewScale, setViewScale] = useState(1);   // 지도를 불러오면 2.5배로 시작(아래 loadMap)
     const [viewOff, setViewOff] = useState<[number, number]>([0, 0]);   // 확대 상태에서의 이동량(px)
     const panStart = useRef<{ x: number; y: number } | null>(null);
+    // 두 손가락 확대(핀치) — 지도 위에서 브라우저 페이지 확대 대신 이 처리를 태운다
+    const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+    const pinch = useRef<{ dist: number; scale: number } | null>(null);
+    const dragView = useRef<{ x: number; y: number; off: [number, number] } | null>(null);
     const [northLocked, setNorthLocked] = useState(false); // 위성지도 = 위가 정북(방위 확정)
     const imgElRef = useRef<HTMLImageElement>(null);
     // 복원 완료 전에는 저장하지 않는다(빈 값으로 덮어쓰기 방지).
@@ -307,6 +311,19 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     };
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         if (!img) return;
+        pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        if (pointers.current.size === 2) {
+            // 두 손가락 — 핀치 시작. 진행 중이던 탭·드래그는 취소한다.
+            const [a, b] = [...pointers.current.values()];
+            pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), scale: viewScale };
+            tapStart.current = null; panStart.current = null; dragIdx.current = null; dragView.current = null;
+            return;
+        }
+        // 확대해서 보는 중이면 한 손가락으로 바로 밀 수 있게 한다(이동 모드를 켤 필요 없이)
+        if (viewScale > 1 && !panMode && pickMode !== "outline") {
+            dragView.current = { x: e.clientX, y: e.clientY, off: viewOff };
+        }
         if (panMode) {
             panStart.current = { x: e.clientX, y: e.clientY };
             setPanOff([0, 0]);
@@ -331,6 +348,23 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         }
     };
     const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pinch.current && pointers.current.size >= 2) {
+            const [a, b] = [...pointers.current.values()];
+            const d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (pinch.current.dist > 0) {
+                const next = Math.max(1, Math.min(8, pinch.current.scale * (d / pinch.current.dist)));
+                setViewScale(+next.toFixed(2));
+                if (next <= 1.01) setViewOff([0, 0]);
+            }
+            return;
+        }
+        if (dragView.current) {
+            const { x, y, off } = dragView.current;
+            const dx = e.clientX - x, dy = e.clientY - y;
+            if (Math.hypot(dx, dy) > 4) { dragged.current = true; setViewOff([off[0] + dx, off[1] + dy]); }
+            return;
+        }
         if (panMode) {
             const st = panStart.current;
             if (st) setPanOff([e.clientX - st.x, e.clientY - st.y]);
@@ -344,6 +378,17 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         setOutline((prev) => prev.map((q, k) => (k === i ? p : q)));
     };
     const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        pointers.current.delete(e.pointerId);
+        if (pinch.current) {
+            if (pointers.current.size < 2) { pinch.current = null; tapStart.current = null; }
+            return;
+        }
+        if (dragView.current) {
+            const moved = dragged.current;
+            dragView.current = null;
+            dragged.current = false;
+            if (moved) return;   // 밀었으면 점 찍기로 오인하지 않는다
+        }
         if (panMode) {
             const st = panStart.current;
             panStart.current = null;
@@ -378,7 +423,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
         const p = toImgXY(e);
         if (p) onPick(p[0], p[1]);
     };
-    const onPointerCancel = () => {
+    const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+        pointers.current.delete(e.pointerId);
+        pinch.current = null; dragView.current = null;
         dragIdx.current = null; dragged.current = false; tapStart.current = null;
         panStart.current = null; setPanOff([0, 0]);
     };
@@ -519,6 +566,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                     setPickMode("center"); setCenterNote(""); setAiRead(null);
                 }
                 setNorthDeg(0); setNorthLocked(true);   // 지도는 위 = 정북
+                // 지도 배율 상한(20)에서도 건물이 작아 보인다. 중심 기준으로 확대해 시작한다.
+                if (!shift) { setViewScale(2.5); setViewOff([0, 0]); }
                 setImg(j.image);
                 setMapZoom(z);
                 mapPos.current = { lat: j.lat, lng: j.lng };
@@ -781,8 +830,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             disabled={viewScale <= 1}
                             className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 font-bold text-base disabled:opacity-40">−</button>
                         <span className="w-12 text-center font-semibold">{viewScale.toFixed(1)}×</span>
-                        <button onClick={() => setViewScale((v) => Math.min(6, +(v + 0.5).toFixed(1)))}
-                            disabled={viewScale >= 6}
+                        <button onClick={() => setViewScale((v) => Math.min(8, +(v + 0.5).toFixed(1)))}
+                            disabled={viewScale >= 8}
                             className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 font-bold text-base disabled:opacity-40">+</button>
                         <button onClick={() => setPanMode((v) => !v)}
                             className={"px-2.5 py-1.5 rounded-full font-semibold border " + (panMode
@@ -851,7 +900,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         onPointerDown={onPointerDown} onPointerMove={onPointerMove}
                         onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
                         style={{
-                            touchAction: pickMode === "outline" || panMode ? "none" : undefined,
+                            // 항상 none — 지도 위 핀치가 페이지 전체를 확대하는 것을 막고 직접 처리한다
+                            touchAction: "none",
                             aspectRatio: `${natW} / ${natH}`,
                             // 세로로 긴 도면이 화면을 넘지 않게 — 높이 기준으로 폭을 제한한다
                             maxWidth: fitView ? `calc(72vh * ${natW / natH})` : undefined,
