@@ -29,17 +29,29 @@ export const SSANGSAN: [string, string][] = [
   ["丙", "午"], ["丁", "未"], ["坤", "申"], ["庚", "酉"], ["辛", "戌"], ["乾", "亥"],
 ];
 
-/** 수구 지지(또는 쌍산 상대) → 국 */
+/**
+ * 수구(파구) → 국.
+ *
+ * 파구는 각 국의 **묘·절·태** 세 방위다. 12쌍산이 4국으로 정확히 3개씩 나뉜다 —
+ *   수국 乙辰·巽巳·丙午 / 목국 丁未·坤申·庚酉 / 화국 辛戌·乾亥·壬子 / 금국 癸丑·艮寅·甲卯
+ * 예전에는 묘·절 두 자리만 하드코딩해 壬子·甲卯·丙午·庚酉 넷이 국을 못 잡았다.
+ * 목록을 박아 두지 않고 포태에서 유도해 그런 누락이 다시 생기지 않게 한다.
+ */
 export function gukFromSugu(mountain: string): Guk | null {
-  // 쌍산 조로 지지를 확정
   const pair = SSANGSAN.find(([g, b]) => g === mountain || b === mountain);
   if (!pair) return null;
   const b = pair[1];
-  if (["辰", "巳"].includes(b) || mountain === "巽") return "수국";
-  if (["戌", "亥"].includes(b) || mountain === "乾") return "화국";
-  if (["丑", "寅"].includes(b) || mountain === "艮") return "금국";
-  if (["未", "申"].includes(b) || mountain === "坤") return "목국";
-  return null;
+  return (["수국", "목국", "화국", "금국"] as Guk[])
+    .find((g) => ["묘", "절", "태"].includes(potaeOf(g, b))) ?? null;
+}
+
+/** 파구가 그 국의 어느 자리인가 — 놓을 수 있는 향이 여기서 갈린다 */
+export function suguKind(mountain: string): { guk: Guk; kind: "묘" | "절" | "태" } | null {
+  const guk = gukFromSugu(mountain);
+  if (!guk) return null;
+  const pair = SSANGSAN.find(([g, b]) => g === mountain || b === mountain)!;
+  const p = potaeOf(guk, pair[1]);
+  return { guk, kind: p as "묘" | "절" | "태" };
 }
 
 /** 국별 장생 기점 지지 */
@@ -60,3 +72,61 @@ export function ssangsanPotae(guk: Guk): { pair: string; branch: string; potae: 
     return { pair: `${g}${b}`, branch: b, potae: p, grade: POTAE_GRADE[p] };
   });
 }
+
+/* ── 향 후보 판정 ──
+   88향법은 파구가 어디냐에 따라 놓을 수 있는 향이 정해진다.
+   여기서는 **정향(正向) 4종**만 낸다 — 이름 그대로 향의 포태 자리로 정의되어
+   계산이 확정적이기 때문이다.
+
+   변향(자생향·자왕향·문고소수·목욕소수)은 향상작국(向上作局)으로 국을 다시 세우는
+   방식이라 유파에 따라 조건이 갈린다. 근거를 확보하기 전에는 이름과 개념만 알리고
+   수치 판정은 내지 않는다(틀린 판정을 자신 있게 내놓는 것보다 낫다). */
+
+export interface HyangCandidate {
+  name: string;          // 정생향 등
+  pair: string;          // 향 쌍산 (예: 坤申)
+  potae: Potae;          // 향의 포태 자리
+  flow: string;          // 물 흐름 조건
+  note: string;
+}
+
+/** 포태 자리 → 쌍산 조 */
+function pairAt(guk: Guk, potae: Potae): { pair: string; branch: string } {
+  const i = POTAE.indexOf(potae);
+  const start = BRANCHES12.indexOf(GUK_JANGSAENG[guk] as (typeof BRANCHES12)[number]);
+  const b = BRANCHES12[(start + i) % 12];
+  const ss = SSANGSAN.find(([, x]) => x === b)!;
+  return { pair: `${ss[0]}${ss[1]}`, branch: b };
+}
+
+/**
+ * 파구 자리별로 놓을 수 있는 정향.
+ * 묘(고장)파구 → 정생향·정왕향 / 절파구 → 정묘향 / 태파구 → 정양향
+ */
+export function jeonghyang(sugu: string): HyangCandidate[] {
+  const k = suguKind(sugu);
+  if (!k) return [];
+  const { guk, kind } = k;
+  const mk = (name: string, potae: Potae, flow: string, note: string): HyangCandidate => {
+    const { pair } = pairAt(guk, potae);
+    return { name, pair, potae, flow, note };
+  };
+  if (kind === "묘") {
+    return [
+      mk("정생향(正生向)", "장생", "우수도좌(물이 오른쪽에서 왼쪽으로)", "향이 장생 자리 — 사람과 재물이 함께 이는 자리로 봅니다."),
+      mk("정왕향(正旺向)", "제왕", "좌수도우(물이 왼쪽에서 오른쪽으로)", "향이 제왕 자리 — 기세가 가장 성한 자리로 봅니다."),
+    ];
+  }
+  if (kind === "절") {
+    return [mk("정묘향(正墓向)", "묘", "좌수도우", "향이 묘(고장) 자리 — 거두어 갈무리하는 향으로 봅니다.")];
+  }
+  return [mk("정양향(正養向)", "양", "우수도좌", "향이 양 자리 — 기르고 북돋우는 향으로 봅니다.")];
+}
+
+/** 변향 계열 — 이름과 개념만. 조건은 유파 차가 커서 판정하지 않는다. */
+export const BYEONHYANG_NOTE = [
+  { name: "자생향(自生向)", note: "향을 기준으로 국을 다시 세워(향상작국) 생향을 빌려 쓰는 방식. 차고소수라고도 합니다." },
+  { name: "자왕향(自旺向)", note: "같은 방식으로 왕향을 빌려 쓰는 방식." },
+  { name: "문고소수(文庫消水)", note: "태궁으로 파구되고 정국 포태로는 절향이 되는 자리." },
+  { name: "목욕소수(沐浴消水)", note: "목욕 자리로 물이 빠지는 형태." },
+];

@@ -1001,8 +1001,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             </Button>
                         </div>
                     )}
-                    {/* C. 결과 보기 — 정렬이 끝난 뒤에만 노출한다 */}
-                    {aligned && (
+                    {/* C. 결과 보기 — 방위가 확정된 뒤에만 노출한다.
+                        지도는 위=정북이라 처음부터 확정이고, 도면 사진은 정렬(②)을 해야 확정된다. */}
+                    {center && (aligned || northLocked) && (
                         <div className="glass-card p-3 space-y-2">
                             <div className="flex items-center gap-2 flex-wrap text-[11px]">
                                 <span className="font-bold text-slate-700 dark:text-slate-200">방위 표시</span>
@@ -1032,7 +1033,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         </div>
                     )}
 
-                    {/* 방별 궁 배정 — "안방이 어느 궁인가"를 표로 정리 */}
+                    {/* 방별 궁 배정 — 방위가 확정돼야 궁이 맞는다.
+                        도면 사진에서 정렬 전에 찍으면 북이 0°인 채라 궁이 통째로 어긋난다. */}
+                    {center && (aligned || northLocked) && (
                     <div className="glass-card p-3 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-200">🏷 방별 궁 배정</span>
@@ -1099,6 +1102,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             </div>
                         )}
                     </div>
+                    )}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-[11px] text-slate-400">
                             {mode === "팔택" && ming && <>본명괘 <b className="font-noto-serif">{ming}</b> 기준 — 초록=길방, 붉음=흉방. </>}
