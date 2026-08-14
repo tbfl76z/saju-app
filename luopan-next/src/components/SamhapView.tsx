@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-    gukFromSugu, suguKind, ssangsanPotae, jeonghyang, BYEONHYANG_NOTE,
-    SSANGSAN, GUK_JANGSAENG, type Guk,
-} from "@/lib/samhap";
+import { gukFromSugu, suguKind, ssangsanPotae, SSANGSAN, GUK_JANGSAENG, type Guk } from "@/lib/samhap";
+import { HYANG88, CAUTIONS, SOURCES } from "@/lib/hyang88";
 
 // 삼합수법(三合水法) 뷰 — 수구(물 나가는 방위)로 4국을 정하고,
-// 파구 자리에 따라 놓을 수 있는 향(정향)과 쌍산 12포태를 보여준다.
-// 계산은 lib/samhap.ts(구조 유도 + 전수 검증)만 사용한다.
+// 파구 궁위에 따라 놓을 수 있는 향을 88향 표에서 조회한다.
+// 국·포태 계산은 lib/samhap.ts, 향 목록은 lib/hyang88.ts(교차검증본 88행)를 쓴다.
+// 향을 추론하지 않고 표를 조회하는 이유는 변향(자생·자왕·문고소수 등)의 조건이
+// 유파에 따라 갈려 유도식으로 만들면 틀리기 때문이다.
 
 const GRADE_STYLE: Record<string, string> = {
     길: "text-emerald-600 dark:text-emerald-400 font-bold",
@@ -21,26 +21,29 @@ const GUK_NOTE: Record<Guk, string> = {
     화국: "寅午戌 삼합 — 장생 寅(북동), 제왕 午(남), 묘 戌(북서)",
     금국: "巳酉丑 삼합 — 장생 巳(남동), 제왕 酉(서), 묘 丑(북동)",
 };
+// 88향 표 기준. 예전 안내는 정양향을 태궁으로 적었으나 실제로는 절궁이다.
 const KIND_NOTE: Record<string, string> = {
-    묘: "묘(墓)·고장궁으로 빠집니다 — 가장 많이 쓰는 파구로, 정생향·정왕향을 놓을 수 있습니다.",
-    절: "절(絶)궁으로 빠집니다 — 정묘향을 놓습니다.",
-    태: "태(胎)궁으로 빠집니다 — 정양향을 놓습니다.",
+    묘: "묘(墓)·고장궁으로 빠집니다 — 가장 많이 쓰는 파구입니다. 정생·정왕향과 자생·자왕향을 놓습니다.",
+    절: "절(絶)궁으로 빠집니다 — 정양향·정묘향, 그리고 절향절류를 놓습니다.",
+    태: "태(胎)궁으로 빠집니다 — 문고소수·목욕소수·태향태류·쇠향태류를 놓습니다.",
 };
-
-/** 향의 정반대 쌍산 = 좌(坐) */
-function seatOf(pair: string): string {
-    const i = SSANGSAN.findIndex(([g, b]) => g + b === pair);
-    if (i < 0) return "";
-    const [g, b] = SSANGSAN[(i + 6) % 12];
-    return `${g}${b}`;
-}
 
 export default function SamhapView() {
     const [sugu, setSugu] = useState("乙");
     const guk = useMemo(() => gukFromSugu(sugu), [sugu]);
     const kind = useMemo(() => suguKind(sugu), [sugu]);
     const rows = useMemo(() => (guk ? ssangsanPotae(guk) : []), [guk]);
-    const hyangs = useMemo(() => jeonghyang(sugu), [sugu]);
+    // 88향 표에서 이 국·파구 궁위에 해당하는 향을 뽑는다(추론이 아니라 표 조회).
+    const hyangs = useMemo(() => {
+        if (!kind) return [];
+        return HYANG88.filter((h) => h.guk === kind.guk && h.gung === kind.kind);
+    }, [kind]);
+    // 같은 향법 유형끼리 묶는다(쌍산 2향이 한 쌍)
+    const grouped = useMemo(() => {
+        const m = new Map<string, typeof hyangs>();
+        for (const h of hyangs) { const a = m.get(h.type) ?? []; a.push(h); m.set(h.type, a); }
+        return [...m.entries()];
+    }, [hyangs]);
 
     return (
         <div className="space-y-3">
@@ -79,27 +82,32 @@ export default function SamhapView() {
                 )}
             </div>
 
-            {/* 놓을 수 있는 향 — 이 수법의 결론 */}
-            {hyangs.length > 0 && (
+            {/* 놓을 수 있는 향 — 88향 표 조회 결과 */}
+            {grouped.length > 0 && (
                 <div className="glass-card p-4 space-y-2">
-                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">이 수구에 놓을 수 있는 향</div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        {hyangs.map((h) => (
-                            <div key={h.name} className="rounded-xl border border-emerald-300/60 bg-emerald-50/50 dark:bg-emerald-900/15 p-3 space-y-1">
-                                <div className="flex items-baseline gap-2">
-                                    <b className="text-emerald-700 dark:text-emerald-400">{h.name}</b>
-                                    <span className="text-[11px] text-slate-500">{h.potae} 자리</span>
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                        이 파구에 놓을 수 있는 향
+                        <span className="ml-2 font-normal text-[11px] text-slate-400">88향법 · {hyangs.length}개</span>
+                    </div>
+                    <div className="space-y-2">
+                        {grouped.map(([type, list]) => (
+                            <div key={type} className="rounded-xl border border-emerald-300/60 bg-emerald-50/50 dark:bg-emerald-900/15 p-3 space-y-1">
+                                <div className="flex items-baseline gap-2 flex-wrap">
+                                    <b className="text-emerald-700 dark:text-emerald-400">{type}</b>
+                                    <span className="font-noto-serif text-[11px] text-slate-500">{list[0].hanja}</span>
+                                    <span className="text-[11px] text-slate-500">쌍산 {list[0].pairHyang}</span>
+                                    <span className="ml-auto text-[11px] font-semibold text-[#bf953f]">물 흐름 — {list[0].flow}</span>
                                 </div>
-                                <div className="font-noto-serif text-lg text-slate-800 dark:text-slate-100">
-                                    {seatOf(h.pair)}坐 → {h.pair}向
+                                <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-noto-serif text-[15px] text-slate-800 dark:text-slate-100">
+                                    {list.map((h) => <span key={h.no}>{h.label}</span>)}
                                 </div>
-                                <div className="text-[11.5px] text-slate-600 dark:text-slate-300">{h.note}</div>
-                                <div className="text-[11px] text-[#bf953f] font-semibold">물 흐름 — {h.flow}</div>
+                                {list[0].cond && <div className="text-[11px] text-slate-500 dark:text-slate-400">조건 — {list[0].cond}</div>}
+                                <div className="text-[10.5px] text-slate-400">파구 {list[0].pagu}</div>
                             </div>
                         ))}
                     </div>
                     <p className="text-[10.5px] text-slate-400">
-                        향의 포태 자리로 정의되는 <b>정향(正向)</b>만 표시합니다. 물 흐름 조건까지 맞아야 성립합니다.
+                        파구 궁위(묘·절·태)에 따라 놓을 수 있는 향이 정해집니다. <b>물 흐름 조건까지 맞아야</b> 성립합니다.
                     </p>
                 </div>
             )}
@@ -128,16 +136,21 @@ export default function SamhapView() {
 
             <details className="glass-card px-3 py-2">
                 <summary className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
-                    변향(變向) — 판정에 넣지 않은 것들
+                    ⚠ 자료 간 이견과 근거
                 </summary>
-                <div className="pt-2 space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-300">
-                    {BYEONHYANG_NOTE.map((b) => (
-                        <p key={b.name}><b>{b.name}</b> — {b.note}</p>
+                <div className="pt-2 space-y-2 text-[11.5px] text-slate-600 dark:text-slate-300">
+                    {CAUTIONS.map((c) => (
+                        <p key={c.topic}><b>{c.topic}</b> — {c.fact}</p>
                     ))}
-                    <p className="text-slate-500 dark:text-slate-400 pt-1">
-                        변향은 향을 기준으로 국을 다시 세우는 <b>향상작국(向上作局)</b> 방식이라 유파에 따라 조건이 갈립니다.
-                        근거를 확정하기 전에는 <b>수치 판정을 내지 않습니다</b> — 틀린 판정을 자신 있게 내놓는 것보다 낫다고 봅니다.
-                    </p>
+                    <div className="pt-1 border-t border-slate-200 dark:border-slate-700">
+                        <div className="font-semibold mb-1">근거 자료</div>
+                        {SOURCES.map((s2) => (
+                            <div key={s2.url} className="text-[11px] text-slate-500 dark:text-slate-400">
+                                · <a href={s2.url} target="_blank" rel="noreferrer" className="underline hover:text-[#bf953f]">{s2.name}</a>
+                                {s2.by && <span> — {s2.by}</span>} <span className="text-slate-400">({s2.level})</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </details>
         </div>
