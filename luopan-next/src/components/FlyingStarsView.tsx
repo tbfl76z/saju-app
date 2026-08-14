@@ -1079,9 +1079,32 @@ export default function FlyingStarsView({ birthYear, gender }: Props) {
             {chart && (
                 <div className={"glass-card p-4 space-y-3 " + (step === 4 ? "" : "hidden")}>
                     <div className="text-sm font-bold text-slate-700 dark:text-slate-200">STEP 4 · AI 풀이 <span className="font-normal text-[11px] text-slate-400">— 격국·배치·올해 주의 방위를 종합 해석</span></div>
+                    {/* 무엇을 근거로 푸는지 먼저 보여 준다 — 결과만 던지면 신뢰가 안 선다 */}
+                    <div className="rounded-xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-3 py-2 text-[11.5px] text-slate-600 dark:text-slate-300 space-y-1">
+                        <div className="font-semibold text-slate-700 dark:text-slate-200">이 값으로 풀이합니다</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                            <span>坐 <b className="font-noto-serif">{chart.sitting}</b>·向 <b className="font-noto-serif">{chart.facing}</b></span>
+                            <span>{chart.period}운 <b>{chart.replaced ? "체괘" : "하괘"}반</b>{chart.period !== curPeriod ? ` (당운 ${curPeriod}운)` : ""}</span>
+                            <span>격국 <b>{chart.structure}</b></span>
+                            <span>{measuredDeg != null ? `실측 ${measuredDeg.toFixed(1)}°` : "직접 선택값"}</span>
+                            {kyem?.kyem && <span className="text-violet-600 dark:text-violet-400">겸향 {kyem.type}</span>}
+                            {ming && <span>본명괘 <b className="font-noto-serif">{ming}</b></span>}
+                            <span>연자백 {annualYear}년</span>
+                        </div>
+                        {measuredDeg == null && (
+                            <p className="text-amber-700 dark:text-amber-400">
+                                아직 실측 전입니다 — STEP 1에서 좌향을 재면 풀이 정확도가 올라갑니다.
+                            </p>
+                        )}
+                    </div>
                     <Button onClick={interpret} disabled={interpreting} className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                        {interpreting ? "풀이 중..." : "✨ AI 현공 풀이"}
+                        {interpreting ? "풀이 중..." : interp ? "✨ 다시 풀이하기" : "✨ AI 현공 풀이 받기"}
                     </Button>
+                    {!interp && !interpreting && (
+                        <p className="text-[11px] text-slate-400 text-center">
+                            방위별 기운, 침실·공부방·금고 자리, 올해 피할 방위와 보완법을 정리해 드립니다.
+                        </p>
+                    )}
                     {interp && <ReportRenderer text={interp} streaming={interpreting} />}
                 </div>
             )}

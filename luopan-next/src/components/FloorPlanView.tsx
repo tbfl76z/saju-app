@@ -668,253 +668,117 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
 
     return (
         <div className="space-y-3">
-            {/* 내장 모드: STEP 1 연동 상태를 분명히 / 단독 모드: 실측 우선 경고 */}
-            {embedded ? (
-                <div className="rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 px-3 py-2 text-[12px] text-emerald-800 dark:text-emerald-300">
-                    🔗 <b>STEP 1 값이 연동되어 있습니다</b> — 坐 <b className="font-noto-serif">{sitting}</b>
-                    {measuredDeg != null ? ` (실측 ${measuredDeg.toFixed(1)}°)` : " (직접 선택값)"} · 준공년 {year}.
-                    도면에서 <b>① 중심 → ② 창(정면)</b>을 차례로 탭하면 이 각도에 맞춰 도면이 자동 정렬됩니다.
-                </div>
-            ) : (
-                <div className="rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2 text-[12px] text-amber-800 dark:text-amber-300">
-                    <b>도면 오버레이는 참고용입니다.</b> 아파트는 동마다 배치각이 달라 도면이 얼마나 틀어져 있는지 실측 없이는 알 수 없습니다.
-                    먼저 <b>현공비성 탭에서 좌향을 실측</b>(또는 실물 패철로 측정)한 뒤, 그 값에 맞춰 아래 &lsquo;도면 상단의 실제 방위&rsquo;를 조정하세요.
-                    위성지도 캡처는 대개 위=북(0°)이라 그대로 쓸 수 있습니다.
+            {/* ── 진행 순서대로 필요한 것만 보인다 ──
+                도면 준비 → 방위·중심 잡기 → 결과 보기.
+                가끔 쓰는 도구와 주의사항은 접어 둔다(유료 서비스에서 컨트롤 벽은 그 자체로 결함이다). */}
+
+            {/* A. 도면 준비 — 도면이 없을 때는 이 카드 하나만 */}
+            {!img && (
+                <div className="glass-card p-5 space-y-4 text-center">
+                    <div>
+                        <div className="text-base font-bold text-slate-700 dark:text-slate-200">우리 집 도면을 준비하세요</div>
+                        <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+                            주소만 넣으면 지도를 불러옵니다. 집 도면이 있으면 사진으로 올려도 됩니다.
+                        </p>
+                    </div>
+                    <div className="max-w-md mx-auto space-y-2">
+                        <div className="flex items-center gap-1.5">
+                            <input value={addr} onChange={(e) => setAddr(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") loadMap(); }}
+                                placeholder="예: 서울 강남구 테헤란로 152"
+                                className="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/80 dark:bg-slate-800/80 text-sm" />
+                            <Button onClick={() => loadMap()} disabled={mapBusy}
+                                className="h-10 px-4 rounded-xl text-sm font-bold bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900 whitespace-nowrap">
+                                {mapBusy ? "불러오는 중…" : "지도 불러오기"}
+                            </Button>
+                        </div>
+                        <div className="flex items-center gap-2 justify-center text-[11px] text-slate-400">
+                            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />또는<span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                        </div>
+                        <label className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-sm text-slate-500 cursor-pointer hover:border-[#d4af37] hover:text-[#bf953f]">
+                            📐 도면 사진 올리기
+                            <input type="file" accept="image/*" onChange={onFile} className="hidden" />
+                        </label>
+                        <p className="text-[11px] text-slate-400">사진은 기기 안에서만 처리됩니다.</p>
+                    </div>
                 </div>
             )}
-            <div className="glass-card p-4 space-y-3">
-                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <label className="inline-flex items-center px-3 py-1.5 rounded-full border border-[#d4af37]/40 text-[#bf953f] text-xs font-bold cursor-pointer hover:bg-[#d4af37]/10">
-                        📐 도면/사진 불러오기
-                        <input type="file" accept="image/*" onChange={onFile} className="hidden" />
-                    </label>
-                    <input value={addr} onChange={(e) => setAddr(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") loadMap(); }}
-                        placeholder="주소 입력 (예: 서울 강남구 테헤란로 1)"
-                        className="flex-1 min-w-[180px] px-2.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-xs" />
+
+            {/* B. 지금 할 일 — 도면이 있을 때만, 한 줄로 */}
+            {img && (
+                <div className="glass-card p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
+                        <span className={"px-2.5 py-1 rounded-full border " + (center
+                            ? "border-emerald-400/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                            : "border-[#d4af37] bg-[#d4af37]/15 text-[#bf953f] animate-pulse")}>
+                            ① 집 중심{center ? " ✓" : ""}
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">→</span>
+                        <span className={"px-2.5 py-1 rounded-full border " + (aligned
+                            ? "border-emerald-400/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
+                            : center ? "border-[#d4af37] bg-[#d4af37]/15 text-[#bf953f] animate-pulse"
+                                : "opacity-40 border-slate-200 dark:border-slate-700 text-slate-400")}>
+                            ② 정면 방향{aligned ? " ✓" : ""}
+                        </span>
+                        {center && (
+                            <button onClick={resetPick}
+                                className="ml-auto px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 hover:text-rose-500 hover:border-rose-300">
+                                ↺ 다시 찍기
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-[12px] text-slate-600 dark:text-slate-300">
+                        {panMode
+                            ? <>🖐 <b>지도를 끌어</b> 우리 집이 가운데 오게 맞추세요. 다 되면 이동을 끄고 중심을 탭합니다.</>
+                            : pickMode === "outline"
+                                ? <><b className="text-blue-600 dark:text-blue-400">①번 점</b>부터 <b>바깥 모서리를 차례로</b> 탭하세요. 잘못 찍은 점은 끌어서 옮기면 됩니다.</>
+                                : pickMode === "room"
+                                    ? <>🏷 <b>{roomName}</b> 위치를 도면에서 탭하세요.</>
+                                    : !center
+                                        ? <>① 우리 집(터)의 <b>한가운데를 탭</b>하세요.</>
+                                        : !aligned
+                                            ? <>② <b>창(베란다)·정면 쪽을 한 번 더 탭</b>하세요{northLocked ? " — 좌향이 계산됩니다." : ` — 실측 향(${facingDeg.toFixed(0)}°)에 맞춰 도면이 회전합니다.`}</>
+                                            : <>✅ <b className="text-emerald-600 dark:text-emerald-400">완료</b> — 파란 선이 정면(向) 방향입니다. 아래에서 방위별 기운을 확인하세요.</>}
+                    </p>
+                    {centerNote && <p className="text-[11px] text-emerald-700 dark:text-emerald-300">{centerNote}</p>}
+                    {/* 중심 잡기 보조 — 이 단계에서만 */}
+                    {!center && pickMode !== "outline" && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <Button onClick={() => { setOutline([]); setCenterNote(""); setPickMode("outline"); }}
+                                variant="outline" className="h-7 rounded-full text-[11px]">📐 외곽선으로 정확히 잡기</Button>
+                            <Button onClick={autoDetect} disabled={detecting} variant="outline" className="h-7 rounded-full text-[11px]">
+                                {detecting ? "검출 중…" : "🤖 외곽 자동 검출"}
+                            </Button>
+                            <span className="text-[10.5px] text-slate-400">ㄱ자·ㄷ자 평면이면 권장</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* 지도 조작 — 지도로 불러왔을 때만, 한 줄 */}
+            {img && mapInfo && (
+                <div className="glass-card p-2.5 flex items-center gap-1.5 flex-wrap text-[11px]">
+                    <span className="font-semibold text-sky-700 dark:text-sky-300">🗺 지도</span>
+                    <span className="text-slate-400 truncate max-w-[40%]">{mapInfo.address}</span>
+                    <button onClick={() => loadMap({ zoom: mapZoom - 1, byCoords: true })} disabled={mapBusy || mapZoom <= 16}
+                        className="w-7 h-7 rounded-full border border-slate-300 dark:border-slate-600 font-bold disabled:opacity-40">−</button>
+                    <span className="text-slate-500 w-20 text-center">{mapBusy ? "불러오는 중" : `가로 ${Math.round(natW * mapInfo.mpp)}m`}</span>
+                    <button onClick={() => loadMap({ zoom: mapZoom + 1, byCoords: true })} disabled={mapBusy || mapZoom >= 20}
+                        className="w-7 h-7 rounded-full border border-slate-300 dark:border-slate-600 font-bold disabled:opacity-40">+</button>
+                    <button onClick={() => setPanMode((v) => !v)}
+                        className={"px-2.5 py-1 rounded-full font-semibold border " + (panMode
+                            ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
+                            : "border-slate-300 dark:border-slate-600 text-slate-500")}>
+                        {panMode ? "🖐 이동 끄기" : "🖐 이동"}
+                    </button>
                     {(["basic", "satellite"] as const).map((t) => (
                         <button key={t} onClick={() => { setMapType(t); if (mapPos.current) loadMap({ byCoords: true, type: t }); }}
-                            className={"px-2.5 py-1 rounded-full text-[11px] font-semibold " + (mapType === t ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                            className={"px-2 py-1 rounded-full font-semibold " + (mapType === t ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
                             {t === "basic" ? "일반" : "위성"}
                         </button>
                     ))}
-                    <Button onClick={() => loadMap()} disabled={mapBusy} className="h-8 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                        {mapBusy ? "불러오는 중…" : "🗺 지도 불러오기"}
-                    </Button>
-                    {img && (
-                        <>
-                            <Button onClick={() => {
-                                if (!window.confirm("불러온 도면과 찍어둔 점·방 핀을 모두 지웁니다. 계속할까요?")) return;
-                                userActed.current = true;
-                                setImg(null); setCenter(null); setOutline([]); setRooms([]); setAligned(false);
-                                setPickMode("center"); setCenterNote(""); setAiRead(null);
-                                setNorthLocked(false); setMapInfo(null); setNorthDeg(0);
-                                clearPlan();
-                                notify.success("도면을 지웠습니다", "새 도면을 올리거나 주소로 불러오세요.");
-                            }} variant="outline" className="h-7 rounded-full text-[11px] text-rose-500 border-rose-300">🗑 도면 지우기</Button>
-                            <Button onClick={() => transformImage("flipH")} variant="outline" className="h-7 rounded-full text-[11px]">↔ 좌우 반전</Button>
-                            <Button onClick={() => transformImage("rot90")} variant="outline" className="h-7 rounded-full text-[11px]">↻ 90°</Button>
-                            <Button onClick={() => setFitView((v) => !v)} variant="outline" className="h-7 rounded-full text-[11px]">
-                                {fitView ? "🔍 크게 보기" : "🖥 화면에 맞추기"}
-                            </Button>
-                        </>
-                    )}
-                    <span className="mx-1">모드</span>
-                    {(["24산", "팔택", "현공"] as OverlayMode[]).map((m) => (
-                        <button key={m} onClick={() => setMode(m)}
-                            className={"px-3 py-1 rounded-full text-xs font-semibold " + (mode === m ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
-                            {m}{m === "팔택" && !ming ? "(명식 필요)" : ""}
-                        </button>
-                    ))}
                 </div>
-                {/* 위성지도 상태 — 방위가 확정됐다는 것과 축척을 알린다 */}
-                {mapInfo && (
-                    <div className="rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40 px-3 py-2 text-[12px] text-sky-800 dark:text-sky-300">
-                        🗺 <b>지도 — 위가 정북(0°)으로 고정</b>됐습니다.
-                        {mapInfo.provider && <span className="text-slate-500 dark:text-slate-400"> ({mapInfo.provider === "naver" ? "네이버" : "구글"})</span>}
-                        {mapInfo.address && <span> · {mapInfo.address} </span>}
-                        · 약 {mapInfo.mpp.toFixed(2)} m/픽셀
-                        <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                            <span className="text-[11px] font-semibold">배율</span>
-                            <button onClick={() => loadMap({ zoom: mapZoom - 1, byCoords: true })} disabled={mapBusy || mapZoom <= 16}
-                                className="w-7 h-7 rounded-full border border-sky-300 dark:border-sky-700 font-bold disabled:opacity-40">−</button>
-                            <span className="text-[11px] w-16 text-center">{mapZoom} 단계</span>
-                            <button onClick={() => loadMap({ zoom: mapZoom + 1, byCoords: true })} disabled={mapBusy || mapZoom >= 20}
-                                className="w-7 h-7 rounded-full border border-sky-300 dark:border-sky-700 font-bold disabled:opacity-40">+</button>
-                            <span className="text-[10.5px] text-slate-500 dark:text-slate-400">
-                                {mapBusy ? "불러오는 중…" : `가로 약 ${Math.round(natW * mapInfo.mpp)}m`}
-                            </span>
-                            <button onClick={() => setPanMode((v) => !v)}
-                                className={"ml-auto px-2.5 py-1 rounded-full text-[11px] font-semibold border "
-                                    + (panMode
-                                        ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
-                                        : "border-slate-300 dark:border-slate-600 text-slate-500")}>
-                                {panMode ? "🖐 이동 중 — 끄기" : "🖐 지도 이동"}
-                            </button>
-                        </div>
-                        건물 중심 → 정면(베란다 쪽)을 차례로 탭하면 <b>좌향이 계산</b>됩니다.
-                        아파트는 동마다 배치각이 달라 이 값은 <b>실측의 대체가 아니라 교차검증용</b>입니다.
-                        {mapType === "satellite" && <><br /><b>※ 위성사진은 고층일수록 건물 옆면이 보여</b> 지붕 윤곽이 실제 대지 경계와 어긋납니다 — 중심을 잡을 땐 <b>일반지도</b>가 정확합니다.</>}
-                    </div>
-                )}
-
-                {/* 평면 분할 방식 — 유파가 갈리는 자리라 토글로 둔다. 결과가 다르게 나온다. */}
-                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <span>분할</span>
-                    {(["부채꼴", "9궁격"] as DivideMode[]).map((d) => (
-                        <button key={d} onClick={() => setDivide(d)}
-                            className={"px-3 py-1 rounded-full text-xs font-semibold " + (divide === d ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
-                            {d === "부채꼴" ? "◔ 부채꼴(45°)" : "▦ 9궁격(井)"}
-                        </button>
-                    ))}
-                    <span className="mx-1">진하기</span>
-                    <input type="range" min={20} max={100} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
-                        className="w-24 accent-[#d4af37]" aria-label="오버레이 진하기" />
-                    <span className="text-xs text-slate-400 w-9">{alpha}%</span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                    {divide === "부채꼴"
-                        ? <>중심에서 45°씩 방사로 나눕니다 — 각도를 그대로 반영해 <b>비스듬한 벽·모난 평면</b>에 잘 맞습니다.</>
-                        : <>전통 구궁도처럼 <b>가로세로 3등분</b>합니다{outline.length >= 3 ? " (찍어둔 외곽선 범위 기준)" : " (외곽선을 찍으면 그 범위로 잡힙니다)"} — <b>반듯한 평면</b>에 잘 맞습니다.</>}
-                    {" "}유파에 따라 판정이 갈리는 자리이니, <b>어느 쪽으로 봤는지 기록에 남기세요.</b>
-                </p>
-                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                    <span>도면 상단의 실제 방위</span>
-                    <input type="range" min={0} max={359} value={northDeg} onChange={(e) => setNorthDeg(Number(e.target.value))} className="w-36 accent-[#d4af37]" />
-                    <input type="number" min={0} max={359} value={northDeg} onChange={(e) => setNorthDeg(Number(e.target.value))}
-                        className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
-                    <span className="text-xs text-slate-400">° (위성지도 캡처는 대개 0=북)</span>
-                </div>
-                {mode === "현공" && embedded && chart && (
-                    <p className="text-[11px] text-slate-400">위 현공 반의 <b className="text-[#bf953f] font-noto-serif">{chart.sitting}山{chart.facing}向 · {chart.period}운 {chart.replaced ? "체괘" : "하괘"}반</b>이 그대로 적용됩니다.</p>
-                )}
-                {mode === "현공" && !embedded && (
-                    <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-                        <span>좌(坐)</span>
-                        <select value={sitting} onChange={(e) => { setSitting(e.target.value); try { window.localStorage.setItem("destiny-luopan-sitting", e.target.value); } catch { /* 무시 */ } }}
-                            className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm font-noto-serif">
-                            {Object.keys(MOUNTAIN_INFO).map((m) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                        <span>준공년</span>
-                        <input type="number" value={year} min={1864} max={2100} onChange={(e) => setYear(Number(e.target.value))}
-                            className="w-20 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
-                        {chart && <span className="text-xs text-[#bf953f] font-semibold">{chart.period}운 {chart.sitting}山{chart.facing}向 · {chart.structure}</span>}
-                    </div>
-                )}
-                {/* 거울상 경고 — 방위 판정을 통째로 뒤집는 함정이라 눈에 띄게 둔다 */}
-                {img && (
-                    <div className="rounded-xl bg-rose-50/70 dark:bg-rose-950/25 border border-rose-200/60 dark:border-rose-800/40 px-3 py-2 text-[12px] text-rose-800 dark:text-rose-300">
-                        🪞 <b>도면이 거울상은 아닌지 먼저 확인하세요.</b> 부동산 사이트 캡처 중에는 좌우가 뒤집힌 것이 있습니다 —
-                        <b> 글자가 뒤집혀 보이면 반전된 도면</b>입니다. 그대로 쓰면 <b>동서가 통째로 바뀌어</b>(진궁↔태궁, 손궁↔곤궁)
-                        산성·향성 판정이 정반대가 됩니다. 위의 <b>↔ 좌우 반전</b>으로 바로잡고 시작하세요.
-                    </div>
-                )}
-
-                {/* ⓪ 외곽선으로 입극점 자동 산출 — 다각형 평면에서 눈대중 오차를 없앤다 */}
-                <div className="rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/5 p-2.5 space-y-1.5">
-                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
-                        <span className="font-bold text-[#bf953f]">📐 입극점(立極點) 자동 산출</span>
-                        <span className="text-slate-500 dark:text-slate-400">— ㄱ자·ㄷ자처럼 반듯하지 않은 평면에 권장</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                        <Button onClick={autoDetect} disabled={!img || detecting}
-                            className="h-7 rounded-full text-[11px] bg-slate-900 text-white dark:bg-[#d4af37] dark:text-slate-900">
-                            {detecting ? "검출 중…" : "🤖 외곽 자동 검출"}
-                        </Button>
-                        {pickMode !== "outline" ? (
-                            <Button onClick={() => { setOutline([]); setCenterNote(""); setPickMode("outline"); }}
-                                disabled={!img} variant="outline" className="h-7 rounded-full text-[11px]">
-                                직접 찍기
-                            </Button>
-                        ) : (
-                            <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                                외곽 {outline.length}점 찍음 — 되돌리기·완료 버튼은 도면 아래에 있습니다
-                            </span>
-                        )}
-                        <span className="text-[10px] text-slate-400">
-                            {pickMode === "outline"
-                                ? "평면 바깥 모서리를 순서대로 탭하세요(발코니·피난테라스 포함 여부는 직접 선택)"
-                                : "건너뛰고 중심을 직접 탭해도 됩니다"}
-                        </span>
-                    </div>
-                    {centerNote && <p className="text-[11px] text-emerald-700 dark:text-emerald-300">{centerNote}</p>}
-
-                    {/* AI 도면 판독 — 산입 범위 판단(좌표 아님) */}
-                    <div className="pt-1 border-t border-[#d4af37]/20 space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Button onClick={analyzeWithAI} disabled={!img || aiBusy} variant="outline"
-                                className="h-7 rounded-full text-[11px]">
-                                {aiBusy ? "판독 중…" : "🧠 AI 도면 판독(산입 범위)"}
-                            </Button>
-                            <span className="text-[10px] text-slate-400">
-                                어느 공간을 면적에 넣을지 판단해 줍니다 — 좌표는 위 자동 검출이 맡습니다
-                            </span>
-                        </div>
-                        {aiRead && (
-                            <div className="rounded-lg bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 p-2.5 space-y-1.5 text-[11px]">
-                                {aiRead.shape && <p className="text-slate-600 dark:text-slate-300"><b>평면 형태</b> — {aiRead.shape}</p>}
-                                {!!aiRead.spaces?.length && (
-                                    <div className="space-y-0.5">
-                                        {aiRead.spaces.map((s, i) => (
-                                            <div key={i} className="flex gap-1.5">
-                                                <span className={"shrink-0 w-11 font-bold " + (s.decision === "include" ? "text-emerald-600 dark:text-emerald-400" : s.decision === "exclude" ? "text-rose-500" : "text-amber-600 dark:text-amber-400")}>
-                                                    {s.decision === "include" ? "포함" : s.decision === "exclude" ? "제외" : "판단필요"}
-                                                </span>
-                                                <span className="text-slate-600 dark:text-slate-300"><b>{s.name}</b> — {s.reason}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <p className="text-slate-500 dark:text-slate-400">
-                                    거실 큰 창 <b>{aiRead.living_window_side || "불명"}</b> 쪽 · 현관 <b>{aiRead.entrance_side || "불명"}</b> 쪽
-                                    <span className="text-slate-400"> — ② 창(정면) 방향을 탭할 때 참고하세요</span>
-                                </p>
-                                {aiRead.caution && <p className="text-amber-700 dark:text-amber-400">⚠ {aiRead.caution}</p>}
-                                <p className="text-[10px] text-slate-400">
-                                    ※ 발코니·확장부 산입 여부는 <b>문헌 근거가 확인되지 않은 판단 영역</b>입니다. 최종 결정은 직접 하시고,
-                                    감정 기록에는 &lsquo;발코니 제외 / 전유부 기준&rsquo;처럼 산입 기준을 남겨 두세요.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* 정렬 진행 표시 — 지금 어느 단계인지, 적용됐는지를 분명하게 */}
-                <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-semibold">
-                    <span className={"px-2.5 py-1 rounded-full border " + (!img
-                        ? "opacity-40 border-slate-200 dark:border-slate-700 text-slate-400"
-                        : center ? "border-emerald-400/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-                            : "border-[#d4af37] bg-[#d4af37]/15 text-[#bf953f] animate-pulse")}>
-                        ① 집 중심 탭{center ? " ✓" : ""}
-                    </span>
-                    <span className="text-slate-300 dark:text-slate-600">→</span>
-                    <span className={"px-2.5 py-1 rounded-full border " + (aligned
-                        ? "border-emerald-400/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-                        : center ? "border-[#d4af37] bg-[#d4af37]/15 text-[#bf953f] animate-pulse"
-                            : "opacity-40 border-slate-200 dark:border-slate-700 text-slate-400")}>
-                        ② 창(정면) 방향 탭{aligned ? " ✓" : ""}
-                    </span>
-                    {center && (
-                        <button onClick={resetPick}
-                            className="ml-1 px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-600 text-slate-500 hover:text-rose-500 hover:border-rose-300">
-                            ↺ 다시 찍기
-                        </button>
-                    )}
-                </div>
-                <p className="text-[11px] text-slate-400">
-                    {!img
-                        ? <>도면을 불러오면 시작합니다. (이미지는 기기에서만 처리됩니다)</>
-                        : pickMode === "outline"
-                            ? <><b className="text-blue-600 dark:text-blue-400">파란 점 ①</b>부터 <b>바깥 모서리를 차례로 탭</b>하세요. 잘못 찍은 점은 <b>손가락(마우스)으로 끌어서 옮기면</b> 됩니다.
-                                점선은 마지막 점과 ①이 이어질 선입니다. 다 되면 &lsquo;완료&rsquo; → <b>면적 가중 중심(도심)</b>으로 입극점이 잡힙니다.</>
-                            : !center
-                            ? <>① 사진 속 우리 집(터)의 <b>한가운데를 탭</b>하세요.</>
-                            : !aligned
-                                ? <>② 이제 <b>창(베란다)·정면 방향을 한 번 더 탭</b>하세요 — 실측 향({facingDeg.toFixed(0)}°)에 맞춰 도면이 자동 회전됩니다.</>
-                                : <>✅ <b className="text-emerald-600 dark:text-emerald-400">정렬 완료</b> — 파란 선이 창(정면=向) 방향입니다. 어긋나 보이면 슬라이더로 미세 조정하거나 &lsquo;다시 찍기&rsquo;를 누르세요.</>}
-                </p>
-            </div>
-
+            )}
             {img ? (
                 <>
                     <div ref={boxRef}
@@ -1137,6 +1001,37 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             </Button>
                         </div>
                     )}
+                    {/* C. 결과 보기 — 정렬이 끝난 뒤에만 노출한다 */}
+                    {aligned && (
+                        <div className="glass-card p-3 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                                <span className="font-bold text-slate-700 dark:text-slate-200">방위 표시</span>
+                                {(["현공", "팔택", "24산"] as OverlayMode[]).map((m) => (
+                                    <button key={m} onClick={() => setMode(m)} disabled={m === "팔택" && !ming}
+                                        className={"px-2.5 py-1 rounded-full font-semibold disabled:opacity-40 "
+                                            + (mode === m ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                                        {m === "현공" ? "기운 지도" : m === "팔택" ? "내 길방" : "24방위"}
+                                    </button>
+                                ))}
+                                <span className="ml-1 text-slate-400">|</span>
+                                {(["부채꼴", "9궁격"] as DivideMode[]).map((d) => (
+                                    <button key={d} onClick={() => setDivide(d)}
+                                        className={"px-2.5 py-1 rounded-full font-semibold " + (divide === d ? "bg-[#d4af37]/15 text-[#bf953f]" : "text-slate-400")}>
+                                        {d === "부채꼴" ? "◔ 부채꼴" : "▦ 9궁격"}
+                                    </button>
+                                ))}
+                                <input type="range" min={20} max={100} value={alpha} onChange={(e) => setAlpha(Number(e.target.value))}
+                                    className="w-20 accent-[#d4af37] ml-auto" aria-label="표시 진하기" title="진하기" />
+                            </div>
+                            <p className="text-[10.5px] text-slate-400">
+                                {mode === "현공" && "금색=왕기 · 초록=생기 · 붉음=쇠살. 숫자는 산성·향성입니다."}
+                                {mode === "팔택" && ming && `본명괘 ${ming} 기준 — 초록이 길방입니다.`}
+                                {mode === "24산" && "24방위 눈금만 표시합니다."}
+                                {" "}분할은 유파가 갈리는 자리라 결과가 달라질 수 있습니다.
+                            </p>
+                        </div>
+                    )}
+
                     {/* 방별 궁 배정 — "안방이 어느 궁인가"를 표로 정리 */}
                     <div className="glass-card p-3 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1214,6 +1109,78 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                             {saving ? "저장 중..." : "📷 이미지로 저장"}
                         </Button>
                     </div>
+
+                    {/* 가끔 쓰는 것들 — 접어 둔다 */}
+                    <details className="glass-card px-3 py-2">
+                        <summary className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">🛠 도구 · 미세 조정</summary>
+                        <div className="pt-2 space-y-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <Button onClick={() => transformImage("flipH")} variant="outline" className="h-7 rounded-full text-[11px]">↔ 좌우 반전</Button>
+                                <Button onClick={() => transformImage("rot90")} variant="outline" className="h-7 rounded-full text-[11px]">↻ 90° 회전</Button>
+                                <Button onClick={() => setFitView((v) => !v)} variant="outline" className="h-7 rounded-full text-[11px]">
+                                    {fitView ? "🔍 크게 보기" : "🖥 화면에 맞추기"}
+                                </Button>
+                                <Button onClick={analyzeWithAI} disabled={aiBusy} variant="outline" className="h-7 rounded-full text-[11px]">
+                                    {aiBusy ? "판독 중…" : "🧠 AI 도면 판독"}
+                                </Button>
+                                <Button onClick={() => {
+                                    if (!window.confirm("불러온 도면과 찍어둔 점·방 핀을 모두 지웁니다. 계속할까요?")) return;
+                                    userActed.current = true;
+                                    setImg(null); setCenter(null); setOutline([]); setRooms([]); setAligned(false);
+                                    setPickMode("center"); setCenterNote(""); setAiRead(null);
+                                    setNorthLocked(false); setMapInfo(null); setNorthDeg(0);
+                                    clearPlan();
+                                    notify.success("도면을 지웠습니다");
+                                }} variant="outline" className="h-7 rounded-full text-[11px] text-rose-500 border-rose-300">🗑 도면 지우기</Button>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                                <span>도면 상단의 실제 방위</span>
+                                <input type="range" min={0} max={359} value={northDeg} onChange={(e) => setNorthDeg(Number(e.target.value))} className="w-32 accent-[#d4af37]" />
+                                <input type="number" min={0} max={359} value={northDeg} onChange={(e) => setNorthDeg(Number(e.target.value))}
+                                    className="w-14 px-1 py-0.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-center" />
+                                <span className="text-slate-400">° {northLocked ? "(지도라 0=북으로 고정돼 있습니다)" : "(오버레이가 어긋나 보일 때만 조정)"}</span>
+                            </div>
+                            {!embedded && (
+                                <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                                    <span>좌(坐)</span>
+                                    <select value={sitting} onChange={(e) => { setSitting(e.target.value); try { window.localStorage.setItem("destiny-luopan-sitting", e.target.value); } catch { /* 무시 */ } }}
+                                        className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 font-noto-serif">
+                                        {Object.keys(MOUNTAIN_INFO).map((m) => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <span>준공년</span>
+                                    <input type="number" value={year} min={1864} max={2100} onChange={(e) => setYear(Number(e.target.value))}
+                                        className="w-20 px-1 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-center" />
+                                </div>
+                            )}
+                            {aiRead && (
+                                <div className="rounded-lg bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 p-2.5 space-y-1 text-[11px]">
+                                    {aiRead.shape && <p className="text-slate-600 dark:text-slate-300"><b>평면 형태</b> — {aiRead.shape}</p>}
+                                    {aiRead.spaces?.map((sp, i) => (
+                                        <div key={i} className="flex gap-1.5">
+                                            <span className={"shrink-0 w-11 font-bold " + (sp.decision === "include" ? "text-emerald-600 dark:text-emerald-400" : sp.decision === "exclude" ? "text-rose-500" : "text-amber-600 dark:text-amber-400")}>
+                                                {sp.decision === "include" ? "포함" : sp.decision === "exclude" ? "제외" : "판단필요"}
+                                            </span>
+                                            <span className="text-slate-600 dark:text-slate-300"><b>{sp.name}</b> — {sp.reason}</span>
+                                        </div>
+                                    ))}
+                                    <p className="text-slate-500 dark:text-slate-400">
+                                        거실 큰 창 <b>{aiRead.living_window_side || "불명"}</b> 쪽 · 현관 <b>{aiRead.entrance_side || "불명"}</b> 쪽
+                                    </p>
+                                    {aiRead.caution && <p className="text-amber-700 dark:text-amber-400">⚠ {aiRead.caution}</p>}
+                                </div>
+                            )}
+                        </div>
+                    </details>
+
+                    <details className="glass-card px-3 py-2">
+                        <summary className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">⚠ 알아두기 — 방위가 틀어지는 함정</summary>
+                        <div className="pt-2 space-y-1.5 text-[11.5px] text-slate-600 dark:text-slate-300">
+                            <p>🪞 <b>거울상 도면.</b> 부동산 캡처 중에 좌우가 뒤집힌 것이 있습니다. 글자가 뒤집혀 보이면 반전된 도면이고, 그대로 쓰면 <b>동서가 통째로 바뀌어</b>(진궁↔태궁) 판정이 정반대가 됩니다. 도구의 <b>좌우 반전</b>으로 바로잡으세요.</p>
+                            <p>🛰 <b>위성사진의 시차.</b> 고층일수록 건물 옆면이 보여 지붕 윤곽이 실제 대지 경계와 어긋납니다. 중심을 잡을 땐 <b>일반지도</b>가 정확합니다.</p>
+                            <p>🧭 <b>지도는 교차검증용.</b> 아파트는 동마다 배치각이 달라, 지도로 낸 좌향은 현장 실측을 대신하지 못합니다.</p>
+                            <p>📐 <b>발코니 산입.</b> 확장부·발코니를 면적에 넣을지는 문헌 근거가 확인되지 않은 판단 영역입니다. 기록에 기준을 남겨 두세요.</p>
+                        </div>
+                    </details>
                 </>
             ) : (
                 <div className="glass-card p-10 text-center text-slate-400 text-sm">

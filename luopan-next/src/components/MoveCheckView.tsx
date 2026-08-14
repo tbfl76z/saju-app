@@ -247,10 +247,17 @@ export default function MoveCheckView({ birthYear, gender, currentSitting, curre
                 🏡 이사할 집 진단 <span className="font-normal text-[11px] text-slate-400">— 후보 집이 좋은지 계약 전에 미리 확인</span>
             </div>
             <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                후보 집의 <b>좌향</b>과 <b>준공(건축) 연도</b>만 넣으면 그 집에 고착된 운의 반을 세워 판정합니다.
-                <b> 현관 방위</b>와 <b>입주 예정 해</b>는 선택 — 넣으면 기운의 입구(현관) 길흉과 그 해의 흉성 방위(이사 시기)까지 함께 점검합니다.
-                후보 집에 방문했다면 &lsquo;우리집 진단&rsquo; 메뉴의 STEP 1로 좌향을 실측한 뒤 아래 &lsquo;실측값 가져오기&rsquo;를 누르는 것이 가장 정확합니다.
+                <b>좌향</b>과 <b>준공 연도</b>만 넣으면 판정합니다.
+                <span className="text-slate-400"> 현관 방위·입주 예정 해는 선택.</span>
             </p>
+            <details className="text-[11.5px] text-slate-500 dark:text-slate-400">
+                <summary className="cursor-pointer select-none text-slate-400">자세히</summary>
+                <div className="pt-1.5 space-y-1">
+                    <p>준공 연도가 반(盤)의 골조를 정합니다. 건물이 완성되는 순간 그 시기의 운이 집에 고착되기 때문입니다. 뼈대만 남긴 대수선을 했다면 공사가 끝난 해가 새 준공년입니다.</p>
+                    <p><b>현관 방위</b>를 넣으면 기운이 드나드는 입구(氣口)의 길흉을, <b>입주 예정 해</b>를 넣으면 그 해 흉성이 앉는 방위까지 함께 봅니다.</p>
+                    <p>후보 집에 직접 가보셨다면 &lsquo;우리집 진단&rsquo;의 STEP 1로 좌향을 실측한 뒤 <b>실측값 가져오기</b>를 누르는 것이 가장 정확합니다. 각도를 가져와야 겸향(체괘) 판정도 섭니다.</p>
+                </div>
+            </details>
 
             {/* 입력 — 좌향 · 준공 연도 · 입주 예정 해 */}
             <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">

@@ -52,25 +52,34 @@ export default function LuopanHome() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-24">
             <div className="text-center space-y-2 py-5 md:py-8">
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-50 font-noto-serif">🧭 풍수 나경</h2>
-                <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰으로 집 방향을 재서 우리 집 기운 지도를 그리고, 이사할 집도 미리 진단합니다.</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">휴대폰으로 집 방향을 재면 방위별 기운을 지도로 보여 드립니다.</p>
             </div>
 
-            {/* 본명괘용 생년·성별 (선택) — 입춘(2/4) 전 출생은 전년도로 입력 */}
-            <div className="glass-card p-3 mb-4 flex items-center gap-2 flex-wrap text-sm text-slate-500 justify-center">
-                <span>출생연도(입춘 기준)</span>
-                <input type="number" value={yearIn} min={1900} max={2100} placeholder="예: 1983"
-                    onChange={(e) => setYearIn(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") applyYear(); }}
-                    onBlur={applyYear}
-                    className="w-24 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
-                <select value={gender ?? ""} onChange={(e) => applyGender(e.target.value as Gender)}
-                    className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
-                    <option value="" disabled>성별</option>
-                    <option value="male">남</option>
-                    <option value="female">여</option>
-                </select>
-                <span className="text-[11px] text-slate-400">본명괘(팔택) 계산용 · 입춘(2/4) 전 출생은 전년도로</span>
-            </div>
+            {/* 본명괘(팔택)용 생년·성별 — 선택 입력이라 접어 둔다.
+                항상 펼쳐 두면 주 흐름(좌향 재기)보다 먼저 눈에 들어와 순서를 헷갈리게 한다. */}
+            <details className="glass-card px-3 py-2 mb-4">
+                <summary className="text-[12px] text-slate-500 dark:text-slate-400 cursor-pointer select-none flex items-center gap-2">
+                    <span>👤 내 정보</span>
+                    <span className={birthYear && gender ? "font-semibold text-[#bf953f]" : "text-slate-400"}>
+                        {birthYear && gender ? `${birthYear}년생 ${gender === "male" ? "남" : "여"}` : "미설정 — 넣으면 내 길방(팔택)까지 봅니다"}
+                    </span>
+                </summary>
+                <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500 pt-2">
+                    <span>출생연도</span>
+                    <input type="number" value={yearIn} min={1900} max={2100} placeholder="예: 1983"
+                        onChange={(e) => setYearIn(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") applyYear(); }}
+                        onBlur={applyYear}
+                        className="w-24 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm text-center" />
+                    <select value={gender ?? ""} onChange={(e) => applyGender(e.target.value as Gender)}
+                        className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-800/70 text-sm">
+                        <option value="" disabled>성별</option>
+                        <option value="male">남</option>
+                        <option value="female">여</option>
+                    </select>
+                    <span className="text-[11px] text-slate-400">입춘(2/4) 전 출생은 전년도로 넣으세요</span>
+                </div>
+            </details>
 
             {/* 메뉴 탭: 우리집 진단(현공, 기본) / 이사할 집 진단 / 나침반 길방(팔택) / 물길 좌향(삼합) */}
             <div className="flex gap-1.5 mb-4 flex-wrap justify-center">
