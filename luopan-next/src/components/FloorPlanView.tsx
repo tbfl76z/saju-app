@@ -241,8 +241,10 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
     const boxRef = useRef<HTMLDivElement>(null);
 
     const [natW, natH] = natural;
-    // 이미지 좌표 1px이 화면에서 몇 px인지의 역수 — 화면 13px 글씨를 원하면 13*k 를 쓴다
-    const k = dispW > 0 ? natW / dispW : natW / 900;
+    // 이미지 좌표 1px이 화면에서 몇 px인지의 역수 — 화면 13px 글씨를 원하면 13*k 를 쓴다.
+    // 래퍼에 CSS scale(viewScale)이 걸려 있어 그만큼 더 커지므로 나눠서 상쇄한다.
+    // (이걸 빼먹으면 확대할 때 중심점·글씨가 같이 부풀어 지도를 덮는다)
+    const k = (dispW > 0 ? natW / dispW : natW / 900) / viewScale;
     const cx = center?.[0] ?? natW / 2;
     const cy = center?.[1] ?? natH / 2;
     const L = Math.hypot(natW, natH);                 // 화면 밖까지 뻗는 선 길이
@@ -799,7 +801,7 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                 : pickMode === "room"
                                     ? <>🏷 <b>{roomName}</b> 위치를 도면에서 탭하세요.</>
                                     : !center
-                                        ? <>① 우리 집(터)의 <b>한가운데를 탭</b>하세요.</>
+                                        ? <>① 우리 집(터)의 <b>한가운데를 탭</b>하세요 — 탭하면 그 자리를 기준으로 방위가 그려집니다.</>
                                         : !aligned
                                             ? <>② <b>창(베란다)·정면 쪽을 한 번 더 탭</b>하세요{northLocked ? " — 좌향이 계산됩니다." : ` — 실측 향(${facingDeg.toFixed(0)}°)에 맞춰 도면이 회전합니다.`}</>
                                             : <>✅ <b className="text-emerald-600 dark:text-emerald-400">완료</b> — 파란 선이 정면(向) 방향입니다. 아래에서 방위별 기운을 확인하세요.</>}
@@ -919,7 +921,9 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img ref={imgElRef} src={img} alt="도면" className="w-full h-full block" />
                         <svg viewBox={`0 0 ${natW} ${natH}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                            <g opacity={alpha / 100}>
+                            {/* 중심을 찍기 전에는 방위 오버레이를 그리지 않는다.
+                                기준점이 없는 상태의 방사선·중심점은 실제 위치와 무관해 오해를 부른다. */}
+                            <g opacity={alpha / 100} style={{ display: center ? undefined : "none" }}>
                             {/* 8괘 반투명 부채꼴 (팔택/현공) */}
                             {divide === "부채꼴" && mode !== "24산" && GUA8.map((g, i) => {
                                 const mid = i * 45;
@@ -1078,8 +1082,8 @@ export default function FloorPlanView({ birthYear, gender, sitting: extSitting, 
                                     </g>
                                 );
                             })}
-                            {/* 중심점 */}
-                            <circle cx={cx} cy={cy} r={4.5 * k} fill="#c0392b" stroke="#fff" strokeWidth={1.2 * k} />
+                            {/* 중심점 — 찍은 뒤에만 표시 */}
+                            {center && <circle cx={cx} cy={cy} r={4.5 * k} fill="#c0392b" stroke="#fff" strokeWidth={1.2 * k} />}
                         </svg>
                         </div>
                         {/* 다음 탭 안내 오버레이 — 정렬 전까지만 표시(저장 이미지 오염 방지).
