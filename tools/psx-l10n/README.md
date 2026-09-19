@@ -125,6 +125,35 @@ python3 timtool.py extract extracted/ fonts/ --opaque --all-cluts
 - 128×128 또는 256×256에 글자가 격자로 박힌 것
 - `--opaque`를 주면 투명 배경이 사라져 글자 모양을 보기 쉽다
 
+## sjisdump.py — 일본어 문자열 덤프
+
+아카이브 안의 Shift-JIS 문자열을 오프셋과 함께 뽑는다. 각 문자열이 무슨
+바이트로 끝나는지도 기록해서 게임의 제어 코드(줄바꿈·화자·종료)를
+역추적할 수 있다.
+
+```
+python3 sjisdump.py map  G2DATA1.DAT             # 문자열이 몰린 영역 지도
+python3 sjisdump.py dump G2DATA1.DAT -o script.tsv
+python3 sjisdump.py peek G2DATA1.DAT 0x75874C    # 특정 위치를 16진수로
+```
+
+`dump`의 TSV 열: `offset, bytes, chars, gap, term, text`.
+`gap`은 직전 문자열 끝에서 이 문자열까지의 바이트 수 — 일정하면 고정 길이
+레코드. `term`은 문자열 직후 4바이트 — 제어 코드 후보.
+
+## 창세기전2 PS1 프로토타입 — 확인된 구조
+
+폰용 검사 페이지로 두 디스크를 검사해 확인한 내용.
+
+- 시리얼 SLPS-02311 / 02312 (정식 2장 세트). MODE2/2352
+- `G2DATA1.DAT` (76MB): **일본어 스크립트 전체** — Shift-JIS 평문, 7,321개 덩어리
+- `G2DATA2.DAT` (274MB): 텍스트 0건 → 그래픽·사운드
+- `SLPS_023.11` (1.1MB, 디스크 1에만 있음): 시스템 메시지 133건
+- `XA/`, `XA3/`: 동영상·음성. 디스크 간에 다른 건 이것뿐
+- 두 디스크의 `G2DATA1.DAT`, `G2DATA2.DAT`는 파일 내 오프셋까지 완전히 동일
+  → **한 번 한글화해서 두 디스크에 같이 적용**
+- 한국어 텍스트 없음. 한글 판정으로 잡힌 건 전부 `0xB8` 채움 패턴
+
 ## 검증
 
 합성 데이터로 각 도구를 검증했다.
