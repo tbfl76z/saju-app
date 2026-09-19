@@ -9,6 +9,8 @@ Galmuri11 같은 BDF 폰트에서 필요한 글자만 뽑아 이 형식으로 �
     python3 hangulfont.py build   Galmuri11.bdf out.bin [--chars ksx1001|all|파일] [--dx 1 --baseline 11] [--png sheet.png]
     python3 hangulfont.py preview Galmuri11.bdf "문장" out.png [--dx 1 --baseline 11] [--game-exe SLPS_023.11]
     python3 hangulfont.py info    Galmuri11.bdf
+    python3 hangulfont.py patch   Galmuri11.bdf koremap.tsv SLPS_023.11 -o SLPS_023.11.ko
+    python3 hangulfont.py shot    SLPS_023.11.ko out.png --file G2DATA1.ko.DAT --offset 0xD008
 
 `preview`는 게임 렌더러와 같은 규칙(글리프의 실제 좌우 폭 + 4px 진행, 빈 글리프 8px)으로
 문장을 찍어 실제 화면 간격을 미리 본다. `--game-exe`를 주면 같은 줄 아래에 게임 원본
@@ -271,6 +273,143 @@ def cmd_preview(a):
     print(f"'{a.text}' → {a.out}  (진행 폭 합 {sum(advance(s) for s in slots)}px)")
 
 
+# ------------------------------------------------------------------ EXE 패치
+
+FONT_BASES = {"nonkanji": 0x800DFBDC, "kanji1": 0x800E3114, "kanji2": 0x800F5E38}
+FONT_COUNTS = {"nonkanji": 524, "kanji1": 2965, "kanji2": 3390}
+EXE_LOAD = 0x80010000
+
+
+def cmd_patch(a):
+    """대응표가 지정한 글리프 슬롯을 한글 비트맵으로 덮어쓴다."""
+    glyphs, _, _ = parse_bdf(a.bdf)
+    base, count = FONT_BASES[a.region], FONT_COUNTS[a.region]
+    exe = bytearray(open(a.exe, "rb").read())
+
+    rows_map = []
+    missing = []
+    with open(a.map, encoding="utf-8") as f:
+        next(f)
+        for line in f:
+            t = line.rstrip("\n").split("\t")
+            if len(t) < 3:
+                continue
+            ch, idx = t[0], int(t[2])
+            if not 0 <= idx < count:
+                sys.exit(f"글리프 인덱스 {idx} 가 {a.region} 범위(0~{count - 1}) 밖입니다.")
+            g = glyphs.get(ord(ch))
+            if g is None:
+                missing.append(ch)
+                continue
+            rows_map.append((idx, ch, bdf_to_slot(g, a.baseline, a.dx)))
+
+    for idx, ch, rows in rows_map:
+        off = base - EXE_LOAD + 0x800 + idx * SLOT_BYTES
+        if off + SLOT_BYTES > len(exe):
+            sys.exit(f"글리프 {ch} (인덱스 {idx}) 가 EXE 밖입니다.")
+        exe[off:off + SLOT_BYTES] = slot_bytes(rows)
+
+    out = a.output or (a.exe + ".ko")
+    with open(out, "wb") as f:
+        f.write(exe)
+    print(f"{len(rows_map):,}개 글리프를 {a.region} 슬롯에 덮어썼습니다 → {out}")
+    print(f"  EXE 크기 {len(exe):,} bytes (원본과 동일, 코드 이동 없음)")
+    if missing:
+        print(f"  BDF에 없는 글자 {len(missing)}자: {''.join(missing[:40])}")
+    if a.png:
+        idxs = sorted(i for i, _, _ in rows_map)
+        lo, hi = idxs[0], idxs[-1]
+        slots = []
+        for i in range(lo, min(hi + 1, lo + a.png_count)):
+            o = base - EXE_LOAD + 0x800 + i * SLOT_BYTES
+            slots.append([struct.unpack_from(">H", exe, o + 2 * j)[0] for j in range(SLOT_H)])
+        sheet_png(a.png, slots, a.per_row)
+        print(f"  패치 결과 확인용 표 → {a.png} (인덱스 {lo}부터 {len(slots)}개)")
+
+
+ASCII_KIND = [(0x20, 0x10, 1, None), (0x30, 0x0A, 0, 0), (0x3A, 0x07, 0x0B, None),
+              (0x41, 0x1A, 0, 1), (0x5B, 0x06, 0x25, None), (0x61, 0x1A, 0, 2),
+              (0x7B, 0x04, 0x3F, None)]
+
+
+def ascii_to_sjis(exe, b):
+    """게임의 ASCII → 전각 SJIS 변환 (0x80019514). 없으면 None.
+
+    `.` 은 `。`, `,` 는 `、` 가 된다 — 한국어에는 맞지 않으므로 구두점은
+    koremap 의 --extra 로 한글 슬롯에 따로 넣는다.
+    """
+    for lo, n, kind, group in ASCII_KIND:
+        if not lo <= b < lo + n:
+            continue
+        if kind:
+            o = 0x800DFA18 - EXE_LOAD + 0x800 + (b - kind - 0x1F) * 2
+            return struct.unpack_from("<H", exe, o)[0]
+        o = 0x800DFA0C - EXE_LOAD + 0x800 + group * 4
+        base, sub = struct.unpack_from("<HH", exe, o)
+        return base + b - sub
+    return None
+
+
+def game_glyph(exe, code):
+    """게임 렌더러(0x80019A50)와 똑같이 SJIS 코드 → 글리프 26바이트를 꺼낸다.
+
+    폰트 교체가 실제로 맞는 슬롯에 들어갔는지 확인하는 가장 확실한 방법이다.
+    """
+    lead, trail = code >> 8, code & 0xFF
+    if 0x8140 <= code <= 0x84BE:
+        table, base, k = 0x800DFA7C, FONT_BASES["nonkanji"], None
+        bounds = [0x8140, 0x8180, 0x81B8, 0x81C8, 0x81DA, 0x81F0, 0x81FC, 0x824F, 0x8260,
+                  0x8281, 0x829F, 0x8340, 0x8380, 0x839F, 0x83BF, 0x8440, 0x8470, 0x8480, 0x849F]
+        k = max(i for i, b in enumerate(bounds) if code >= b)
+    elif 0x889F <= code <= 0x9872:
+        table, base = 0x800DFAC8, FONT_BASES["kanji1"]
+        k = (lead - 0x88) * 2 - (1 if trail < 0x7F else 0)
+    elif 0x989F <= code <= 0xEAA4:
+        table, base = 0x800DFB48, FONT_BASES["kanji2"]
+        k = ((lead - 0xE0) * 2 + (15 if trail < 0x7F else 16)) if lead >= 0xE0 \
+            else ((lead - 0x98) * 2 - (1 if trail < 0x7F else 0))
+    else:
+        return None
+    sub, add = struct.unpack_from("<HH", exe, table - EXE_LOAD + 0x800 + 4 * k)
+    idx = code - sub + add
+    o = base - EXE_LOAD + 0x800 + idx * SLOT_BYTES
+    return [struct.unpack_from(">H", exe, o + 2 * i)[0] for i in range(SLOT_H)]
+
+
+def cmd_shot(a):
+    """패치된 EXE의 폰트로, 게임 바이트열을 게임과 같은 규칙으로 그린다."""
+    exe = open(a.exe, "rb").read()
+    if a.hexstr:
+        raw = bytes.fromhex(a.hexstr)
+    else:
+        raw = open(a.file, "rb").read()[int(a.offset, 16):][:a.len]
+        raw = raw.split(b"\x00")[0]
+    slots, shown = [], []
+    i = 0
+    while i < len(raw):
+        b = raw[i]
+        if (0x81 <= b <= 0x9F or 0xE0 <= b <= 0xFC) and i + 1 < len(raw):
+            code = (b << 8) | raw[i + 1]
+            i += 2
+        else:
+            code = ascii_to_sjis(exe, b)
+            i += 1
+            if code is None:
+                continue
+        g = game_glyph(exe, code)
+        if g is None:
+            g = [0] * SLOT_H
+        slots.append(g)
+        shown.append(f"{code:04X}")
+    img = line_png_rows(slots, a.scale)
+    W = len(img[0]) + 8 * a.scale
+    out = [[40] * W for _ in range(4 * a.scale)]
+    out += [[0] * (4 * a.scale) + r + [0] * (W - len(r) - 4 * a.scale) for r in img]
+    out += [[40] * W for _ in range(4 * a.scale)]
+    write_png(a.out, W, len(out), out)
+    print(f"{len(slots)}글자 → {a.out}  (코드 {' '.join(shown[:16])}{' …' if len(shown) > 16 else ''})")
+
+
 def main():
     ap = argparse.ArgumentParser(description="BDF → 게임 폰트 슬롯(16×13 1bpp) 변환")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -300,6 +439,29 @@ def main():
     p.add_argument("--game-exe", help="SLPS_023.11 — 아래 줄에 원본 가나 비교 렌더")
     p.add_argument("--ref-text", default="その中の栄光のセップターはこの間", help="비교용 일본어(가나만 정확)")
     p.set_defaults(func=cmd_preview)
+
+    p = sub.add_parser("patch", help="대응표대로 EXE 폰트 슬롯을 한글로 교체")
+    p.add_argument("bdf")
+    p.add_argument("map", help="koremap.py build 로 만든 TSV")
+    p.add_argument("exe", help="SLPS_023.11")
+    p.add_argument("-o", "--output")
+    p.add_argument("--region", default="kanji2", choices=sorted(FONT_BASES))
+    p.add_argument("--dx", type=int, default=1)
+    p.add_argument("--baseline", type=int, default=11)
+    p.add_argument("--png", help="패치 결과 확인용 PNG")
+    p.add_argument("--png-count", type=int, default=512)
+    p.add_argument("--per-row", type=int, default=32)
+    p.set_defaults(func=cmd_patch)
+
+    p = sub.add_parser("shot", help="패치된 EXE 폰트로 게임 바이트열을 렌더 (최종 검증)")
+    p.add_argument("exe", help="폰트를 패치한 SLPS_023.11")
+    p.add_argument("out")
+    p.add_argument("--hex", dest="hexstr", help="게임 바이트열(16진)")
+    p.add_argument("--file", help="여기서 읽음 (G2DATA1.DAT 등)")
+    p.add_argument("--offset", default="0", help="--file 안 오프셋(hex)")
+    p.add_argument("--len", type=int, default=64)
+    p.add_argument("--scale", type=int, default=3)
+    p.set_defaults(func=cmd_shot)
 
     a = ap.parse_args()
     a.func(a)

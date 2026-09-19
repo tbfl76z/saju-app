@@ -179,6 +179,25 @@ python3 hangulfont.py preview fonts/Galmuri11.bdf "확인할 문장" out.png --s
 `--baseline`(기준선이 놓이는 슬롯 행, 기본 11)과 `--dx`(가로 오프셋, 기본 1)로 위치를 맞춘다.
 슬롯 밖으로 잘린 글자가 있으면 경고한다.
 
+## g2text.py / koremap.py / g2patch.py — 텍스트 파이프라인
+
+```
+g2text.py chars   SLPS_023.11 G2DATA1.DAT       # 실제 쓰이는 문자 집계 (슬롯 선정용)
+koremap.py build  SLPS_023.11 G2DATA1.DAT -o koremap.tsv
+hangulfont.py patch Galmuri11.bdf koremap.tsv SLPS_023.11 -o SLPS_023.11.ko
+g2patch.py table  G2DATA1.DAT --preset items -o tr_items.tsv    # 번역 TSV 생성
+g2patch.py apply  G2DATA1.DAT tr_items.tsv koremap.tsv -o G2DATA1.ko.DAT
+hangulfont.py shot SLPS_023.11.ko out.png --file G2DATA1.ko.DAT --offset 0xD008
+```
+
+`shot` 은 게임 렌더러와 똑같이 **코드 → 리맵 테이블 → 글리프**를 거쳐 그리므로,
+에뮬레이터 없이도 화면에 무엇이 나올지 확인할 수 있다. 원본 바이트를 넣으면 원본
+화면과 같은 그림이 나오는 것으로 경로가 맞는지 검증했다.
+
+문자 집계는 **NUL 종결 + 전체 유효 SJIS + 가나 비율**을 요구한다. 단순히 "2바이트
+문자로 보이는 바이트쌍"을 세면 그래픽 데이터가 대량 오탐된다(이 게임에서 JIS 2수준
+한자가 1,387개 쓰이는 것처럼 보였지만 실제로는 71개).
+
 ## 창세기전2 PS1 프로토타입 — 확인된 구조
 
 폰용 검사 페이지로 두 디스크를 검사해 확인한 내용.
@@ -203,6 +222,10 @@ python3 hangulfont.py preview fonts/Galmuri11.bdf "확인할 문장" out.png --s
 - 타일 렌더: 합성 16×16 1bpp 글리프(대각선·테두리)를 정확한 위치에 그리는지 확인
 - 디스어셈블러: `lui/addiu/lw/jal/jr/bne/sltiu/li` 등 9개 알려진 인코딩 일치 확인
 - BDF 변환: 합성 글리프(ox/oy 양·음)가 기준선 기준 정확한 행·열에 놓이고 실폭·진행 폭 계산이 맞는지 확인
+- 텍스트 섹션 파서: 합성 섹션을 인식하고, offs·size를 일부러 어긋낸 것은 거부
+- 제자리 교체: 공간에 맞으면 넣고 주변 바이트는 그대로, 초과하면 파일을 건드리지 않음
+- 코드 ↔ 글리프 인덱스: 리맵 테이블 왕복, 0x7F 건너뛰기 연속성, 2수준 3,390개 전수
+- ASCII → 전각 변환: 게임 테이블로 계산한 값이 알려진 대응(Ａ Ｚ ０ ９ ！ ？ ． ，)과 일치
 - 언어 판정: 랜덤 바이트를 한국어로 오탐하던 문제를 확률 기반 임계값으로 해결
   (EUC-KR 한글은 바이트 범위가 넓어 랜덤에서도 3.6%가 우연히 일치한다)
 
@@ -214,9 +237,8 @@ identify → ls → extract → triage → archive --unpack → triage → timto
 
 ## 아직 미구현
 
-1. 한글 ↔ JIS 글리프 슬롯 대응표 생성 + EXE 폰트 패치 (글리프 변환은 `hangulfont.py`로 완료)
-2. 텍스트 섹션(count/size/offs/len) 덤프 / 재삽입 및 EXE 인덱스 재계산
-3. 캐릭터·아이템 고정 길이 테이블 덤프 / 재삽입
-4. `mkpsxiso` 리빌드 + xdelta 패치 생성
+1. 텍스트 섹션 **재삽입** (길이 증가 시 EXE 인덱스 재계산) — 덤프는 `g2text.py`로 완료
+2. NUL 종결 대사(전체의 95%)의 위치 목록화
+3. `mkpsxiso` 리빌드 + xdelta 패치 생성
 
 확인된 세부 구조(인덱스 위치, 텍스트 섹션 형식, 폰트 좌표)는 `CLAUDE.md`에 있다.
