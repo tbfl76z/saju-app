@@ -366,6 +366,13 @@ def cmd_scan_text(args):
 
 
 def main():
+    # head/less 로 파이프할 때 BrokenPipeError 대신 조용히 끝나도록
+    try:
+        import signal
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except (AttributeError, ValueError, ImportError):
+        pass  # Windows에는 SIGPIPE가 없다
+
     ap = argparse.ArgumentParser(description="PS1/PC CD 이미지 분석 도구")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
