@@ -4,6 +4,10 @@ g2patch - 고정 레코드 테이블 / NUL 종결 문자열의 덤프와 제자�
 
 창세기전2 PS1의 인명·아이템·마법·메뉴는 포인터 재계산이 필요 없는 형태로 들어 있다:
 
+레코드 앞에 `u32 len` 이 붙어 있으면(텍스트 섹션 레코드, 마을 NPC 대사 등) 그 값도
+같이 고친다. 안 고치면 게임이 옛 길이만큼 읽어 한글 뒤의 NUL 을 계속 처리하다 멈춘다.
+레코드가 차지하는 자리 크기는 그대로라 `offs[]` 와 섹션 `size` 는 손댈 필요가 없다.
+
 - **고정 레코드 테이블**: 일정 간격마다 레코드가 있고 앞쪽 N바이트가 이름
   (캐릭터 0x0, 256바이트 간격, 이름 24바이트 ×2 / 아이템 0xE614, 68바이트 간격)
 - **NUL 종결 문자열**: EXE 안 마법명·메뉴. 뒤따르는 0 패딩까지가 쓸 수 있는 공간
@@ -25,7 +29,9 @@ g2patch - 고정 레코드 테이블 / NUL 종결 문자열의 덤프와 제자�
 """
 
 import argparse
+import csv
 import os
+import re
 import struct
 import sys
 
@@ -33,8 +39,10 @@ import sys
 # 유효성 검사는 "이 레코드가 아직 테이블 안인가"를 본다. 테이블 뒤에는 설명문이
 # 이어지므로 이름 필드만으로는 경계를 못 잡는다(아이템은 +30의 분류 바이트로 구분).
 PRESETS = {
-    "chars": (0x0, 0x100, [(0x00, 0x18, "짧은이름"), (0x18, 0x18, "긴이름")], 64,
-              lambda d, o: bool(d[o:o + 0x18].strip(b"\x00"))),
+    # 짧은 이름이 빈 레코드가 있으므로(#38 クリス) 두 필드를 함께 봐야 한다.
+    # 한쪽만 보면 거기서 테이블이 끝난 줄 알고 잘린다(38명 → 실제 120명).
+    "chars": (0x0, 0x100, [(0x00, 0x18, "짧은이름"), (0x18, 0x18, "긴이름")], 256,
+              lambda d, o: bool(d[o:o + 0x30].strip(b"\x00"))),
     "items": (0xD008, 68, [(0x00, 30, "이름")], 400,
               lambda d, o: d[o + 30] != 0 and d[o + 33] == 0
               and d[o + 30] <= 0x20 and d[o + 31] <= 0x20
@@ -186,6 +194,11 @@ def scan_pool(buf, min_double=2, pointers=False, gap=48):
     return out
 
 
+# EXE 안 폰트 글리프(1bpp 비트맵)가 Shift-JIS 두 글자로 읽히는 오탐이 잦다.
+# 비한자 0x800DFBDC / 1수준 0x800E3114 / 2수준 0x800F5E38~0x8010B684 (파일 0xD03DC~0xFBE84)
+FONT_REGION = (0xD03DC, 0xFBE84)
+
+
 def cmd_exestr(a):
     """NUL 종결 문자열과 각자 쓸 수 있는 바이트 수.
 
@@ -195,7 +208,10 @@ def cmd_exestr(a):
     e = open(a.exe, "rb").read()
     use_ptr = e[:8] == b"PS-X EXE" and not a.no_pointers
     rows = []
+    is_exe = e[:8] == b"PS-X EXE"
     for off, codes in scan_pool(e, a.min_double, pointers=use_ptr):
+        if is_exe and FONT_REGION[0] <= off < FONT_REGION[1]:
+            continue        # 폰트 비트맵 오탐
         nb = sum(1 if c < 0x100 else 2 for c in codes)
         end = off + nb + 1                      # NUL 포함
         room = nb
@@ -215,48 +231,81 @@ def cmd_exestr(a):
               + ("  (포인터 참조 포함)" if use_ptr else ""))
 
 
+_LATIN = re.compile(r"[A-Za-z]{2,}")
+
+
+def _fold(s):
+    """전각 영문·숫자를 반각으로. 원문 ＧＳ 와 번역 GS 를 같은 것으로 보기 위해."""
+    return "".join(chr(ord(c) - 0xFEE0) if 0xFF21 <= ord(c) <= 0xFF5A or 0xFF10 <= ord(c) <= 0xFF19
+                   else c for c in s)
+
+
+def suspect(src, ko):
+    """기계번역이 망가뜨린 흔적을 찾는다. 이유 문자열, 없으면 None."""
+    for ph in ("??", "⁇", "？？", "\ufffd"):
+        if ph in ko:
+            return f"{ph} 자리표시자"
+    folded = _fold(src)
+    for tok in _LATIN.findall(ko):
+        if tok.casefold() not in folded.casefold():
+            return f"원문에 없는 영문 '{tok}'"
+    return None
+
+
 def cmd_apply(a):
     K = _koremap()
     fwd, rev, _ = K.load_map(a.map)
     buf = bytearray(open(a.target, "rb").read())
 
-    applied = over = bad = skipped = 0
+    applied = over = bad = skipped = suspicious = fixed_len = 0
     problems = []
-    with open(a.tsv, encoding="utf-8") as f:
-        head = next(f).rstrip("\n").split("\t")
-        io, im, ik = head.index("offset"), head.index("max"), head.index("ko")
-        it = head.index("text")
-        for line in f:
-            t = line.rstrip("\n").split("\t")
-            if len(t) <= max(io, im, ik):
-                continue
-            ko = t[ik].strip()
+    with open(a.tsv, encoding="utf-8", newline="") as f:
+        # 단순 split 로 나누면 따옴표가 붙은 필드에서 열이 어긋난다. csv 로 읽는다.
+        for t in csv.DictReader(f, delimiter="\t"):
+            ko = (t.get("ko") or "").strip()
             if not ko:
                 skipped += 1
                 continue
-            off, room = int(t[io], 16), int(t[im])
+            src = t.get("text") or ""
+            if a.only_clean:
+                why = suspect(src, ko)
+                if why:
+                    suspicious += 1
+                    if len(problems) < 4000:
+                        problems.append((t["offset"], why, ko))
+                    continue
+            off, room = int(t["offset"], 16), int(t["max"])
             raw, missing = K.encode(ko, fwd)
             if missing:
                 bad += 1
-                problems.append((t[io], "미매핑 " + "".join(missing), ko))
+                problems.append((t["offset"], "미매핑 " + "".join(sorted(set(missing))), ko))
                 continue
             if len(raw) > room:
                 over += 1
-                problems.append((t[io], f"{len(raw)}바이트 > 공간 {room}", ko))
+                problems.append((t["offset"], f"{len(raw)}바이트 > 공간 {room}", ko))
                 continue
             buf[off:off + room] = raw + b"\x00" * (room - len(raw))
+            # 길이 접두 레코드(u32 len + 본문 + NUL + 정렬 패딩)면 len 도 같이 고친다.
+            # 안 고치면 게임이 옛 길이만큼 읽어 한글 뒤의 NUL 까지 처리하다 멈춘다.
+            if a.fix_len and off >= 4 and t.get("bytes"):
+                src_len = int(t["bytes"])
+                if struct.unpack_from("<I", buf, off - 4)[0] == src_len:
+                    struct.pack_into("<I", buf, off - 4, len(raw))
+                    fixed_len += 1
             applied += 1
 
     out = a.output or (a.target + ".ko")
     with open(out, "wb") as f:
         f.write(buf)
-    print(f"{applied:,}건 적용, 건너뜀 {skipped:,}, 공간 초과 {over}, 미매핑 {bad} → {out}")
+    print(f"{applied:,}건 적용, 건너뜀 {skipped:,}, 공간 초과 {over}, 미매핑 {bad}"
+          + (f", 의심 제외 {suspicious:,}" if a.only_clean else "")
+          + (f", 길이 필드 정정 {fixed_len:,}" if fixed_len else "") + f" → {out}")
     if problems:
         print("문제 행:")
-        for o, why, ko in problems[:20]:
-            print(f"  {o}  {why}  [{ko}]")
-        if len(problems) > 20:
-            print(f"  ... 총 {len(problems)}건")
+        for o, why, ko in problems[:a.show]:
+            print(f"  {o}  {why}  [{ko[:70]}]")
+        if len(problems) > a.show:
+            print(f"  ... 총 {len(problems):,}건 (--show 로 더 보기)")
 
 
 def main():
@@ -282,6 +331,12 @@ def main():
     p.add_argument("tsv")
     p.add_argument("map", help="koremap.tsv")
     p.add_argument("-o", "--output")
+    p.add_argument("--only-clean", action="store_true",
+                   help="기계번역이 망가뜨린 흔적이 있는 행은 건너뛴다 "
+                        "(?? 자리표시자, 원문에 없는 영문)")
+    p.add_argument("--show", type=int, default=10, help="문제 행 표시 개수")
+    p.add_argument("--no-fix-len", dest="fix_len", action="store_false",
+                   help="길이 접두(u32 len) 자동 정정을 끈다")
     p.set_defaults(func=cmd_apply)
 
     a = ap.parse_args()

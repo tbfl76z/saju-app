@@ -7,6 +7,8 @@ G2DATA1.DAT 안의 대사는 "텍스트 섹션" 단위로 들어 있다:
     u32 count          레코드 수
     u32 size           offs 배열 선두부터 마지막 레코드 끝까지의 바이트 수 (= 4*count + 레코드 전체)
     u32 offs[count]    각 레코드의 상대 오프셋 (기준 = offs 배열 바로 뒤)
+                       — 레코드 위치는 이 표가 정한다. 한글화로 len 이 줄어도
+                         자리 크기는 그대로 두므로 이 표는 손댈 필요가 없다.
     레코드 × count:
         u32 len        본문 바이트 수 (NUL 제외)
         u8  text[len]  Shift-JIS
@@ -67,25 +69,25 @@ def parse_section(d, pos, limit):
         return None
     table = pos + 8
     text0 = table + 4 * count
-    if text0 > limit:
+    end = pos + 8 + size
+    if text0 > limit or end > limit:
+        return None
+    offs = list(struct.unpack_from(f"<{count}I", d, table))
+    if offs[0] != 0 or any(offs[i] >= offs[i + 1] for i in range(count - 1)):
         return None
     recs = []
-    h = 0
     for k in range(count):
-        if struct.unpack_from("<I", d, table + 4 * k)[0] != h:
-            return None          # offs 불일치 → 섹션 아님
-        rp = text0 + h
-        if rp + 4 > limit:
+        rp = text0 + offs[k]
+        slot = (offs[k + 1] if k + 1 < count else end - text0) - offs[k]
+        # 레코드 자리: u32 len + 본문 + NUL + 4바이트 정렬 패딩
+        if slot < 8 or rp + slot > limit:
             return None
         ln = struct.unpack_from("<I", d, rp)[0]
-        if ln == 0 or ln > 8000 or rp + 4 + ln >= limit:
+        if ln == 0 or 4 + ln + 1 > slot:
             return None
         if d[rp + 4 + ln] != 0:
             return None
         recs.append((rp, d[rp + 4: rp + 4 + ln]))
-        h += 4 + ((ln + 1 + 3) & ~3)
-    if text0 + h != pos + 8 + size:
-        return None              # size 불일치 → 섹션 아님
     return 8 + size, recs        # 섹션이 차지하는 전체 바이트
 
 
