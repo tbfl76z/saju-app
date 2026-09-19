@@ -130,15 +130,27 @@ EXE 인덱스(뒤 엔트리 전부)를 밀어야 한다. 블록 안에서 이 �
 
 확인 명령: `python3 tileview.py ex/SLPS_023.11 0xD03DC out.png --bpp 1 --tile 16x13 --count 524`
 
-### 한글 폰트 전략 (6단계 권장안)
+### 한글 폰트 — 결정됨: Galmuri11 (2026-09-20)
 
-렌더러를 건드리지 않는 **코드 치환** 방식이 가능하다:
-1. 한글 완성형 2,350자 + 필요한 기호를 **쓰지 않을 JIS 한자 코드**(2수준 3,390슬롯이면 충분)에
-   1:1로 배정하는 대응표를 만든다.
-2. 번역문을 그 대응표로 SJIS 바이트열로 인코딩해 넣는다(게임은 그냥 한자로 인식).
-3. 해당 슬롯의 26바이트 글리프를 한글 16×13 비트맵으로 바꾼다 (EXE 안, 위치 고정).
-가변폭 렌더러라 한글 폭(대개 12~14px)도 자연히 맞는다. 13px 높이가 빡빡하므로
-12px 계열 한글 비트맵 폰트(둥근모꼴 등, 라이선스 확인)를 후보로.
+사용자가 **Galmuri11**(quiple, SIL OFL 1.1, 12px/한글 11×11, BDF 배포)로 확정했다.
+전략은 **코드 치환**: 한글을 쓰지 않는 JIS 한자 슬롯에 1:1 배정하고, 그 슬롯의 26바이트
+글리프만 Galmuri11 비트맵으로 교체한다. 렌더러는 수정하지 않는다.
+
+- 폰트 파일: `fonts/Galmuri11.bdf`, `fonts/Galmuri11-Bold.bdf`, `fonts/Galmuri11-Condensed.bdf`
+  (`fonts/`는 gitignore. 없으면
+  `curl -L -o fonts/Galmuri11.bdf https://raw.githubusercontent.com/quiple/galmuri/main/dist/Galmuri11.bdf`)
+- 변환: `python3 hangulfont.py build fonts/Galmuri11.bdf fonts/galmuri11_ksx1001.bin --map fonts/galmuri11_ksx1001.tsv --png sheet.png`
+  → KS X 1001 2,350자, 잘림 0, 진행 폭 14~15px (원본 가나 13~15px과 동급).
+- 배치: `--baseline 11 --dx 1` (기본값). 한글 본체가 슬롯 1~11행·1~11열 → 원본 한자(0~12행)와 중심 일치.
+  BDF의 `FONT_ASCENT 14`는 슬롯보다 커서 쓰지 않는다.
+- Regular이 원본 획 굵기(1px)와 같다. Bold는 CRT/컴포지트 실기 검증에서 가독성이 부족할 때의
+  대안(`fonts/preview_galmuri11_*.png` 비교 참고).
+- 미리보기: `python3 hangulfont.py preview fonts/Galmuri11.bdf "문장" out.png --scale 3 --game-exe ex/SLPS_023.11`
+  (게임 규칙 = 글리프 실폭 + 4px, 빈 글리프 8px 로 문장을 찍고 아래 줄에 원본 가나를 같은 규칙으로 찍음).
+
+남은 폰트 작업: (a) 한글 2,350자(+한글 문장부호) ↔ JIS 2수준 한자 슬롯(0x989F~, 3,390개) 대응표
+확정 — 번역에 실제로 쓰는 일본어 한자가 있으면 그 슬롯은 피한다, (b) EXE `0x800F5E38`부터 해당
+슬롯에 글리프 블롭 덮어쓰기, (c) 번역 TSV → 대응표 인코딩.
 
 ## 도구 (이 폴더, 의존성 없는 Python 3)
 
@@ -150,6 +162,7 @@ EXE 인덱스(뒤 엔트리 전부)를 밀어야 한다. 블록 안에서 이 �
 | `sjisdump.py map/dump/peek` | Shift-JIS 문자열 지도·덤프·16진 보기 |
 | `tileview.py` | 헤더 없는 원시 비트맵/타일을 PNG로 (폰트 확인용, `--bpp 1 --tile 16x13`) |
 | `mipsdis.py` | PS-X EXE 미니 디스어셈블러 (`--find-ref`, `--calls`, lui 쌍 주소 주석) |
+| `hangulfont.py info/build/preview` | BDF → 게임 폰트 슬롯(16×13, 26B) 변환, 게임 간격 규칙 미리보기 |
 
 사용법은 `README.md`. 새 도구를 만들 때도 같은 원칙: 단일 파일, 표준 라이브러리만,
 한국어 도움말, 합성 데이터로 검증 후 커밋.
@@ -158,8 +171,8 @@ EXE 인덱스(뒤 엔트리 전부)를 밀어야 한다. 블록 안에서 이 �
 
 1~5는 끝났다(위 섹션). 남은 것:
 
-6. **한글 폰트 전략 확정**: 위 권장안(코드 치환)으로 갈지 결정. 확정되면 (a) 한글↔JIS 슬롯
-   대응표 생성 도구, (b) 16×13 한글 비트맵 → 26바이트 글리프 변환 도구, (c) EXE 폰트 패치.
+6. **한글 폰트**: Galmuri11 + 코드 치환으로 확정, 변환 도구(`hangulfont.py`) 완료. 남은 것:
+   (a) 한글↔JIS 슬롯 대응표 생성 도구, (b) EXE 폰트 패치.
    추가로 볼 것: `0x80153F90` 버퍼를 VRAM으로 올리는 코드(글자 캐시 크기 제한 여부),
    메뉴/이름처럼 EXE·테이블에 고정 길이로 박힌 문자열의 폭 제한.
 7. **재삽입 파이프라인**: 번역 TSV → 대응표 인코딩 → 텍스트 섹션(len/offs/size) 재조립 →

@@ -164,6 +164,21 @@ python3 mipsdis.py SLPS_023.11 --find-ref 0x800DFBDC    # 이 주소를 만드�
 python3 mipsdis.py SLPS_023.11 --calls 0x80019A50       # 이 함수를 jal 하는 위치
 ```
 
+## hangulfont.py — BDF 폰트를 게임 폰트 슬롯으로
+
+TIM이 아닌 원시 1bpp 폰트(글리프당 13행 × u16)를 쓰는 게임에 한글 비트맵 폰트를 넣기 위한
+변환기. Galmuri11 같은 BDF에서 KS X 1001 2,350자를 뽑아 26바이트 글리프 블롭으로 만들고,
+게임 렌더러의 가변폭 규칙으로 문장을 미리 렌더해 원본 글자와 크기를 비교한다.
+
+```
+python3 hangulfont.py info    fonts/Galmuri11.bdf
+python3 hangulfont.py build   fonts/Galmuri11.bdf out.bin --map map.tsv --png sheet.png
+python3 hangulfont.py preview fonts/Galmuri11.bdf "확인할 문장" out.png --scale 3 --game-exe SLPS_023.11
+```
+
+`--baseline`(기준선이 놓이는 슬롯 행, 기본 11)과 `--dx`(가로 오프셋, 기본 1)로 위치를 맞춘다.
+슬롯 밖으로 잘린 글자가 있으면 경고한다.
+
 ## 창세기전2 PS1 프로토타입 — 확인된 구조
 
 폰용 검사 페이지로 두 디스크를 검사해 확인한 내용.
@@ -187,6 +202,7 @@ python3 mipsdis.py SLPS_023.11 --calls 0x80019A50       # 이 함수를 jal 하�
 - 아카이브 탐지: 두 가지 헤더 변형을 각각 올바르게 판별하고 조각 경계 정확
 - 타일 렌더: 합성 16×16 1bpp 글리프(대각선·테두리)를 정확한 위치에 그리는지 확인
 - 디스어셈블러: `lui/addiu/lw/jal/jr/bne/sltiu/li` 등 9개 알려진 인코딩 일치 확인
+- BDF 변환: 합성 글리프(ox/oy 양·음)가 기준선 기준 정확한 행·열에 놓이고 실폭·진행 폭 계산이 맞는지 확인
 - 언어 판정: 랜덤 바이트를 한국어로 오탐하던 문제를 확률 기반 임계값으로 해결
   (EUC-KR 한글은 바이트 범위가 넓어 랜덤에서도 3.6%가 우연히 일치한다)
 
@@ -198,7 +214,7 @@ identify → ls → extract → triage → archive --unpack → triage → timto
 
 ## 아직 미구현
 
-1. 한글 ↔ JIS 글리프 슬롯 대응표 생성 + 한글 비트맵 → 26바이트 글리프 변환
+1. 한글 ↔ JIS 글리프 슬롯 대응표 생성 + EXE 폰트 패치 (글리프 변환은 `hangulfont.py`로 완료)
 2. 텍스트 섹션(count/size/offs/len) 덤프 / 재삽입 및 EXE 인덱스 재계산
 3. 캐릭터·아이템 고정 길이 테이블 덤프 / 재삽입
 4. `mkpsxiso` 리빌드 + xdelta 패치 생성
