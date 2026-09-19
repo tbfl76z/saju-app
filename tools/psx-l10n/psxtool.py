@@ -276,93 +276,166 @@ def cmd_extract(args):
     disc.close()
 
 
-def cmd_scan_text(args):
-    """이미지 전체를 훑어서 어떤 문자 인코딩이 얼마나 들어있는지 센다.
+# 랜덤 바이트에서 각 언어의 2바이트 쌍이 우연히 나타날 확률
+#   EUC-KR 한글 : 선행 0xB0~0xC8(25종) × 후행 0xA1~0xFE(94종) / 65536
+#   Shift-JIS   : 선행 0x81~0x9F,0xE0~0xEF(47종) × 후행 0x40~0xFC(188종) / 65536
+# 일본어 쪽이 4배 가까이 넓어서, 같은 기준을 쓰면 랜덤 데이터가
+# 전부 "일본어"로 판정된다.
+P_PAIR = {"kr": (25 * 94) / 65536, "jp": (47 * 188) / 65536}
 
-    대사가 일본어인지 한국어인지, 어느 영역(LBA)에 몰려 있는지를
-    빠르게 파악하기 위한 통계다. 정밀한 덤프가 아니라 어디를 팔지
-    정하기 위한 지도에 가깝다.
+# 가나 필터("가나가 25% 이상")를 통과하는 우연한 덩어리의 비율.
+# 64MB 랜덤 데이터로 실측한 값이다(402개 중 24개 통과 = 0.06).
+# 이론 추정치(0.005)를 쓰면 기대치를 과소평가해 랜덤을 텍스트로 오판한다.
+KANA_FACTOR = {"kr": 1.0, "jp": 0.06}
+
+# 덩어리 안에 끼어도 문장이 이어지는 것으로 보는 1바이트 문자.
+# 한국어는 띄어쓰기가 잦아 이걸 허용하지 않으면 덩어리가 잘게 쪼개진다.
+CONNECTORS = set(b" \t\r\n.,!?'\"-~()")
+
+MIN_KANA_RATIO = 0.25
+
+
+def _run_kind(b0, b1):
+    """이 2바이트 쌍이 한글인지 일본어인지 판정.
+
+    EUC-KR 한글 선행바이트(0xB0~0xC8)는 Shift-JIS의 선행바이트 범위
+    (0x81~0x9F, 0xE0~0xEF)와 겹치지 않는다. 덕분에 둘을 구분할 수 있다.
     """
-    size = os.path.getsize(args.image)
-    counts = {"sjis_kana": 0, "sjis_kanji": 0, "euckr_hangul": 0,
-              "euckr_hanja": 0, "johab": 0, "ascii_text": 0}
-    # 1MB 단위로 어느 구간에 몰려있는지도 같이 센다
-    buckets = {}
+    if 0xB0 <= b0 <= 0xC8 and 0xA1 <= b1 <= 0xFE:
+        return "kr"
+    if (0x81 <= b0 <= 0x9F or 0xE0 <= b0 <= 0xEF) and 0x40 <= b1 <= 0xFC and b1 != 0x7F:
+        return "jp"
+    return None
 
-    CHUNK = 1 << 20
+
+def _is_kana(b0, b1):
+    """히라가나(0x82 0x9F~0xF1) 또는 가타카나(0x83 0x40~0x96)."""
+    return (b0 == 0x82 and 0x9F <= b1 <= 0xF1) or (b0 == 0x83 and 0x40 <= b1 <= 0x96)
+
+
+def scan_runs(buf, base, min_run, seen_end):
+    """연속된 2바이트 문자의 '덩어리'를 찾는다.
+
+    개수만 세는 방식은 700MB급 이미지에서 무용지물이다. 그래픽·음성
+    데이터에서만 수백만 건의 오탐이 나온다. 대신 '연속'을 본다.
+    한글 6글자가 연달아 나올 우연 확률은 0.036^6 ≈ 2e-9 이라,
+    700MB를 다 뒤져도 우연히는 거의 나오지 않는다.
+
+    일본어는 바이트 범위가 넓어 이것만으로는 부족해서, 가나가 일정
+    비율 이상 섞여 있을 것을 추가로 요구한다. 실제 일본어 문장은
+    가나가 반 이상이지만, 우연히 만들어진 덩어리는 희귀한 한자뿐이다.
+    """
+    runs = []
+    i, n = 0, len(buf) - 1
+    while i < n:
+        kind = _run_kind(buf[i], buf[i + 1])
+        if kind is None:
+            i += 1
+            continue
+
+        start = i
+        chars = kana = 0
+        last_end = i
+        while i < n:
+            if _run_kind(buf[i], buf[i + 1]) == kind:
+                if kind == "jp" and _is_kana(buf[i], buf[i + 1]):
+                    kana += 1
+                chars += 1
+                i += 2
+                last_end = i
+                continue
+            # 띄어쓰기·문장부호는 덩어리를 끊지 않는다 (뒤에 같은 언어가 이어질 때만)
+            if (buf[i] in CONNECTORS and i + 2 < n
+                    and _run_kind(buf[i + 1], buf[i + 2]) == kind):
+                i += 1
+                continue
+            break
+
+        if chars < min_run or base + start < seen_end:
+            continue
+        if kind == "jp" and kana < max(1, int(chars * MIN_KANA_RATIO)):
+            continue        # 가나 없는 한자 나열 = 우연히 만들어진 덩어리
+
+        raw = bytes(buf[start:last_end])
+        try:
+            text = raw.decode("euc-kr" if kind == "kr" else "shift_jis")
+        except UnicodeDecodeError:
+            continue        # 디코딩 실패 = 진짜 텍스트가 아님
+
+        runs.append((base + start, text, kind, chars, last_end - start))
+    return runs
+
+
+def cmd_scan_text(args):
+    """이미지 전체에서 '연속된 문자 덩어리'를 찾아 언어를 판정한다."""
+    CHUNK = 8 << 20
+    OVERLAP = 64
+    size = os.path.getsize(args.image)
+
+    stats = {"kr": 0, "jp": 0}
+    longest = {"kr": (0, 0), "jp": (0, 0)}
+    samples = {"kr": [], "jp": []}
+    seen_end = 0
+
     with open(args.image, "rb") as f:
-        offset = 0
-        carry = b""
+        carry, carry_base, pos = b"", 0, 0
         while True:
             chunk = f.read(CHUNK)
             if not chunk:
                 break
             buf = carry + chunk
-            local = {"sjis": 0, "euckr": 0}
-            i = 0
-            limit = len(buf) - 1
-            while i < limit:
-                b0 = buf[i]
-                b1 = buf[i + 1]
-                if 0x81 <= b0 <= 0x9F or 0xE0 <= b0 <= 0xEF:
-                    # Shift-JIS 2바이트 영역
-                    if 0x40 <= b1 <= 0xFC and b1 != 0x7F:
-                        if b0 == 0x82 and 0x9F <= b1 <= 0xF1:
-                            counts["sjis_kana"] += 1   # 히라가나
-                        elif b0 == 0x83 and 0x40 <= b1 <= 0x96:
-                            counts["sjis_kana"] += 1   # 가타카나
-                        else:
-                            counts["sjis_kanji"] += 1
-                        local["sjis"] += 1
-                        i += 2
-                        continue
-                if 0xB0 <= b0 <= 0xC8 and 0xA1 <= b1 <= 0xFE:
-                    counts["euckr_hangul"] += 1        # 완성형 한글
-                    local["euckr"] += 1
-                    i += 2
-                    continue
-                if 0xCA <= b0 <= 0xFD and 0xA1 <= b1 <= 0xFE:
-                    counts["euckr_hanja"] += 1         # EUC-KR 한자
-                    i += 2
-                    continue
-                if 0x88 <= b0 <= 0xD3 and b1 >= 0x31:
-                    counts["johab"] += 1               # 조합형 추정(노이즈 많음)
-                if 0x20 <= b0 < 0x7F:
-                    counts["ascii_text"] += 1
-                i += 1
+            base = carry_base if carry else pos
 
-            mb = offset // CHUNK
-            if local["sjis"] > 200 or local["euckr"] > 200:
-                buckets[mb] = local
-            carry = buf[-1:]
-            offset += len(chunk)
+            for off, text, kind, chars, nbytes in scan_runs(buf, base, args.min_run, seen_end):
+                stats[kind] += 1
+                seen_end = off + nbytes
+                if chars > longest[kind][0]:
+                    longest[kind] = (chars, off)
+                if len(samples[kind]) < args.samples:
+                    samples[kind].append((off, chars, text[:args.width]))
 
-    print("전체 인코딩 분포 (2바이트 문자 추정 개수)")
-    print("-" * 46)
-    for k, v in counts.items():
-        print(f"  {k:<14} {v:>12,}")
+            pos = base + len(buf)
+            carry = buf[-OVERLAP:]
+            carry_base = pos - OVERLAP
 
-    jp = counts["sjis_kana"]
-    kr = counts["euckr_hangul"]
+    print(f"파일 크기 : {size:,} bytes")
+    print(f"판정 기준 : {args.min_run}글자 이상 연속 (띄어쓰기 허용)")
     print()
-    print(f"  일본어 가나 : {jp:,}")
-    print(f"  한글 완성형 : {kr:,}")
-    if jp > kr * 3:
-        print("  → 일본어 텍스트가 지배적입니다. 일본어 → 한국어 번역이 필요합니다.")
-    elif kr > jp * 3:
-        print("  → 한국어 텍스트가 지배적입니다. 이미 한글 스크립트가 들어있습니다.")
-    else:
-        print("  → 판정 보류. 두 인코딩의 바이트 범위가 겹쳐 오탐이 섞였을 수 있습니다.")
 
-    if buckets:
+    for kind, label in (("kr", "한국어"), ("jp", "일본어")):
+        # 이 크기의 랜덤 데이터에서 우연히 나올 것으로 기대되는 개수
+        noise = size * (P_PAIR[kind] ** args.min_run) * KANA_FACTOR[kind]
+        found = stats[kind]
+        print(f"  {label}  덩어리 {found:>8,}개   "
+              f"최장 {longest[kind][0]}글자 (오프셋 0x{longest[kind][1]:X})")
+        print(f"          우연히 나올 기대치 {noise:.1f}개")
+        # 개수보다 강력한 증거는 '최장 덩어리'다. 우연히 6글자가 이어질 수는
+        # 있어도, 10글자 이상은 확률적으로 만들어지지 않는다.
+        best = longest[kind][0]
+        noise_at_best = size * (P_PAIR[kind] ** best) * KANA_FACTOR[kind] if best else 1e9
+
+        if best >= args.min_run and noise_at_best < 0.01:
+            print(f"          ✅ {label} 텍스트가 확실히 들어 있습니다.")
+            print(f"             (최장 {best}글자 덩어리는 우연으로 설명되지 않음)")
+        elif found > max(5, noise * 20):
+            print(f"          ✅ {label} 텍스트가 실제로 들어 있습니다.")
+        elif found > noise * 3:
+            print(f"          ⚠️  {label} 텍스트가 소량 있을 수 있습니다. 샘플을 확인하세요.")
+        else:
+            print(f"          ❌ 의미 있는 {label} 텍스트 없음 (기대치 수준).")
         print()
-        print(f"텍스트가 몰려 있는 구간 (상위 {args.top}개, MB 오프셋 기준)")
-        print("-" * 46)
-        ranked = sorted(buckets.items(),
-                        key=lambda kv: kv[1]["sjis"] + kv[1]["euckr"],
-                        reverse=True)
-        for mb, c in ranked[:args.top]:
-            print(f"  {mb:>5} MB  sjis={c['sjis']:>7,}  euckr={c['euckr']:>7,}")
+
+    for kind, label, codec in (("kr", "한국어", "euc-kr"), ("jp", "일본어", "shift_jis")):
+        if not samples[kind]:
+            continue
+        print(f"--- {label} 샘플 ({codec}로 디코딩) ---")
+        for off, chars, text in samples[kind]:
+            print(f"  0x{off:08X} ({chars:3d}글자)  {text}")
+        print()
+
+    if not stats["kr"] and not stats["jp"]:
+        print("둘 다 없다면 자체 인코딩(폰트 타일 인덱스)을 쓰는 빌드입니다.")
+        print("그 경우 폰트 이미지부터 찾아야 합니다: timtool.py scan")
 
 
 def main():
@@ -390,9 +463,12 @@ def main():
     p.add_argument("outdir")
     p.set_defaults(func=cmd_extract)
 
-    p = sub.add_parser("scan-text", help="이미지 전체 텍스트 인코딩 분포 추정")
+    p = sub.add_parser("scan-text", help="연속된 문자 덩어리를 찾아 언어 판정")
     p.add_argument("image")
-    p.add_argument("--top", type=int, default=20)
+    p.add_argument("--min-run", type=int, default=6,
+                   help="몇 글자 이상 연속돼야 텍스트로 볼지 (기본 6)")
+    p.add_argument("--samples", type=int, default=15, help="언어별 샘플 개수")
+    p.add_argument("--width", type=int, default=40, help="샘플 표시 길이")
     p.set_defaults(func=cmd_scan_text)
 
     args = ap.parse_args()
