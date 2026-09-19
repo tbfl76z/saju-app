@@ -141,6 +141,29 @@ python3 sjisdump.py peek G2DATA1.DAT 0x75874C    # 특정 위치를 16진수로
 `gap`은 직전 문자열 끝에서 이 문자열까지의 바이트 수 — 일정하면 고정 길이
 레코드. `term`은 문자열 직후 4바이트 — 제어 코드 후보.
 
+## tileview.py — 헤더 없는 폰트/타일 보기
+
+TIM 헤더 없이 EXE나 아카이브에 그대로 박힌 비트맵을 격자 타일로 렌더한다.
+폰트 구간을 맞게 잡으면 글자가 줄줄이 보인다. 의존성 없이 PNG를 만든다.
+
+```
+python3 tileview.py SLPS_023.11 0xD03DC font.png --bpp 1 --tile 16x13 --per-row 32 --count 524
+python3 tileview.py DATA.BIN 0x1000 raw.png --linear --width 128        # 그냥 연속 비트맵으로
+```
+
+1bpp는 MSB 우선, 4/8bpp는 `--lsb`로 PS1 니블 순서를 맞춘다.
+
+## mipsdis.py — PS-X EXE 미니 디스어셈블러
+
+폰트 렌더러·문자열 루틴을 읽기 위한 최소 MIPS R3000 디스어셈블러. PS-X EXE 헤더로
+파일 오프셋 ↔ RAM 주소를 자동 변환하고 `lui`+`addiu/lw/sw` 쌍의 합성 주소를 주석으로 단다.
+
+```
+python3 mipsdis.py SLPS_023.11 0x80019A50 --len 200     # 디스어셈블
+python3 mipsdis.py SLPS_023.11 --find-ref 0x800DFBDC    # 이 주소를 만드는 lui/addiu 위치
+python3 mipsdis.py SLPS_023.11 --calls 0x80019A50       # 이 함수를 jal 하는 위치
+```
+
 ## 창세기전2 PS1 프로토타입 — 확인된 구조
 
 폰용 검사 페이지로 두 디스크를 검사해 확인한 내용.
@@ -162,6 +185,8 @@ python3 sjisdump.py peek G2DATA1.DAT 0x75874C    # 특정 위치를 16진수로
 - TIM 파서: 쓰레기 데이터 사이에 박은 TIM을 정확한 오프셋에서 발견,
   PNG로 변환한 결과가 원본 픽셀·팔레트 색상값과 완전 일치
 - 아카이브 탐지: 두 가지 헤더 변형을 각각 올바르게 판별하고 조각 경계 정확
+- 타일 렌더: 합성 16×16 1bpp 글리프(대각선·테두리)를 정확한 위치에 그리는지 확인
+- 디스어셈블러: `lui/addiu/lw/jal/jr/bne/sltiu/li` 등 9개 알려진 인코딩 일치 확인
 - 언어 판정: 랜덤 바이트를 한국어로 오탐하던 문제를 확률 기반 임계값으로 해결
   (EUC-KR 한글은 바이트 범위가 넓어 랜덤에서도 3.6%가 우연히 일치한다)
 
@@ -173,8 +198,9 @@ identify → ls → extract → triage → archive --unpack → triage → timto
 
 ## 아직 미구현
 
-1. 폰트 타일 ↔ 문자 대응표(테이블) 생성
-2. 포인터 테이블 탐색기
-3. 대사 덤프 / 재삽입 (길이 변화에 따른 포인터 재계산 포함)
-4. 한글 폰트 생성 및 렌더러 훅 (MIPS ASM)
-5. `mkpsxiso` 리빌드 + xdelta 패치 생성
+1. 한글 ↔ JIS 글리프 슬롯 대응표 생성 + 한글 비트맵 → 26바이트 글리프 변환
+2. 텍스트 섹션(count/size/offs/len) 덤프 / 재삽입 및 EXE 인덱스 재계산
+3. 캐릭터·아이템 고정 길이 테이블 덤프 / 재삽입
+4. `mkpsxiso` 리빌드 + xdelta 패치 생성
+
+확인된 세부 구조(인덱스 위치, 텍스트 섹션 형식, 폰트 좌표)는 `CLAUDE.md`에 있다.
