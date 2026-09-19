@@ -185,7 +185,8 @@ python3 hangulfont.py preview fonts/Galmuri11.bdf "확인할 문장" out.png --s
 g2text.py chars   SLPS_023.11 G2DATA1.DAT       # 실제 쓰이는 문자 집계 (슬롯 선정용)
 koremap.py build  SLPS_023.11 G2DATA1.DAT -o koremap.tsv
 hangulfont.py patch Galmuri11.bdf koremap.tsv SLPS_023.11 -o SLPS_023.11.ko
-g2patch.py table  G2DATA1.DAT --preset items -o tr_items.tsv    # 번역 TSV 생성
+g2patch.py table  G2DATA1.DAT --preset items -o tr_items.tsv    # 고정 레코드 → 번역 TSV
+g2patch.py exestr G2DATA1.DAT -o tr_data.tsv                    # NUL 종결 문자열 → 번역 TSV
 g2patch.py apply  G2DATA1.DAT tr_items.tsv koremap.tsv -o G2DATA1.ko.DAT
 hangulfont.py shot SLPS_023.11.ko out.png --file G2DATA1.ko.DAT --offset 0xD008
 ```
@@ -194,9 +195,22 @@ hangulfont.py shot SLPS_023.11.ko out.png --file G2DATA1.ko.DAT --offset 0xD008
 에뮬레이터 없이도 화면에 무엇이 나올지 확인할 수 있다. 원본 바이트를 넣으면 원본
 화면과 같은 그림이 나오는 것으로 경로가 맞는지 검증했다.
 
-문자 집계는 **NUL 종결 + 전체 유효 SJIS + 가나 비율**을 요구한다. 단순히 "2바이트
-문자로 보이는 바이트쌍"을 세면 그래픽 데이터가 대량 오탐된다(이 게임에서 JIS 2수준
-한자가 1,387개 쓰이는 것처럼 보였지만 실제로는 71개).
+문자 집계와 문자열 추출 모두 **오탐을 거르는 것이 핵심**이다. 700MB 짜리 바이너리에서
+"2바이트 문자로 보이는 바이트쌍"을 세면 그래픽·코드 데이터가 대량으로 걸린다
+(JIS 2수준 한자가 1,387개 쓰이는 것처럼 보였지만 실제로는 71개, EXE 문자열은
+2,201개처럼 보였지만 실제로는 243개).
+
+`exestr` 가 쓰는 판정:
+
+1. **NUL 부터 NUL 까지 전체가** 유효한 Shift-JIS/ASCII 여야 한다. 중간부터 보면
+   코드 바이트가 통과한다. 덤으로 `%s %d レベルアップ` 처럼 ASCII 로 시작하는
+   문자열이 앞부분까지 온전히 잡힌다.
+2. 2바이트 문자가 **글자다운 범위**여야 한다(그리스·키릴·괘선 제외). 가나나 한자 최소 하나.
+3. **혼자 떨어져 있는 짧은 것**은 버린다 — 진짜 문자열은 풀에 여럿 붙어 있거나,
+   포인터로 참조되거나, 셋 글자 이상이다.
+
+앞이 NUL 이 아니라 포인터 배열인 문자열(마법명 표 등)은 1번으로 못 찾으므로,
+PS-X EXE 일 때는 EXE 안을 가리키는 u32 도 후보 시작점으로 쓴다.
 
 ## 창세기전2 PS1 프로토타입 — 확인된 구조
 
