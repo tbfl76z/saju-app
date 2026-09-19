@@ -1,0 +1,14 @@
+# 게임 데이터는 절대 커밋하지 않는다
+ex/
+extracted/
+unpacked/
+unp/
+fonts/
+pngs/
+*.BIN
+*.bin
+*.iso
+*.cue
+*.DAT
+*.tsv
+report.txt
