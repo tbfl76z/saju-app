@@ -43,6 +43,10 @@ PRESETS = {
     # 한쪽만 보면 거기서 테이블이 끝난 줄 알고 잘린다(38명 → 실제 120명).
     "chars": (0x0, 0x100, [(0x00, 0x18, "짧은이름"), (0x18, 0x18, "긴이름")], 256,
               lambda d, o: bool(d[o:o + 0x30].strip(b"\x00"))),
+    # 직업 표. 100바이트 레코드, 이름 24바이트. +0x1C 의 분류 바이트로 경계를 잡는다.
+    # NUL 문자열 스캔만으로는 절반밖에 못 잡았다(고립 짧은 문자열 필터에 걸려서).
+    "jobs": (0x8008, 0x64, [(0x00, 0x18, "이름")], 200,
+             lambda d, o: bool(d[o:o + 0x18].strip(b"\x00"))),
     "items": (0xD008, 68, [(0x00, 30, "이름")], 400,
               lambda d, o: d[o + 30] != 0 and d[o + 33] == 0
               and d[o + 30] <= 0x20 and d[o + 31] <= 0x20
@@ -232,6 +236,7 @@ def cmd_exestr(a):
 
 
 _LATIN = re.compile(r"[A-Za-z]{2,}")
+_FMT = re.compile(r"%[-+ #0]*\d*(?:\.\d+)?[diouxXeEfgGcs%]")
 
 
 def _fold(s):
@@ -245,6 +250,10 @@ def suspect(src, ko):
     for ph in ("??", "⁇", "？？", "\ufffd"):
         if ph in ko:
             return f"{ph} 자리표시자"
+    # printf 서식이 빠지면 인자 개수가 어긋나 출력이 깨지거나 죽는다
+    a, b = sorted(_FMT.findall(src)), sorted(_FMT.findall(ko))
+    if a != b:
+        return f"서식 불일치 {a} → {b}"
     folded = _fold(src)
     for tok in _LATIN.findall(ko):
         if tok.casefold() not in folded.casefold():
