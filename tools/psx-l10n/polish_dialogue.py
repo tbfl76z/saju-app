@@ -76,6 +76,14 @@ REQUIRED_TERMS = {
     "元老院": "원로원", "レンジャー": "레인저", "硫黄洞窟": "유황 동굴",
 }
 
+TERM_VARIANTS = {
+    "팬드래건": ("팬드라곤", "팬드래곤", "펜드래건"),
+    "게이시르": ("게이실",), "카슈미르": ("카슈밀",), "크리프": ("크립스", "크리프스"),
+    "실버 애로우": ("실버아로", "실버 아로", "은색 아로", "은빛 화살"),
+    "아스카론": ("아스칼론",), "원로원": ("상원", "원로 회의"),
+    "레인저": ("경관", "레인져"), "유황 동굴": ("황굴", "유황굴"),
+}
+
 
 def split_dialogue(text):
     if not text.startswith("/5") or "/1" not in text:
@@ -196,6 +204,8 @@ def validate(item, body, fwd, koremap):
         "—": "-", "–": "-", "。": ".", "！": "!", "？": "?", "、": ",",
     }.items():
         body = body.replace(old, new)
+    body = re.sub(r"\s*[\r\n]+\s*", " ", body)
+    body = re.sub(r"(^|/n)-\s+", r"\1", body)
     body = re.sub(r"[ \t]+", " ", body)
     if JP_RE.search(body):
         return "Japanese remains"
@@ -204,7 +214,11 @@ def validate(item, body, fwd, koremap):
     if controls(body) != controls(item["body"]):
         return "control mismatch"
     for source, target in REQUIRED_TERMS.items():
-        if source in item["body"] and target not in body:
+        if source not in item["body"]:
+            continue
+        for variant in TERM_VARIANTS.get(target, ()):
+            body = body.replace(variant, target)
+        if target not in body:
             return f"required term missing: {source}={target}"
     size, missing = encoded(body, fwd, koremap)
     if missing:
@@ -238,6 +252,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=6)
     parser.add_argument("--limit", type=int, default=0, help="maximum uncached batches")
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--retry", action="store_true", help="retry rejected lines with a compact prompt")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -327,7 +342,7 @@ def main():
                         retry.append(item)
                     else:
                         cache[item["cache_key"]] = item["accepted"]
-                if retry:
+                if retry and args.retry:
                     compact_output = call_server(args.url, args.model, make_messages(retry, compact=True), args.timeout)
                     compact_by_id = {value.get("id"): value.get("body") for value in compact_output if isinstance(value, dict)}
                     for i, item in enumerate(retry):

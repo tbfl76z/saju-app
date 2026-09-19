@@ -83,11 +83,17 @@ def validate(item, text, fwd, koremap):
         return "foreign text or markup"
     if dialogue.controls(text) != dialogue.controls(item["text"]):
         return "control mismatch"
+    for source, target in dialogue.REQUIRED_TERMS.items():
+        if source in item["text"] and target not in text:
+            return f"required term missing: {source}={target}"
     size, missing = dialogue.encoded(text, fwd, koremap)
     if missing:
         return "unmapped"
     if size > int(item["row"]["max"]):
         return f"{size}>{item['row']['max']}"
+    source_size, _ = dialogue.encoded(item["text"], fwd, koremap)
+    if source_size >= 36 and size < source_size * 0.4:
+        return f"translation too short: {size}/{source_size}"
     item["accepted"] = text
     return None
 
