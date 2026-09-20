@@ -166,6 +166,8 @@ EXE 인덱스(뒤 엔트리 전부)를 밀어야 한다. 블록 안에서 이 �
 | `g2text.py sections/dump/chars` | 텍스트 섹션 탐색·덤프, 실제 쓰이는 문자 집계 |
 | `koremap.py build/encode/decode/check` | 한글 ↔ 게임 코드 대응표, 인코딩·검증 |
 | `g2patch.py table/exestr/apply` | 고정 레코드·NUL 문자열 번역 TSV 생성과 제자리 적용 |
+| `binject.py verify/inject` | MODE2/2352 이미지에 같은 크기 파일 제자리 삽입 (EDC/ECC 재계산) |
+| `gdbclient.py` + `relay.py` | DuckStation GDB 서버 접속 — 레지스터·메모리·브레이크포인트 |
 
 사용법은 `README.md`. 새 도구를 만들 때도 같은 원칙: 단일 파일, 표준 라이브러리만,
 한국어 도움말, 합성 데이터로 검증 후 커밋.
@@ -341,7 +343,38 @@ python3 binject.py inject "원본.BIN" 출력.bin \
 즉 스테이지 데이터는 **G2DATA1 을 절대 LBA 로 직접 읽는다**(EXE 인덱스 경유가 아님).
 `0x800ACCE4` 는 바이트 단위 복사 루프 = memcpy 로, 이 단계에 압축은 없다.
 
-**다음 한 수**: DuckStation 디버거에서 `0x801E28AA` 에 **쓰기 브레이크포인트**.
+#### GDB 서버로 붙는 법 (도구 확보)
+
+DuckStation `settings.ini` `[Debug] EnableGDBServer = true` (포트 2345). WSL 에서는
+Windows 루프백에 직접 못 붙으므로 중계가 필요하다:
+
+```
+# Windows 쪽에서 (파이썬은 이미 설치돼 있다)
+python.exe relay.py                       # 0.0.0.0:2346 → 127.0.0.1:2345
+# WSL 쪽에서
+python3 gdbclient.py --host $(ip route | awk '/default/{print $3}') --port 2346 info
+```
+
+`gdbclient.py` 로 레지스터·메모리 읽기, 메모리 덤프, 브레이크포인트 설정이 된다.
+RAM 2MB 덤프에 약 47초. 확인된 것: `Z0`(실행)·`Z2`(쓰기)·`Z4`(접근) 전부 `OK` 응답.
+
+**한계**: `c`(계속) 를 보내면 DuckStation 이 GDB 연결을 끊는다. 연결을 끊어 재개시키면
+워치포인트도 살아남지 않는다. **실시간 중단점 추적은 GUI 디버거(Debug → CPU Debugger)로
+해야 한다.** 메모리/레지스터 조사는 GDB 로 충분하다.
+
+#### 텍스트 이미지 — 값 0 마스크로 판명 (2026-09-20)
+
+화면에 그 텍스트가 떠 있는 상태에서 RAM 2MB 를 떠서 확인:
+
+- `カーティスの都市`·`ゴブリン森`·`クリップス村`·`貿易路`·`旅行者` 전부 **RAM 에 SJIS 로 0회**.
+  → 문자열을 폰트로 찍는 방식이 **아니다**.
+- 비트맵은 RAM `0x801E28AA`(행 `0x68`=104바이트=4bpp 208픽셀)에 있고 **주소가 매번 같다**
+  (결정적 할당).
+- 4bpp 값 분포: 0 이 53%, 1 이 21%, 2~F 가 각 2% 안팎. 값별로 마스크를 떠 보면
+  **글자 픽셀은 값 0**이고 배경은 1~F 다. 즉 **배경 그림 위에 글자를 값 0 으로 뚫은 것**.
+
+따라서 어딘가에 글리프 원본이 있다. 다음 한 수는 GUI 디버거에서 `0x801E28AA` 에
+**쓰기 브레이크포인트**.
 거기서 멈춘 코드가 글리프 원본과 글자 저장 형식을 한 번에 알려준다.
 (`settings.ini` 의 `SaveStateCompression = Uncompressed` 는 켜둔 상태다.)
 
