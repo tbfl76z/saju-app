@@ -12,3 +12,4 @@ pngs/
 *.DAT
 *.tsv
 report.txt
+dbg/
